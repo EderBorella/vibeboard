@@ -29,6 +29,12 @@ export const STOP_REASONS = [
   // otherwise report the project's only success. The loop study the design cites names this apart from
   // success for the same reason.
   'no-op',
+  // THE FEATURE LIST IS DERIVED AND WAITING FOR A PERSON — decision 74. Its own reason rather than a
+  // `stalled` with different wording, on exactly the argument `infrastructure` below makes: `stalled` says
+  // work remains and nothing the loop can do would move it, which is a statement about the BOARD. Here the
+  // board is fine and the loop is waiting on a human, and a stop that blames the cards for that is the
+  // accusation this vocabulary exists to stop making.
+  'review',
   'interrupted', // the server died under it; a checkup is owed before it resumes
   // THE MACHINE FAILED, NOT THE WORK, and no card is to blame. Its own reason rather than a `stalled`
   // with a different sentence, because `stalled` means "work remains and nothing it can do would move
@@ -73,6 +79,11 @@ const SENTENCES: Record<StopReason, string> = {
   stalled: 'Auto-pilot stopped because work remains and nothing it can do would move it.',
   complete: 'Auto-pilot finished: nothing is eligible and nothing is unfinished.',
   'no-op': 'Auto-pilot had nothing to work on, which is not the same as being finished.',
+  // NEVER SEEN ON ITS OWN. `review` always carries a detail naming how many features were derived, and
+  // `REPLACES_ITS_SENTENCE` hands that detail the whole line — so this is the fallback for a stop recorded
+  // without one, and it has to stand up alone rather than read as half a sentence.
+  review:
+    'Auto-pilot derived this project’s feature list and stopped so you can check it before anything is built on top of it.',
   // NOT "by a restart". This reason covers three endings — a server that died under a running loop, a loop
   // killed from outside, and a loop that crashed — and the detail beside it says which. Naming one of them in
   // the canned sentence told a user whose loop had been SIGKILLed that they had restarted something.
@@ -103,7 +114,11 @@ const SENTENCES: Record<StopReason, string> = {
 //
 // Both details already open with the ending in their own words, so they stand alone. Read live on a focused
 // run: the loop reported success and contradicted itself in the same breath.
-const REPLACES_ITS_SENTENCE: readonly StopReason[] = ['complete'];
+// `review` joins it for a different reason than `complete`'s, and the difference is worth keeping: `complete`
+// is here because its canned sentence makes a claim the detail contradicts, while `review` is here because the
+// detail is the only version that can COUNT — "derived 6 features" rather than "derived this project's feature
+// list". Appending one to the other would say the same thing twice, vaguely and then precisely.
+const REPLACES_ITS_SENTENCE: readonly StopReason[] = ['complete', 'review'];
 
 // The sentence a person reads, with the specifics appended. A reason on its own is a code; a code is
 // something the reader has to look up, and a stalled board that cannot name its card is a dead end.

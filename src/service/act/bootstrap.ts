@@ -1,6 +1,7 @@
 import { byQueueOrder } from '../../core/board/ordering.js';
 import { countLive, createdNothing } from '../../core/created.js';
 import { HARNESS_FEATURE } from '../../core/harness-feature.js';
+import { featuresDerivedSentence } from '../../core/lifecycle/stop-sentences.js';
 import type { RunRecord } from '../../core/runs.js';
 import { hasSetupFeature } from '../../core/setup-feature.js';
 import type { Card } from '../../core/types.js';
@@ -43,16 +44,45 @@ export async function afterProjectRun(
   const created = board.ok ? countLive(board.value.boards) : undefined;
   // Only where the board actually grew. A bootstrap that produced nothing has no scaffolding feature to name,
   // and a board that could not be read is not evidence that it did.
+  // THE GATE — decision 74, and the register carries what this placement costs as well as what it buys: a
+  // loop killed between these board writes and `finish` reporting the stop leaves a list nobody confirmed
+  // and no record saying so. Accepted rather than overlooked, with the two ways out written down there.
+  //
+  // Set inside this branch and nowhere else, so the three conditions that decide
+  // whether the exits are written are the same three that decide whether there is anything to review. A
+  // derivation that produced nothing has no feature list to check, and the attempt cap in `decideTick` is
+  // what decides when to give up on it — a stop here would be a second cap disagreeing with the first.
+  let derived: number | undefined;
+  let harness = false;
   if (board.ok && before !== undefined && created !== undefined && !createdNothing(before, created)) {
-    await stampSetup(deps, board.value.boards.features ?? []);
-    await createHarnessFeature(deps);
+    const features = board.value.boards.features ?? [];
+    // Counted BEFORE the harness feature is created, because it is not one of them: the derived features came
+    // out of the README and are what this stop asks a person to check, while the harness card is canned
+    // (ruling 66) and came from us. A count folding it in sends somebody looking in their README for a
+    // feature that was never in it.
+    derived = features.length;
+    await stampSetup(deps, features);
+    harness = await createHarnessFeature(deps);
   }
   await deps.client.log('run', bootstrapLine(action.skill, settled, created, context), {
     iteration: context.iteration + 1,
     skill: action.skill,
     outcome: settled.status,
   });
-  return { dispatches: 1 };
+  // AFTER THE EXITS, NEVER INSTEAD OF THEM, and the ordering is the whole of what makes this safe to add
+  // here. The scaffolding flag and the harness feature are what the rest of the lifecycle reads to know what
+  // it is looking at; a gate that returned before them would hand a person a list to confirm and lose both,
+  // and this loop does not run again to finish the job — the next one starts from whatever the board says.
+  // ZERO IS NOT `undefined`, AND BOTH MEAN "NOTHING TO CONFIRM". The guard above is `createdNothing`, which
+  // is defined over `countLive` — EVERY board — so a derivation that produced product or engineering cards
+  // and no feature card grows the board, passes it, and would have stopped to ask a person to check a list
+  // of nothing. It printed "derived 0 features". Caught in review; the shim in the trace suite creates
+  // exactly that shape, so it was reachable rather than theoretical.
+  if (derived === undefined || derived === 0) return { dispatches: 1 };
+  return {
+    dispatches: 1,
+    stop: { reason: 'review', detail: featuresDerivedSentence(derived, harness) },
+  };
 }
 
 // `setup: true` ON THE FIRST FEATURE IN `features/backlog`, by the `order` THE ENDPOINT ASSIGNED — read off the
@@ -105,7 +135,10 @@ async function stampSetup(deps: ActDeps, features: Card[]): Promise<void> {
 // AND A CREATE THAT WAS REFUSED IS ALSO NOT FATAL, which covers the one case worth naming: a second bootstrap on
 // a board that already holds the card is refused by the endpoint's duplicate-title rule, and being told "that
 // card already exists" is the answer this wanted.
-async function createHarnessFeature(deps: ActDeps): Promise<void> {
+// ANSWERS WHETHER IT LANDED, which nothing needed until the review sentence had to describe the board it is
+// asking a person to look at. A refused create is not fatal — see below — but a stop claiming a card that was
+// never written sends the reader looking for it.
+async function createHarnessFeature(deps: ActDeps): Promise<boolean> {
   const made = await deps.client.create({
     board: 'features',
     // The column the endpoint stamps anyway, sent because the request takes one. A card a run creates enters its
@@ -116,10 +149,11 @@ async function createHarnessFeature(deps: ActDeps): Promise<void> {
   });
   if (!made.ok) {
     deps.log?.(`could not create the smoke-harness feature: ${made.reason}`);
-    return;
+    return false;
   }
   await deps.client.log('lifecycle', harnessFeatureLine(made.value.id), {
     card: made.value.id,
     board: 'features',
   });
+  return true;
 }

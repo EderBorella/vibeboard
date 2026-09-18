@@ -84,6 +84,13 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
         <li>
           <strong>no-op</strong> — there was no live card to work on in the first place.
         </li>
+        {/* FIRST IN THE LIST BY EXPERIENCE, even though it is not first alphabetically or by severity: on a
+            new project this is the stop a person meets before any of the others, because it is the one the
+            very first session ends in. */}
+        <li>
+          <strong>review</strong> — it derived this project's feature list from the README and stopped so you
+          can check it. Confirm on the bar to carry on; that is also where you can point it at one feature.
+        </li>
         <li>
           <strong>stopped</strong> / <strong>killed</strong> — you did. Stop is reversible and lets runs in
           flight finish; the emergency stop, beside it on this bar, kills every agent in the project and halts

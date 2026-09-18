@@ -24,6 +24,10 @@ export const STOP_REASONS = [
   // Nothing to do in the first place — no live card on any board. Apart from `complete` because the
   // absence of unfinished work is not the presence of finished work.
   'no-op',
+  // The feature list is derived and waiting for a person (decision 74). Apart from `stalled` for the same
+  // reason `infrastructure` is: the board is fine, the loop is waiting on a human, and a stop that blames
+  // the cards for that is the accusation this vocabulary exists to stop making.
+  'review',
   'interrupted',
   // The machine failed, not the work — a dead box or a dead credential, and no card is to blame. Apart
   // from `stalled` because that one is a statement about the board, which is the accusation this exists

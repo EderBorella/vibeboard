@@ -302,8 +302,16 @@ reach them by accident.
 
 - **Readiness** (`GET /api/autopilot/readiness`) with a project that is not ready: every blocker carries
   a **sentence**, never a bare boolean. Read them — they are the whole design.
+- **The review gate**, which is now the FIRST thing a greenfield project does and the first stop most
+  people will ever see. Start a project whose boards are empty and whose README and foundation documents are
+  real: auto-pilot derives the feature list, stamps the scaffolding flag and the smoke-harness feature, and
+  then **stops with reason `review`** without working anything. Beneath the bar you get the derived count,
+  a focus picker in express, and **Confirm and start**. Choosing a feature there writes `autopilot.focus`,
+  and Confirm resumes. It must fire **once**: check the diary for exactly one `outcome review` after the
+  loop has run on for a while. (`decision 74`.)
 - **Start** (`POST /autopilot/start`), watch it dispatch, then **soft stop** (`/stop`). The state on disk
-  survives a reload; that is the point of it being a file.
+  survives a reload; that is the point of it being a file. On a project that has never bootstrapped, the
+  first Start ends at the review gate above rather than running on.
 - **A soft stop on a project that never ran is a no-op** — 200, and the state is untouched.
 - **Emergency stop** (`/kill`). The overlay appears and a reload does not get you out of it. A soft stop
   while halted is refused, naming Restart.

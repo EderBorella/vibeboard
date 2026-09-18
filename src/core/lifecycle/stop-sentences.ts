@@ -191,3 +191,31 @@ export function smokeIsAGate(commands: DeclaredCommands): string | undefined {
   if (smoke === undefined || !commands.gates.includes(smoke)) return undefined;
   return `Every card on this project is done, but the smoke command is the same command as one of its gates (\`${smoke}\`), so nothing has ever run this project the way its README describes — the gates were written beside the code they judge, and they pass over a product with no way to run it. Declare a smoke command in foundation/TESTING.md that exercises the product from outside, and auto-pilot will finish.`;
 }
+
+// THE FEATURE LIST IS DERIVED AND WANTS A PERSON — decision 74, the detail beside the `review` stop.
+//
+// IT COUNTS, which is why `review` is in `REPLACES_ITS_SENTENCE`: "derived 6 features" is a fact a reader can
+// check against the board in one glance, and the canned sentence it replaces can only say "a feature list".
+//
+// THE HARNESS FEATURE IS NAMED APART FROM THE DERIVED ONES, and the distinction is not pedantry. The derived
+// features came out of the README and are exactly what this stop asks a person to check; the smoke-harness
+// feature is canned (ruling 66) and came from us. Folding it into the count would invite somebody to go
+// looking in their README for a feature that was never in it.
+//
+// IT ENDS ON THE ACTION, like the credential refusals: this sentence reaches a balloon that truncates, and the
+// last clause is the one a truncated balloon keeps.
+//
+// "ON THE AUTO-PILOT BAR" IS LOAD-BEARING IN THAT CLAUSE, and it is there because this detail renders on TWO
+// surfaces. Beneath the bar it sits directly above a button that says Confirm; in the top bar's balloon there
+// is no control at all. Naming the button without saying where it is satisfied one surface and stranded the
+// other — which is the rule this comment used to state and, as first written, broke.
+export function featuresDerivedSentence(derived: number, harness: boolean): string {
+  const list =
+    derived === 1
+      ? 'one feature from this project’s README'
+      : `${derived} features from this project’s README`;
+  const extra = harness
+    ? `, and added the smoke-harness feature beside ${derived === 1 ? 'it' : 'them'}`
+    : '';
+  return `Auto-pilot derived ${list}${extra}, then stopped so you can read them before anything is built on top of them. A wrong feature list is the error that compounds hardest, and this is the one moment it is cheap to correct. Check them, choose a feature to focus on if you want one, and confirm on the auto-pilot bar.`;
+}

@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   auditDock,
   auditFocus,
@@ -1458,5 +1460,80 @@ test('15. express mode renders its focus picker without breaking the row', async
     console.log(`[${theme}] express bar: ${seen.options} options, ${seen.lines} line(s), no shell overflow`);
   } finally {
     await setMode(String(ap.mode ?? 'standard'));
+  }
+});
+
+// THE REVIEW GATE'S OWN SURFACE — decision 74, and it is here because its absence has now cost three
+// things. The focus picker read "The whole board" over a focused project; a stray `aria-hidden` spacer sat
+// beside Confirm on this very surface; and the gate's screen was verified by hand, twice, because nothing
+// with a layout engine had ever drawn it. Each was found by opening the page.
+//
+// IT WRITES THE STOP ON DISK rather than asking for one. `POST /autopilot/stopped` is service-scoped, so the
+// browser's admin credential cannot reach it — and a gate this surface only renders after a real derivation
+// is a gate nothing can check. The state file is the same seam the harness already uses to furnish runs.
+test('16. the review gate renders its own surface', async ({ board, theme }) => {
+  const project = process.env.VB_VISUAL_PROJECT;
+  expect(project, 'VB_VISUAL_PROJECT is not set, so this check cannot reach the state file').toBeTruthy();
+  if (!project) return;
+  const stateFile = join(project, '.vibeboard', 'autopilot-state.json');
+  const before = existsSync(stateFile) ? readFileSync(stateFile, 'utf8') : null;
+
+  try {
+    writeFileSync(
+      stateFile,
+      JSON.stringify(
+        {
+          state: 'stopped',
+          iteration: 1,
+          reason: 'review',
+          // The real sentence, not a stand-in: it is the longest thing this surface renders and the one
+          // most likely to overflow the row it wraps in.
+          detail:
+            'Auto-pilot derived 4 features from this project’s README, and added the smoke-harness feature beside them, then stopped so you can read them before anything is built on top of them. A wrong feature list is the error that compounds hardest, and this is the one moment it is cheap to correct. Check them, choose a feature to focus on if you want one, and confirm on the auto-pilot bar.',
+          at: '2026-01-01T09:00:00.000Z',
+        },
+        null,
+        2,
+      ),
+    );
+    await board.reload();
+    await board.locator('[data-testid="ap-review"]').waitFor({ state: 'visible' });
+
+    const seen = await board.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>('[data-testid="ap-review"]');
+      const confirm = document.querySelector<HTMLButtonElement>('[data-testid="ap-review-confirm"]');
+      const shell = document.querySelector('div.app-shell');
+      if (!panel || !confirm) return null;
+      const box = panel.getBoundingClientRect();
+      return {
+        text: (panel.textContent ?? '').replace(/\s+/g, ' '),
+        confirmDisabled: confirm.disabled,
+        confirmWidth: confirm.getBoundingClientRect().width,
+        // An `aria-hidden` placeholder belongs to the bar's pinned row, never to a surface that wraps —
+        // one sat here and was found by eye.
+        spacers: panel.querySelectorAll('[data-testid="ap-focus-spacer"]').length,
+        withinShell: box.right <= (shell?.getBoundingClientRect().right ?? 0) + 1,
+        shellOverflows: (shell?.scrollWidth ?? 0) > (shell?.clientWidth ?? 0),
+      };
+    });
+
+    expect(seen, 'the review surface rendered nothing measurable').not.toBeNull();
+    if (!seen) return;
+    expect(seen.confirmDisabled, 'Confirm is disabled on a stop that is waiting for it').toBe(false);
+    expect(seen.confirmWidth, 'Confirm rendered with no width').toBeGreaterThan(40);
+    expect(seen.spacers, 'a hidden spacer is padding a surface that wraps').toBe(0);
+    // ONE COUNT PER SCREEN: the stop sentence above counts what was derived and names the harness card
+    // apart from it, so a second number here is two answers about one list.
+    expect(seen.text, 'the surface states a count of its own').not.toMatch(/\d+\s+features/);
+    // And it must not invite the one edit that strands a project — `setup: true` is awarded once.
+    expect(seen.text.toLowerCase(), 'the copy invites deleting cards').not.toContain('delete');
+    expect(seen.withinShell, 'the review surface overflows the shell').toBe(true);
+    expect(seen.shellOverflows, 'the app shell scrolls sideways under the review gate').toBe(false);
+    console.log(
+      `[${theme}] review gate: confirm ${Math.round(seen.confirmWidth)}px, ${seen.spacers} spacer(s)`,
+    );
+  } finally {
+    if (before === null) rmSync(stateFile, { force: true });
+    else writeFileSync(stateFile, before);
   }
 });

@@ -150,9 +150,14 @@ async function start(
 // `ticks` bounds the run for the tests that are about a prefix of the lifecycle rather than all of it. The
 // state file is the loop's own stop control, so a budget expressed through it stops the loop the way a person
 // pressing Stop does rather than by reaching inside it.
-async function drive(
+// ONE SESSION OF THE LOOP. Every trace below spans TWO of them now — see `drive`.
+async function driveOnce(
   started: Started,
   opts: { ticks?: number; unreviewedGates?: string[] } = {},
+  // SHARED ACROSS BOTH SESSIONS when there is one, and that is not a detail: `ticks` is how a test says "stop
+  // part-way and look". A budget that reset at the review gate would give every such test twice the run it
+  // asked for, and several of them then walked past the state they were written to inspect.
+  budget = { left: opts.ticks ?? 60 },
 ): Promise<LoopEnded> {
   const { project } = started;
   await writeAutopilotState(project.root, {
@@ -178,14 +183,12 @@ async function drive(
     settlePollMs: 10,
     settleTimeoutMs: 60_000,
   };
-  let ticks = 0;
-  const budget = opts.ticks ?? 60;
   return await runLoop({
     client,
     readState: async () => {
       const state = await readAutopilotState(project.root, new Date().toISOString());
-      ticks += 1;
-      return ticks > budget ? { ...state, state: 'stopped' } : state;
+      budget.left -= 1;
+      return budget.left < 0 ? { ...state, state: 'stopped' } : state;
     },
     addToCounters: async (dispatches) => {
       await updateAutopilotState(project.root, new Date().toISOString(), (current) => ({
@@ -200,6 +203,39 @@ async function drive(
     // Nothing sleeps: the idle wait is five seconds in production and there is nothing to wait for here.
     wait: async () => {},
   });
+}
+
+// EVERY TRACE HERE STARTS FROM AN EMPTY BOARD, so every one of them now meets the review gate (decision 74):
+// the loop derives the feature list and stops, and a person confirms before anything is built on it. That is
+// one human step, not a phase, so driving through it belongs here rather than repeated at fifteen call sites
+// where it would be noise around the thing each test is actually about.
+//
+// A BRANCH AND NOT AN ASSERTION, and the reason is worth writing down because the first version got this
+// wrong in both directions.
+//
+// It began as a bare branch with a comment claiming that a deleted gate would fail every trace in this file.
+// Planted, it was **2 of 24** — only the two that happen to name `'stopped review'` in their expected array.
+// The claim had been written without planting it, which is the one thing this repository's first rule is
+// about. Replacing the branch with `expect(first.reason).toBe('review')` then caught the plant at 24 of 24
+// and **broke 12 real tests**: several traces stop legitimately before they ever reach the gate — a small
+// `ticks` budget, or an unreviewed gate document that stalls the first session — so the helper cannot
+// honestly assert it for every caller.
+//
+// So the gate is pinned where it can be pinned exactly: `stops for review before it works the first
+// feature`, below, which drives ONE session and asserts both halves. This helper just carries the other
+// traces past a stop that is not their subject.
+//
+// The second session is the person pressing Confirm. It re-reads the board from disk exactly as a resumed
+// loop does, which is also why the traces below are unchanged by any of this: the phases are the same
+// phases, in the same order, either side of a stop.
+async function drive(
+  started: Started,
+  opts: { ticks?: number; unreviewedGates?: string[] } = {},
+): Promise<LoopEnded> {
+  const budget = { left: opts.ticks ?? 60 };
+  const first = await driveOnce(started, opts, budget);
+  if (first.reason !== 'review') return first;
+  return await driveOnce(started, opts, budget);
 }
 
 async function diary(project: TestProject): Promise<DiaryEntry[]> {
@@ -374,6 +410,33 @@ async function assertHierarchy(project: TestProject): Promise<void> {
 // and a test that genuinely hangs still fails — one minute later.
 for (const mode of MODES) {
   describe(`the lifecycle, driven end to end — ${mode}`, { timeout: 60_000 }, () => {
+    // THE GATE ITSELF — decision 74 — and the one place in this file that pins it, because `drive` above
+    // cannot: several traces here stop legitimately before they reach it.
+    //
+    // ONE SESSION, and both halves asserted. The reason alone would pass over a gate that fired in the
+    // wrong place; what makes it the gate is that NOTHING HAS MOVED YET — the derivation's own exits are
+    // written and not one feature has left the column it was derived into. Planted by deleting the stop in
+    // `afterProjectRun`: this fails on the reason, and on the board having walked on without anyone.
+    it('stops for review before it works the first feature', async () => {
+      const started = await start({
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      const ended = await driveOnce(started);
+      expect(ended.reason).toBe('review');
+      // It counts, and it names the harness card apart from the derived ones.
+      expect(ended.detail).toContain('one feature');
+      expect(ended.detail).toContain('smoke-harness');
+
+      // The exits ARE written — the gate sits after them, never instead of them.
+      const live = (await board(started.project)).filter(isLive);
+      const features = live.filter((c) => c.board === 'features');
+      expect(features.filter((c) => c.setup === true)).toHaveLength(1);
+      expect(features).toHaveLength(2);
+      // And nothing has been built on the list yet: every feature is still where the derivation put it.
+      expect(features.every((c) => c.columnSlug === 'backlog')).toBe(true);
+      expect(live.filter((c) => c.board === 'engineering')).toHaveLength(0);
+    });
+
     it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
       const started = await start({
         // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
@@ -396,6 +459,11 @@ for (const mode of MODES) {
         // line about the run. One derived feature, so the harness is F-002 and it sorts last.
         'harness F-002',
         'ran project derive-features',
+        // DECISION 74 — THE REVIEW GATE, and its position in this trace is the whole of what it buys. The
+        // derivation's two exits are already written above it, and the first card does not move until after
+        // it: a person has read the feature list before anything is built on top of it. The second session
+        // below this line is that person having confirmed.
+        'stopped review',
         'move features/F-001 todo',
         'move features/F-001 in-progress',
         'ran F-001 break-down',

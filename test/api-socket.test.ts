@@ -1,8 +1,8 @@
 import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
-import { createServer } from 'node:net';
+import { createServer, connect as netConnect } from 'node:net';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
@@ -34,6 +34,22 @@ async function serveOnSocket(inDir?: string): Promise<string> {
     await app.close();
   });
   return socket.path;
+}
+
+// Is anything actually listening there? `existsSync` cannot tell a live socket from a stale file, which
+// is the same distinction `inUse` exists for in the module under test.
+function connectable(path: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = netConnect(path);
+    probe.once('connect', () => {
+      probe.destroy();
+      resolve(true);
+    });
+    probe.once('error', () => {
+      probe.destroy();
+      resolve(false);
+    });
+  });
 }
 
 // A raw request over the unix socket — the same thing the in-box relay does on the agent's behalf.
@@ -104,6 +120,47 @@ describe('the API socket', () => {
     await expect(listenOnApiSocket(app)).rejects.toThrow(/already serving/);
     await app.close();
     await new Promise<void>((resolve) => squatter.close(() => resolve()));
+  });
+
+  // THE SECOND INSTANCE MUST NOT REMOVE THE FIRST ONE'S SOCKET, and this is the whole of the fault: the
+  // shutdown path unlinked `apiSocketPath()` unconditionally, including in a process that had been REFUSED
+  // the bind seconds earlier. Recorded 2026-08-31 while serving two builds side by side.
+  //
+  // The second reported fault is the same cause wearing a later timestamp. Once the file is gone the live
+  // server still holds its bound-but-unlinked socket, so the next start sees no file, probes nothing, and
+  // binds a fresh one at that path — and every agent box, which mounts the DIRECTORY, then reaches whichever
+  // server bound last, while the first serves pages perfectly and nothing of its own can reach it.
+  //
+  // A FRESH MODULE INSTANCE IS THE SECOND PROCESS. Ownership is per-process state, so two servers built in
+  // ONE process share it and the second inherits the first's claim — which is not the production shape and
+  // made the first version of this test fail against a correct fix. `vi.resetModules()` gives the second
+  // instance the empty module state a second process actually starts with.
+  it('does not remove a socket this process never bound', async () => {
+    const dir = await tempDir();
+    process.env.VIBEBOARD_API_SOCKET_DIR = dir;
+    const path = join(dir, 'api.sock');
+
+    // The first VibeBoard, in its own process — here, anything holding that address.
+    const first = createServer();
+    await new Promise<void>((resolve) => first.listen(path, resolve));
+
+    vi.resetModules();
+    const second = await import('../src/server/boxes/api-socket.js');
+    const app = buildApp(new ProjectSession(), {
+      credentials: new CredentialStore('test-admin'),
+      logger: false,
+    });
+    await app.ready();
+    await expect(second.listenOnApiSocket(app)).rejects.toThrow(/already serving/);
+    // ...and it shuts down, running the same cleanup every signal handler runs.
+    second.removeApiSocketFile();
+    await app.close();
+
+    expect(existsSync(path)).toBe(true);
+    // Still answering, not merely still present: `existsSync` alone would pass over a fresh file bound by
+    // somebody else, which is the failure this is really about.
+    expect(await connectable(path)).toBe(true);
+    await new Promise<void>((resolve) => first.close(() => resolve()));
   });
 
   it('removes the socket file on close, and removeApiSocketFile is safe when there is none', async () => {

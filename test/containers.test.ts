@@ -812,7 +812,11 @@ describe('a project’s own packages', () => {
 
     await expect(
       mgr.ensure({ projectRoot: PROJECT, backend: 'claude-code', paths: PATHS, packages: ['jq'] }),
-    ).rejects.toThrow(/could not install the project's own packages/);
+      // apt's line AND the key that produced it: the failure is almost always a name that does not
+      // exist in this distribution, and the list it came from is the thing to edit.
+    ).rejects.toThrow(
+      "could not install the project's own packages: E: Unable to locate package jq — fix box.packages in .vibeboard/config.yaml",
+    );
 
     expect(calls.some((a) => a[0] === 'rm' && a.includes('-f'))).toBe(true);
   });

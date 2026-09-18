@@ -516,6 +516,11 @@ export function installArgs(name: string, packages: string[]): string[] {
   return ['exec', '-u', '0:0', name, INSTALL_HELPER, ...packages];
 }
 
+// WHERE TO GO AND FIX IT. One string, beside the validator it is about, because three refusals over this
+// one list end the same way — two parse failures in `box-service.ts` and apt's own, which arrives from a
+// different layer entirely — and a person who has seen the clause once should recognise it on the third.
+export const FIX_PACKAGES = ' — fix box.packages in .vibeboard/config.yaml';
+
 // Belt as well as braces. Debian package names are lowercase alphanumerics with `+`, `-` and `.`;
 // anything else is refused before it reaches docker rather than being escaped.
 export function isPackageName(name: string): boolean {

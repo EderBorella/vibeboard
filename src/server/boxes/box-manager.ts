@@ -14,6 +14,7 @@ import {
   type DockerRun,
   dockerBin,
   execArgs,
+  FIX_PACKAGES,
   globalIPv6,
   inspectState,
   installArgs,
@@ -274,7 +275,11 @@ export class BoxManager {
     const res = await this.install(name, packages);
     if (res.code === 0) return;
     await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
-    throw new Error(`could not install the project's own packages: ${firstLine(res.stderr || res.stdout)}`);
+    // apt's own line, then where the name came from. The failure is almost always a package that does
+    // not exist in this distribution, and the list it was read out of is the thing to edit.
+    throw new Error(
+      `could not install the project's own packages: ${firstLine(res.stderr || res.stdout)}${FIX_PACKAGES}`,
+    );
   }
 
   // The privileged half, and the only place in VibeBoard that runs anything in a box as root.

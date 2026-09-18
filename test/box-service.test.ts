@@ -318,10 +318,31 @@ describe('the kind decides the image, resolved in one place', () => {
     );
   });
 
-  it('refuses a package list it could never install', async () => {
+  // THE REFUSAL NAMES THE FILE AND THE KEY, because the author of this list is a person with a text
+  // editor — `box.packages` is written by hand or by an admin PATCH, never by an agent. A message that
+  // only says what is wrong leaves them looking for where, and the config is the only place to look.
+  it('refuses a package list it could never install, and says which key to fix', async () => {
     await expect(
       service([], { packages: ['jq;rm -rf /'] }).ensure(await project(), 'claude-code'),
-    ).rejects.toThrow(/not a package name/);
+    ).rejects.toThrow(
+      "not a package name in the project's own list: jq;rm -rf / — fix box.packages in .vibeboard/config.yaml",
+    );
+  });
+
+  // DISTINCT FROM THE MANAGER'S, deliberately: that one answers an AGENT asking for an install through
+  // the API, where there is no config file to fix and saying so would send it to a file it cannot read.
+  it('does not hand the agent’s wording to the person editing the config', async () => {
+    const res = await new BoxManager({ docker: recording([]), user: '1000:1000' }).install('box', [
+      'jq;rm -rf /',
+    ]);
+    expect(res.stderr).toBe('not a package name: jq;rm -rf /');
+    expect(res.stderr).not.toContain('config.yaml');
+  });
+
+  it('refuses a packages value that is not a list at all', async () => {
+    await expect(service([], { packages: 'jq' }).ensure(await project(), 'claude-code')).rejects.toThrow(
+      "the project's box.packages must be a list of names — fix box.packages in .vibeboard/config.yaml",
+    );
   });
 
   // AND THE READER ITSELF, on a config file written by the real writer. Every test above injects

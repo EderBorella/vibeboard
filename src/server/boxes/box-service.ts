@@ -9,6 +9,7 @@ import {
   AGENT_WRITABLE_PATHS,
   boxEnvFor,
   DEFAULT_IMAGE,
+  FIX_PACKAGES,
   imageForKind,
   isPackageName,
   SOCKET_DIR,
@@ -157,11 +158,24 @@ function kindOf(kind: unknown): BoxKind | undefined {
   );
 }
 
+// NO COUNT CAP HERE, unlike `POST /api/toolchain/install`: that cap exists because an AGENT can paste a
+// dependency list into it, and this list has only ever one author — an admin through PATCH /api/config
+// or a person with a text editor, `.vibeboard` being read-only inside every box.
+//
+// Both refusals name the file and the key, because that author is looking for WHERE as much as what.
 function packagesOf(packages: unknown): string[] {
   if (packages === undefined) return [];
-  if (!Array.isArray(packages)) throw new Error('the project box packages must be a list of names');
+  if (!Array.isArray(packages))
+    throw new Error(`the project's box.packages must be a list of names${FIX_PACKAGES}`);
   const bad = packages.filter((p) => typeof p !== 'string' || !isPackageName(p));
-  if (bad.length > 0) throw new Error(`not a package name: ${bad.map(String).join(', ')}`);
+  // DELIBERATELY NOT the manager's wording for the same fault. That one answers an agent asking for an
+  // install over the API, where there is no config file to fix and naming one sends it somewhere it
+  // cannot read; this one answers the person whose file it is.
+  if (bad.length > 0) {
+    throw new Error(
+      `not a package name in the project's own list: ${bad.map(String).join(', ')}${FIX_PACKAGES}`,
+    );
+  }
   return packages as string[];
 }
 

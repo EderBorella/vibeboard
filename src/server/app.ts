@@ -17,6 +17,7 @@ import { registerCardRoutes } from './boards/cards-routes.js';
 import { registerConfigRoutes } from './boards/config-routes.js';
 import { registerProjectRoutes } from './boards/project-routes.js';
 import type { ProjectSession } from './boards/session.js';
+import { registerWizardRoutes } from './boards/wizard-routes.js';
 import { registerBoxRoutes } from './boxes/box-routes.js';
 import type { BoxService } from './boxes/box-service.js';
 import {
@@ -278,6 +279,7 @@ export function buildApp(
       registerAuth(api, credentials, () => session.root);
       registerSigninRoutes(api, ctx);
       await registerProjectRoutes(api, ctx);
+      await registerWizardRoutes(api, ctx);
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);

@@ -17,17 +17,27 @@ FROM vibeboard-agent:base
 # Paying that at build time makes it once per image.
 #
 # `PLAYWRIGHT_BROWSERS_PATH` IS THE WHOLE REASON THIS WORKS. The default is `$HOME/.cache/ms-playwright`,
-# and at this point in the build HOME is root's — while an agent turn runs as the HOST user's uid, which
-# is not known until `docker run`. Browsers under /root would be unreadable by the one process that needs
-# them. /opt with `a+rX` is readable by every uid, and the ENV persists into the container so Playwright
-# looks there rather than in a home directory it cannot write.
+# and this RUN is root — while an agent turn runs as the HOST user's uid, which is not known until
+# `docker run`. Browsers under a home directory would be unreadable by the one process that needs them.
+# /opt with `a+rX` is readable by every uid, and the ENV persists into the container so Playwright looks
+# there rather than in a home directory it cannot write.
+#
+# `HOME` AND `NPM_CONFIG_PREFIX` ARE PUT BACK TO ROOT'S FOR THIS ONE RUN, and without that line the
+# image is broken for every host uid. The base sets both to the AGENT's home (`/home/node`) so that
+# `npm i -g` needs no escalation at all — and a RUN in this layer inherits them, so root's npm creates
+# `/home/node/.npm` and `/home/node/.npm-global/{bin,lib}` owned by root. The agent's own `npm install`
+# then fails EACCES on its cache, whatever uid it runs as, and nothing before the first install says so.
+# Found in review; the RUN below fails the build on the droppings, and test/box-integration.test.ts
+# probes the built image as uid 1000. Exported inside the RUN rather than as ENV so the agent's values
+# are what survive into the container.
 #
 # Installed globally at a pinned version and then removed, rather than run through `npx`: a bare name
 # through a runner is how you end up executing a package that squatted it. The apt packages and the
 # browsers both survive the uninstall, which is the entire point.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ARG PLAYWRIGHT_VERSION=1.62.1
-RUN npm install -g playwright@${PLAYWRIGHT_VERSION} \
+RUN export HOME=/root NPM_CONFIG_PREFIX=/usr/local \
+ && npm install -g playwright@${PLAYWRIGHT_VERSION} \
  && playwright install-deps chromium \
  && playwright install chromium \
  && npm uninstall -g playwright \
@@ -37,3 +47,9 @@ RUN npm install -g playwright@${PLAYWRIGHT_VERSION} \
 # `install-deps` runs apt, and a dependency away is how `sudo` comes back silently — so the web layer
 # re-asserts what the base already proved.
 RUN ! command -v sudo >/dev/null 2>&1
+
+# AND THAT ROOT LEFT NOTHING OF ITS OWN IN THE AGENT'S HOME. A root-owned `~/.npm` or a populated
+# `~/.npm-global` means the RUN above ran with the base's HOME/NPM_CONFIG_PREFIX inherited, and the
+# consequence is not visible until an agent's first `npm install` fails EACCES on a box that looks
+# healthy. Failing the build here costs minutes; the alternative cost every unprivileged install.
+RUN [ ! -e /home/node/.npm ] && [ -z "$(ls -A /home/node/.npm-global)" ]

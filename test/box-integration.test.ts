@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
-import { DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/boxes/containers.js';
+import { BASE_IMAGE, DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/boxes/containers.js';
 import { wrapCommand } from '../src/server/boxes/sandbox.js';
 
 // The boundary itself, against a real container — not the argv that asks for it.
@@ -31,9 +31,9 @@ const realDocker: DockerRun = async (args, opts) => {
   }
 };
 
-async function imageAvailable(): Promise<boolean> {
+async function imageAvailable(image = DEFAULT_IMAGE): Promise<boolean> {
   try {
-    await run('docker', ['image', 'inspect', '-f', '{{.Id}}', DEFAULT_IMAGE], { timeout: 15_000 });
+    await run('docker', ['image', 'inspect', '-f', '{{.Id}}', image], { timeout: 15_000 });
     return true;
   } catch {
     return false;
@@ -42,6 +42,38 @@ async function imageAvailable(): Promise<boolean> {
 
 const available = await imageAvailable();
 const box = available ? describe : describe.skip;
+
+// THE WRITABILITY `npm install` NEEDS, AS A HOST UID, and it is checked on every image because the
+// thing that breaks it is a layer added on top.
+//
+// The base gives the agent a writable home so `npm i -g` needs no escalation at all. A RUN in a layer
+// above inherits that home through `ENV HOME`/`ENV NPM_CONFIG_PREFIX` — so ROOT's npm writes root-owned
+// directories into it, and every later install by the agent's uid fails EACCES. Found by review on the
+// web layer's Playwright step, where `/home/node/.npm` came out owned by root and uid 1000 could not
+// create so much as a cache entry.
+//
+// AN OFFLINE PROXY FOR `npm install`, deliberately: the real command needs a registry and this suite
+// must run where there is no network. What it asserts is the only thing the registry case adds — that
+// the two directories npm writes to are writable by a uid that is not the builder's.
+const NPM_PROBE =
+  'mkdir -p "$HOME/.npm/probe" && touch "$HOME/.npm-global/.probe" && rm -r "$HOME/.npm/probe" "$HOME/.npm-global/.probe"';
+
+for (const image of [DEFAULT_IMAGE, BASE_IMAGE]) {
+  const present = await imageAvailable(image);
+  (present ? describe : describe.skip)(`${image}, as the uid an agent turn runs as`, () => {
+    it('lets an unprivileged install write npm’s cache and its global prefix', async () => {
+      const res = await run('docker', ['run', '--rm', '--user', '1000:1000', image, 'sh', '-c', NPM_PROBE], {
+        timeout: 60_000,
+      })
+        .then(() => ({ code: 0, stderr: '' }))
+        .catch((e: { code?: number; stderr?: string }) => ({ code: e.code ?? 1, stderr: e.stderr ?? '' }));
+      // The stderr rides along as the failure message because it is the whole diagnosis: `Permission
+      // denied` on a path under the agent's own home names both the fault and the layer that caused it.
+      // (It is never empty — the entrypoint says so when no API socket is mounted.)
+      expect(res.code, res.stderr).toBe(0);
+    }, 90_000);
+  });
+}
 
 box('the agent box, for real', () => {
   let dir = '';

@@ -12,12 +12,14 @@ import { agentBuildContext, buildArgs, ensureAgentImages } from '../src/server/b
 // dependency only worked inside a git clone, and on any other machine the app was bricked.
 
 describe('the build context', () => {
-  // THE CLAIM THAT MAKES IT SHIPPABLE. The Dockerfile copies three files, all of them from this
-  // directory, so the context was never the repository root — that was just what the npm script passed.
-  // Narrowing it is what lets the build run from an installed tree.
+  // THE CLAIM THAT MAKES IT SHIPPABLE. The base copies three files, all of them from this directory,
+  // so the context was never the repository root — that was just what the npm script passed. Narrowing
+  // it is what lets the build run from an installed tree. BOTH Dockerfiles, since the split: the build
+  // points `-f` at each in turn out of this same context, so a base missing from an installed tree is a
+  // build that fails on the image every other one is FROM. decision 75.
   it('is a real directory holding everything the Dockerfile copies', () => {
     const context = agentBuildContext();
-    for (const file of ['Dockerfile.agent', 'relay.mjs', 'entrypoint.sh', 'vb-install']) {
+    for (const file of ['Dockerfile.base', 'Dockerfile.agent', 'relay.mjs', 'entrypoint.sh', 'vb-install']) {
       expect(existsSync(join(context, file))).toBe(true);
     }
   });

@@ -71,6 +71,10 @@ interface EnsureOptions {
   publishPort?: number;
   command?: string[];
   image?: string;
+  // The project's own packages, replayed into the box AT CREATION — the runtime half of the preset
+  // ruling. In the spec digest (containers.ts specDigest), so a changed list replaces the box and is
+  // replayed complete rather than diffed. decision 75.
+  packages?: string[];
 }
 
 // One wording for both places that refuse, so an upgrade and a fresh build cannot explain the same fault
@@ -136,12 +140,18 @@ export class BoxManager {
   // started rather than rebuilt for the same reason.
   async ensure(opts: EnsureOptions): Promise<BoxHandle> {
     const name = boxName(opts.projectRoot, opts.backend);
+    const packages = opts.packages ?? [];
+    // ONE image for the box and for the sidecar that confines it: the sidecar runs `iptables` inside
+    // the box's own network namespace, and the base carries iptables precisely so that a box created
+    // from the base — a `game` or `research` project — can be confined by an image it already has.
+    const image = opts.image ?? DEFAULT_IMAGE;
     const spec = {
-      image: opts.image ?? DEFAULT_IMAGE,
+      image,
       mounts: boxMounts(opts.paths),
       env: opts.env ?? {},
       publish: opts.publishPort ? { containerPort: opts.publishPort } : undefined,
       command: opts.command,
+      packages,
     };
     const wanted = specDigest(spec);
     const found = await inspectState(this.#docker, name);
@@ -166,11 +176,7 @@ export class BoxManager {
         user: this.#user,
         ...spec,
       });
-      const created = await this.#docker(args, { timeoutMs: 120_000 });
-      if (created.code !== 0) {
-        throw new Error(`could not start the agent box: ${firstLine(created.stderr)}`);
-      }
-      await this.#applyNetworkRules(name, opts.image ?? DEFAULT_IMAGE);
+      await this.#create(name, args, image, packages);
     } else if (state === 'stopped') {
       const started = await this.#docker(['start', name]);
       if (started.code !== 0) {
@@ -179,13 +185,26 @@ export class BoxManager {
       // Again on restart, NOT only on creation. A container's network namespace is rebuilt when it
       // starts, so rules installed into the old one are gone — a stopped-and-started box would come
       // back with the private network open and nothing would say so.
-      await this.#applyNetworkRules(name, opts.image ?? DEFAULT_IMAGE);
+      await this.#applyNetworkRules(name, image);
     }
 
     return {
       name,
       hostPort: opts.publishPort ? await this.#publishedPort(name, opts.publishPort) : undefined,
     };
+  }
+
+  // BIRTH, and everything that has to be true before the box is handed to anyone: it started, its
+  // network is confined, and it holds the packages the project declared. Its own method because each
+  // step destroys the box rather than returning a box that is not what was asked for — a sequence that
+  // reads as one thing here and as three nested failures inside `ensure`.
+  async #create(name: string, args: string[], image: string, packages: string[]): Promise<void> {
+    const created = await this.#docker(args, { timeoutMs: 120_000 });
+    if (created.code !== 0) {
+      throw new Error(`could not start the agent box: ${firstLine(created.stderr)}`);
+    }
+    await this.#applyNetworkRules(name, image);
+    if (packages.length > 0) await this.#installOwn(name, packages);
   }
 
   // WHETHER THE BOX THAT IS THERE CAN BE ADOPTED. Two questions, and the second cannot be answered by
@@ -245,6 +264,17 @@ export class BoxManager {
     if (ipv6 === '') return;
     await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
     throw new Error(ipv6Refusal(ipv6));
+  }
+
+  // FAILS THE BOX, exactly as the network rules do and for the same reason: a box that exists without
+  // its declared packages would be ADOPTED on every later ensure — replay is a birth event — and the
+  // gap would be permanent and silent. Removing it makes the next ensure retry from scratch, and the
+  // error names the package apt could not place. decision 75.
+  async #installOwn(name: string, packages: string[]): Promise<void> {
+    const res = await this.install(name, packages);
+    if (res.code === 0) return;
+    await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
+    throw new Error(`could not install the project's own packages: ${firstLine(res.stderr || res.stdout)}`);
   }
 
   // The privileged half, and the only place in VibeBoard that runs anything in a box as root.

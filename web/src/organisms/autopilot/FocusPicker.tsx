@@ -34,6 +34,11 @@ interface Props {
   features: Card[];
   onChange: (focus: string | undefined) => void;
   disabled?: boolean;
+  // WHETHER TO HOLD THE LANE OPEN IN STANDARD. True on the bar, where an absent control takes its width out
+  // of a pushed group and moves the button you just clicked; false anywhere the row wraps and nothing is
+  // pinned, where the same placeholder is an empty box with no job. The reservation is a fact about that
+  // ROW, not about this picker, which is why it is asked for rather than assumed.
+  spacer?: boolean;
 }
 
 // WHICH FEATURES CAN BE FOCUSED: every one that is not finished, which is BACKLOG as well as Todo and In
@@ -92,12 +97,14 @@ interface FocusOption {
 // A `select` AND NOT A SEGMENTED PICKER, unlike the two beside it: those choose between two fixed options
 // and this one is a list of whatever a project happens to have, which can be twenty. `Control as="select"`
 // is the box this design system already draws for exactly that.
-export function FocusPicker({ config, features, onChange, disabled = false }: Props) {
+export function FocusPicker({ config, features, onChange, disabled = false, spacer = true }: Props) {
   if (!config) return null;
   // A SPACER OF THE SAME WIDTH IN STANDARD, so the group never changes size and nothing on the row moves when
   // the mode is toggled. Hidden rather than absent: an absent control takes its width out of a group that is
   // pushed from the left, and every pixel of that comes out of the position of the control you just clicked.
-  if (config.mode !== 'express') return <div className="vb-ctl" data-testid="ap-focus-spacer" aria-hidden />;
+  if (config.mode !== 'express') {
+    return spacer ? <div className="vb-ctl" data-testid="ap-focus-spacer" aria-hidden /> : null;
+  }
   const options = withSavedFocus(focusable(features, config.terminal.features ?? []), features, config.focus);
   return (
     <Control

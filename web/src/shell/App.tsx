@@ -210,7 +210,17 @@ export function App() {
         Loading…
       </Text>
     );
-  else if (which === 'gate') content = <ProjectGate onOpened={onOpened} />;
+  else if (which === 'gate')
+    content = (
+      <ProjectGate
+        onOpened={onOpened}
+        // Stopgaps, exactly as `wizard: false` above is one: the screen these two doors open does not
+        // exist yet. They are wired in the same edit that adds the wizard's own render branch, so there
+        // is never a commit where a door leads somewhere that silently renders the board.
+        onNewProject={() => {}}
+        onMapProject={() => {}}
+      />
+    );
   else if (which === 'empty' || !snapshot)
     content = (
       <Text lead className="empty">

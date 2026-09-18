@@ -3,9 +3,10 @@ import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
 import type { ProjectRef } from '../../lib/api';
 import { ProjectGate } from './ProjectGate';
 
-// TWO OPTIONS AND ONLY TWO: open a project VibeBoard already knows, or create one. The list is VibeBoard's
-// own record of projects and NOT a query for containers — a box removed by a prune must not make a project
-// vanish from this screen. Hook-driven: `listProjects` reads `/api/projects` on mount.
+// OPEN A PROJECT VIBEBOARD ALREADY KNOWS, OR START ONE — and starting one is two doors into the wizard,
+// where the form that used to stand here now lives. The list is VibeBoard's own record of projects and NOT
+// a query for containers — a box removed by a prune must not make a project vanish from this screen.
+// Hook-driven: `listProjects` reads `/api/projects` on mount.
 //
 // IT WEARS THE SAME `.gate` CLASSES AS `Pages/SignIn` ON PURPOSE, which is why both are stories: it is the
 // same visual object standing in the same place, and a second look-alike would drift from it. `.gate` and
@@ -25,7 +26,7 @@ const meta = {
   component: ProjectGate,
   parameters: { layout: 'fullscreen' },
   decorators: [withRoutes({ ...EMPTY, '/api/projects': { projects } })],
-  args: { onOpened: () => {} },
+  args: { onOpened: () => {}, onNewProject: () => {}, onMapProject: () => {} },
 } satisfies Meta<typeof ProjectGate>;
 export default meta;
 

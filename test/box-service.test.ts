@@ -4,8 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
 import { BoxService, boxPathsForBackend } from '../src/server/boxes/box-service.js';
-import { boxMounts, type DockerResult, type DockerRun, WORK_DIR } from '../src/server/boxes/containers.js';
+import {
+  boxMounts,
+  type DockerResult,
+  type DockerRun,
+  INSTALL_HELPER,
+  WORK_DIR,
+} from '../src/server/boxes/containers.js';
 import { boxCredentialPath, opencodeBoxCredentialPath } from '../src/server/boxes/copilot-env.js';
+import { defaultConfig, writeConfig } from '../src/store/project/config.js';
 import { tempDir, testTmp } from './helpers.js';
 
 // What a box gets FOR a project and backend. The mount set is the containment boundary, and two of its
@@ -256,5 +263,80 @@ describe('a box is the same box whoever asks for it', () => {
     expect(box.hostPort).toBeUndefined();
     expect(created[0].slice(-2)).toEqual(['sleep', 'infinity']);
     expect(created[0]).not.toContain('-p');
+  });
+});
+
+// WHICH IMAGE, AND WHOSE PACKAGES — read from the project's config HERE, by one reader, and never
+// passed in by a caller. The block above is the whole reason: two callers describing the same box two
+// different ways evicted each other's container, alternating, for ever. A kind passed as a parameter
+// would be that bug a second time, so the only way in is the project's own config.
+describe('the kind decides the image, resolved in one place', () => {
+  // Answers as a daemon holding no box: every test here creates one, and what is asserted is the argv.
+  const recording =
+    (calls: string[][]): DockerRun =>
+    async (args) => {
+      calls.push(args);
+      // The state read, and the only call whose failure means "no such box" — the v6 read below it
+      // must answer empty rather than absent.
+      if (args[0] === 'inspect' && args[1] === '-f') {
+        return { code: 1, stdout: '', stderr: 'No such object' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+  const service = (calls: string[][], settings: Record<string, unknown>) =>
+    new BoxService({
+      manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }),
+      settings: async () => settings,
+    });
+
+  const project = async (): Promise<string> => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    return root;
+  };
+
+  const createArgv = (calls: string[][]): string[] | undefined =>
+    calls.find((a) => a[0] === 'run' && a.includes('-d'));
+
+  it('a research project gets the base image, and its packages travel to the manager', async () => {
+    const calls: string[][] = [];
+    await service(calls, { kind: 'research', packages: ['jq'] }).ensure(await project(), 'claude-code');
+    expect(createArgv(calls)).toContain('vibeboard-agent:base');
+    expect(calls.some((a) => a.includes(INSTALL_HELPER) && a.includes('jq'))).toBe(true);
+  });
+
+  it('no kind at all is the default image — an old project changes in nothing', async () => {
+    const calls: string[][] = [];
+    await service(calls, {}).ensure(await project(), 'claude-code');
+    expect(createArgv(calls)).toContain('vibeboard-agent:latest');
+  });
+
+  it('refuses a mistyped kind by name rather than defaulting it', async () => {
+    await expect(service([], { kind: 'webb' }).ensure(await project(), 'claude-code')).rejects.toThrow(
+      /'webb' is not one of web, game, research/,
+    );
+  });
+
+  it('refuses a package list it could never install', async () => {
+    await expect(
+      service([], { packages: ['jq;rm -rf /'] }).ensure(await project(), 'claude-code'),
+    ).rejects.toThrow(/not a package name/);
+  });
+
+  // AND THE READER ITSELF, on a config file written by the real writer. Every test above injects
+  // `settings`, so between them they prove only that the resolver agrees with a fake — the seam where
+  // the config is actually read would be unexercised, which is how a mock comes to agree with itself.
+  it('reads the kind off a real config file when nothing is injected', async () => {
+    const root = await project();
+    await writeConfig(root, { ...defaultConfig('p'), box: { kind: 'research', packages: ['jq'] } });
+    const calls: string[][] = [];
+
+    await new BoxService({
+      manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }),
+    }).ensure(root, 'claude-code');
+
+    expect(createArgv(calls)).toContain('vibeboard-agent:base');
+    expect(calls.some((a) => a.includes(INSTALL_HELPER) && a.includes('jq'))).toBe(true);
   });
 });

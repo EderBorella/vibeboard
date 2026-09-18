@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { BOX_KINDS, type BoxKind, isBoxKind } from '../../core/box-kinds.js';
+import { readConfig } from '../../store/project/config.js';
 import { apiSocketDir } from './api-socket.js';
 import { BoxManager, boxPathsFor, type ProbeResult } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
@@ -7,6 +9,8 @@ import {
   AGENT_WRITABLE_PATHS,
   boxEnvFor,
   DEFAULT_IMAGE,
+  imageForKind,
+  isPackageName,
   SOCKET_DIR,
   STATE_DIR,
   WORK_DIR,
@@ -122,13 +126,56 @@ function boxShape(backend: BoxBackend): { publishPort?: number; command: string[
   return { command: ['sleep', 'infinity'] };
 }
 
+// What the project's config says about its box. ONE SOURCE, resolved here and never passed by
+// callers — the `boxShape` lesson directly above: two callers asking for the same box two ways evicted
+// each other's container, alternating, for ever. Absent config (mid-scaffold, or a root that is not a
+// project yet) reads as no kind and no packages: the default image, exactly as before kinds.
+// decision 75.
+type BoxSettings = { kind?: unknown; packages?: unknown };
+
+async function boxSettingsFor(projectRoot: string): Promise<BoxSettings> {
+  try {
+    const config = (await readConfig(projectRoot)) as { box?: BoxSettings };
+    return config.box ?? {};
+  } catch {
+    return {};
+  }
+}
+
+// Refusals with names, because config is a hand-editable file: a mistyped kind or a shell-shaped
+// package name is a person's typo, and the fix is the message. Defaulting either would run the box on
+// a shape the person was trying to leave (the `mode` precedent, decision 72).
+function resolveBox(settings: BoxSettings): { kind: BoxKind | undefined; packages: string[] } {
+  return { kind: kindOf(settings.kind), packages: packagesOf(settings.packages) };
+}
+
+function kindOf(kind: unknown): BoxKind | undefined {
+  if (kind === undefined) return undefined;
+  if (isBoxKind(kind)) return kind;
+  throw new Error(
+    `the project's box kind '${String(kind)}' is not one of ${BOX_KINDS.join(', ')} — fix .vibeboard/config.yaml`,
+  );
+}
+
+function packagesOf(packages: unknown): string[] {
+  if (packages === undefined) return [];
+  if (!Array.isArray(packages)) throw new Error('the project box packages must be a list of names');
+  const bad = packages.filter((p) => typeof p !== 'string' || !isPackageName(p));
+  if (bad.length > 0) throw new Error(`not a package name: ${bad.map(String).join(', ')}`);
+  return packages as string[];
+}
+
 export class BoxService {
   #manager: BoxManager;
   #image: string;
+  // Injectable ONLY so a test can drive the resolution without a config file on disk; production has
+  // one reader, and there is no parameter for a caller to disagree through.
+  #settings: (projectRoot: string) => Promise<BoxSettings>;
 
-  constructor(opts: { manager?: BoxManager; image?: string } = {}) {
+  constructor(opts: { manager?: BoxManager; image?: string; settings?: typeof boxSettingsFor } = {}) {
     this.#manager = opts.manager ?? new BoxManager();
     this.#image = opts.image ?? DEFAULT_IMAGE;
+    this.#settings = opts.settings ?? boxSettingsFor;
   }
 
   get manager(): BoxManager {
@@ -151,6 +198,9 @@ export class BoxService {
   // the same box in two different ways — which they did, and which evicted each other's container.
   async ensure(projectRoot: string, backend: BoxBackend): Promise<EnsuredBox> {
     const shape = boxShape(backend);
+    // BEFORE the paths, so a refused kind does not leave a scaffolded directory behind for a box that
+    // was never going to exist.
+    const box = resolveBox(await this.#settings(projectRoot));
     // `boxPathsForBackend` creates the state directory as a side effect, which is deliberate: docker
     // would otherwise create a missing bind source itself, root-owned, on the host.
     return this.#manager.ensure({
@@ -158,7 +208,8 @@ export class BoxService {
       backend,
       paths: boxPathsForBackend(projectRoot, backend),
       env: boxEnvFor(backend),
-      image: this.#image,
+      image: imageForKind(box.kind, this.#image),
+      packages: box.packages,
       ...(shape.publishPort ? { publishPort: shape.publishPort } : {}),
       command: shape.command,
     });

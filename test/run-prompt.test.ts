@@ -14,6 +14,7 @@ import { BOARDS, type BoardName, type Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
 import { allows, endpointsFor } from '../src/server/auth/auth.js';
 import type { Credential, Scope } from '../src/server/auth/credentials.js';
+import { BOX_BROWSERS_PATH, BOX_PLAYWRIGHT_VERSION } from '../src/server/boxes/image-tools.js';
 import { assistCredentialSection } from '../src/server/runs/prompt/credential.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/runs/prompt/index.js';
 
@@ -69,6 +70,8 @@ const inputs = (over: Partial<PromptInputs> = {}): PromptInputs => ({
   reportPath: `${RUNS_DIR}/r1.report.md`,
   runId: 'r1',
   projectRoot: ROOT,
+  // The web layer is the default image, so the default fixture is a box that has the browser.
+  browser: true,
   ...over,
 });
 
@@ -139,6 +142,29 @@ describe('buildRunPrompt', () => {
     const text = buildRunPrompt(inputs({ boardColumns: [] }));
     expect(text).not.toContain("## The project's columns");
     expect(text).not.toContain('Do NOT create a new column');
+  });
+
+  // WHAT THE BOX HAS DEPENDS ON WHICH BOX IT IS, as of the kind split: the browser lives in the web
+  // layer, so a `game` or `research` project's box is created from the base and has none. The section
+  // was written when there was one image and asserted the browser unconditionally — which on those
+  // projects is a prompt telling an agent a 656MB download is already done when it is not. decision 75.
+  it('tells a web box it already has the browser, with the version that answers for it', () => {
+    const text = buildRunPrompt(inputs({ browser: true }));
+    expect(text).toContain('## What this container already has');
+    expect(text).toContain(`A **Chromium for Playwright ${BOX_PLAYWRIGHT_VERSION}** is already installed`);
+    expect(text).toContain(BOX_BROWSERS_PATH);
+  });
+
+  it('claims no browser to a box built from the base, and says what to do instead of fetching one', () => {
+    const text = buildRunPrompt(inputs({ browser: false }));
+    expect(text).toContain('## What this container already has');
+    // The false claim itself, in both the forms it appears in: the sentence and the path it names.
+    expect(text).not.toContain('Chromium for Playwright');
+    expect(text).not.toContain('already installed');
+    expect(text).not.toContain(BOX_BROWSERS_PATH);
+    expect(text).toContain('No browser is installed in this container');
+    // The wrapping is asserted with it: this is a prompt, so the wording IS the behaviour.
+    expect(text).toContain('say so in the report rather than\ndownloading a browser');
   });
 
   it('puts the columns straight after the card, before the linked cards', () => {

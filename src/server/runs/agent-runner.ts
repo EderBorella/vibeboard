@@ -72,6 +72,11 @@ export interface DispatchInput {
   // `foundation`, and for the same reason: a queued run must be sized by the mode the project had when it
   // was resolved, not by whatever it says when the run finally starts.
   express?: true;
+  // Whether the box this run lands in has a browser — the web layer, which a `game` or `research`
+  // project's box is not built from. Carried at dispatch like the fields above it, and ABSENT means
+  // browserful: that is what `imageForKind` does with a project that names no kind, so a caller that
+  // says nothing gets the box it would have got before kinds existed. decision 75.
+  browser?: boolean;
   backend: Backend;
   model: string;
   effort: string;
@@ -372,6 +377,9 @@ export class AgentRunner {
       // Spread, not passed: `exactOptionalPropertyTypes` refuses an explicit `undefined` for an optional
       // `true`, which is the same reason `card`/`cardFile` are spread above.
       ...(input.express ? { express: true as const } : {}),
+      // `!== false`, because the prompt demands an answer and absence means the default image — the one
+      // that carries the browser. The dispatch path computes it from the kind; nothing else needs to.
+      browser: input.browser !== false,
       reportPath: reportContract(run),
       runId: run,
       projectRoot: root,

@@ -62,6 +62,8 @@ const build = (over: Partial<PromptInputs>): string =>
     reportPath: `${RUNS_DIR}/r1.report.md`,
     runId: 'r1',
     projectRoot: ROOT,
+    // Nothing here is about the box; the web layer is the default image, so this is the ordinary box.
+    browser: true,
     ...over,
   });
 

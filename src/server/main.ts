@@ -6,6 +6,7 @@ import { installBreakGlass, signinBanner } from './auth/signin-terminal.js';
 import { ProjectSession } from './boards/session.js';
 import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { backendCheck } from './boxes/backend-liveness.js';
+import { BoxManager } from './boxes/box-manager.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
 import { credentialCheck } from './boxes/credential-freshness.js';
@@ -45,7 +46,18 @@ const admin = await adminToken();
 const devices = await DeviceStore.load();
 // Every agent box this server makes or adopts. One service, because a box is keyed by project and
 // backend and outlives any single request.
-const boxes = new BoxService();
+//
+// AND IT SAYS WHEN IT THROWS ONE AWAY. The manager has had the hook since boxes existed and nothing
+// was listening, which was affordable while a rebuild meant a mount set had genuinely changed.
+// Decision 75 added the packages and the image to the spec digest, so every box on every existing
+// project is replaced ONCE on the upgrade — deliberately, and silently until now. A container being
+// destroyed under somebody's project is worth a line in the log it happens in.
+const boxes = new BoxService({
+  manager: new BoxManager({
+    onRebuild: (name, was, now) =>
+      process.stderr.write(`replacing agent box ${name}: its spec is ${was}, this VibeBoard wants ${now}\n`),
+  }),
+});
 // Probed once, here, because the answer cannot change while the process runs and every agent this
 // server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
 // see the state of is a sandbox nobody trusts.

@@ -210,10 +210,20 @@ async function driveOnce(
 // one human step, not a phase, so driving through it belongs here rather than repeated at fifteen call sites
 // where it would be noise around the thing each test is actually about.
 //
-// IT IS ASSERTED RATHER THAN ABSORBED, and that distinction is the whole reason this is not a silent second
-// call. A helper that just ran the loop twice would let the gate be deleted without one test in this file
-// noticing — and this file is the one that would have to notice, because it is the only place the whole
-// lifecycle runs. So the first ending must BE `review`: if the gate stops firing, all eighteen fail here.
+// A BRANCH AND NOT AN ASSERTION, and the reason is worth writing down because the first version got this
+// wrong in both directions.
+//
+// It began as a bare branch with a comment claiming that a deleted gate would fail every trace in this file.
+// Planted, it was **2 of 24** — only the two that happen to name `'stopped review'` in their expected array.
+// The claim had been written without planting it, which is the one thing this repository's first rule is
+// about. Replacing the branch with `expect(first.reason).toBe('review')` then caught the plant at 24 of 24
+// and **broke 12 real tests**: several traces stop legitimately before they ever reach the gate — a small
+// `ticks` budget, or an unreviewed gate document that stalls the first session — so the helper cannot
+// honestly assert it for every caller.
+//
+// So the gate is pinned where it can be pinned exactly: `stops for review before it works the first
+// feature`, below, which drives ONE session and asserts both halves. This helper just carries the other
+// traces past a stop that is not their subject.
 //
 // The second session is the person pressing Confirm. It re-reads the board from disk exactly as a resumed
 // loop does, which is also why the traces below are unchanged by any of this: the phases are the same
@@ -400,6 +410,33 @@ async function assertHierarchy(project: TestProject): Promise<void> {
 // and a test that genuinely hangs still fails — one minute later.
 for (const mode of MODES) {
   describe(`the lifecycle, driven end to end — ${mode}`, { timeout: 60_000 }, () => {
+    // THE GATE ITSELF — decision 74 — and the one place in this file that pins it, because `drive` above
+    // cannot: several traces here stop legitimately before they reach it.
+    //
+    // ONE SESSION, and both halves asserted. The reason alone would pass over a gate that fired in the
+    // wrong place; what makes it the gate is that NOTHING HAS MOVED YET — the derivation's own exits are
+    // written and not one feature has left the column it was derived into. Planted by deleting the stop in
+    // `afterProjectRun`: this fails on the reason, and on the board having walked on without anyone.
+    it('stops for review before it works the first feature', async () => {
+      const started = await start({
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      const ended = await driveOnce(started);
+      expect(ended.reason).toBe('review');
+      // It counts, and it names the harness card apart from the derived ones.
+      expect(ended.detail).toContain('one feature');
+      expect(ended.detail).toContain('smoke-harness');
+
+      // The exits ARE written — the gate sits after them, never instead of them.
+      const live = (await board(started.project)).filter(isLive);
+      const features = live.filter((c) => c.board === 'features');
+      expect(features.filter((c) => c.setup === true)).toHaveLength(1);
+      expect(features).toHaveLength(2);
+      // And nothing has been built on the list yet: every feature is still where the derivation put it.
+      expect(features.every((c) => c.columnSlug === 'backlog')).toBe(true);
+      expect(live.filter((c) => c.board === 'engineering')).toHaveLength(0);
+    });
+
     it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
       const started = await start({
         // One feature, one story under it, two tasks under that. The chain travels through the cards the shim

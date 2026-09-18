@@ -124,6 +124,14 @@ export async function listenOnApiSocket(app: FastifyInstance): Promise<ApiSocket
     // where `process.exit` runs before any close callback can.
     // Cleared as well as closed, so a signal arriving afterwards does not unlink a path that some other
     // server may have bound in between.
+    //
+    // NO TEST CONSTRAINS THIS LINE, and that is recorded rather than left for the next reader to rediscover:
+    // deleting it leaves the suite green. In ONE process it is genuinely equivalent — after `close()` the
+    // file is already gone, so a later `removeApiSocketFile` unlinks nothing whichever way `bound` reads.
+    // What it protects against needs a SECOND process to bind that path between our close and our signal,
+    // which is the same shape as the fault this module was fixed for and the same reason that one is
+    // verified by a fresh module instance rather than by two servers in one process. Keep it: the cost is a
+    // comparison, and the case it covers is the one that has already happened here once.
     close: () =>
       new Promise<void>((resolve) =>
         server.close(() => {

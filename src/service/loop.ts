@@ -69,8 +69,14 @@ export interface ActResult {
   // does counts against every cap, so an action that ever starts two runs has to cost two iterations
   // instead of one. A boolean would make that a change to the loop rather than to the action.
   dispatches: number;
-  // A reason to stop, when carrying the action out revealed one. `act` never decides to stop on its own —
-  // it reports, and the next tick's `decideTick` sees the world the action left behind.
+  // A reason to stop, when carrying the action out revealed one — a commit that failed, a board write that
+  // was refused: things `decideTick` cannot see because they happened while the action was being carried out.
+  //
+  // IT USED TO SAY `act` NEVER DECIDES TO STOP ON ITS OWN, and decision 74 is the exception that makes that
+  // false rather than merely strained. The review gate IS act deciding, and there is no next tick for
+  // `decideTick` to see the world in. It is here and not there because `decideTick` is given a board, and a
+  // board of freshly-derived features looks exactly like one derived last week — see the decision row for
+  // what that costs as well as what it buys.
   stop?: { reason: StopReason; detail?: string };
 }
 

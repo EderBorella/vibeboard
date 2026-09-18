@@ -203,8 +203,12 @@ export function smokeIsAGate(commands: DeclaredCommands): string | undefined {
 // looking in their README for a feature that was never in it.
 //
 // IT ENDS ON THE ACTION, like the credential refusals: this sentence reaches a balloon that truncates, and the
-// last clause is the one a truncated balloon keeps. "Confirm" rather than "Start", because the control below
-// it says Confirm — a sentence naming a button that is not on screen is worse than one naming no button.
+// last clause is the one a truncated balloon keeps.
+//
+// "ON THE AUTO-PILOT BAR" IS LOAD-BEARING IN THAT CLAUSE, and it is there because this detail renders on TWO
+// surfaces. Beneath the bar it sits directly above a button that says Confirm; in the top bar's balloon there
+// is no control at all. Naming the button without saying where it is satisfied one surface and stranded the
+// other — which is the rule this comment used to state and, as first written, broke.
 export function featuresDerivedSentence(derived: number, harness: boolean): string {
   const list =
     derived === 1
@@ -213,5 +217,5 @@ export function featuresDerivedSentence(derived: number, harness: boolean): stri
   const extra = harness
     ? `, and added the smoke-harness feature beside ${derived === 1 ? 'it' : 'them'}`
     : '';
-  return `Auto-pilot derived ${list}${extra}, then stopped so you can read them before anything is built on top of them. A wrong feature list is the error that compounds hardest, and this is the one moment it is cheap to correct. Check them, choose a feature to focus on if you want one, and confirm.`;
+  return `Auto-pilot derived ${list}${extra}, then stopped so you can read them before anything is built on top of them. A wrong feature list is the error that compounds hardest, and this is the one moment it is cheap to correct. Check them, choose a feature to focus on if you want one, and confirm on the auto-pilot bar.`;
 }

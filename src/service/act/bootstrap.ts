@@ -44,7 +44,11 @@ export async function afterProjectRun(
   const created = board.ok ? countLive(board.value.boards) : undefined;
   // Only where the board actually grew. A bootstrap that produced nothing has no scaffolding feature to name,
   // and a board that could not be read is not evidence that it did.
-  // THE GATE — decision 74. Set inside this branch and nowhere else, so the three conditions that decide
+  // THE GATE — decision 74, and the register carries what this placement costs as well as what it buys: a
+  // loop killed between these board writes and `finish` reporting the stop leaves a list nobody confirmed
+  // and no record saying so.
+  //
+  // Set inside this branch and nowhere else, so the three conditions that decide
   // whether the exits are written are the same three that decide whether there is anything to review. A
   // derivation that produced nothing has no feature list to check, and the attempt cap in `decideTick` is
   // what decides when to give up on it — a stop here would be a second cap disagreeing with the first.
@@ -69,7 +73,12 @@ export async function afterProjectRun(
   // here. The scaffolding flag and the harness feature are what the rest of the lifecycle reads to know what
   // it is looking at; a gate that returned before them would hand a person a list to confirm and lose both,
   // and this loop does not run again to finish the job — the next one starts from whatever the board says.
-  if (derived === undefined) return { dispatches: 1 };
+  // ZERO IS NOT `undefined`, AND BOTH MEAN "NOTHING TO CONFIRM". The guard above is `createdNothing`, which
+  // is defined over `countLive` — EVERY board — so a derivation that produced product or engineering cards
+  // and no feature card grows the board, passes it, and would have stopped to ask a person to check a list
+  // of nothing. It printed "derived 0 features". Caught in review; the shim in the trace suite creates
+  // exactly that shape, so it was reachable rather than theoretical.
+  if (derived === undefined || derived === 0) return { dispatches: 1 };
   return {
     dispatches: 1,
     stop: { reason: 'review', detail: featuresDerivedSentence(derived, harness) },

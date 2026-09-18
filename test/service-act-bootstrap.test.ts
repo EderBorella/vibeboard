@@ -216,8 +216,10 @@ describe('the scaffolding stamp', () => {
     // The COUNT is the whole reason this detail replaces its canned sentence — a reader can check it against
     // the board in one glance.
     expect(result.stop?.detail).toContain('2 features');
-    // And it ends on the action, because this reaches a balloon that truncates.
-    expect(result.stop?.detail).toMatch(/confirm\.$/);
+    // And it ends on the action AND on where to take it: the same detail renders in the top bar's balloon,
+    // which truncates and has no Confirm control on it, so naming the button without naming the surface
+    // satisfies one reader and strands the other.
+    expect(result.stop?.detail).toMatch(/confirm on the auto-pilot bar\.$/);
   });
 
   it('stops for review AFTER its exits are stamped, never instead of them', async () => {
@@ -233,6 +235,21 @@ describe('the scaffolding stamp', () => {
     expect(r.flags).toEqual([{ board: 'features', card: 'F-001', body: { setup: true } }]);
     expect(r.created.some((c) => c.title === HARNESS_FEATURE.title)).toBe(true);
     expect(result.stop?.reason).toBe('review');
+  });
+
+  // A DERIVATION THAT GREW THE BOARD WITHOUT DERIVING A FEATURE. `createdNothing` is defined over
+  // `countLive`, which counts EVERY board — so a run that produced product or engineering cards and no
+  // feature card passes that guard, and the gate would have stopped to ask a person to check a list of
+  // nothing: the sentence read "derived 0 features". Found in review, and reachable rather than theoretical
+  // — the trace suite's own bootstrap shim creates exactly that shape.
+  it('does not stop for review when the derivation produced no FEATURE, only other cards', async () => {
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [CARD('E-001', 'engineering')],
+    });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.stop).toBeUndefined();
   });
 
   it('does not stop for review when the bootstrap derived nothing', async () => {

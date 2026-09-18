@@ -36,10 +36,11 @@ interface Props {
 // LEAVING IT ON "The whole board" IS AN ANSWER, not a skipped question, which is why the button says Confirm
 // rather than Skip and why nothing here is required before it can be pressed.
 //
-// BENEATH THE BAR, NEVER ON IT. The row needs 1504px of the 1277 it has at the harness's width — that is the
-// whole of what the *"auto-pilot bar is full"* note records — and this is three controls, not one. The
-// remedy region below the stop sentence is where it fits, and it is also where the sentence explaining the
-// stop already is: the explanation and the way forward in one place.
+// BENEATH THE BAR, NEVER ON IT. Measured on the browser harness's own bar at a 1280px viewport: the row's
+// controls want about 1504px of the 1277 available, so it already wraps to two lines and has no room for a
+// third control at any width a laptop has — and this is three controls, not one. The remedy region below
+// the stop sentence is where it fits, and it is also where the sentence explaining the stop already is:
+// the explanation and the way forward in one place.
 export function ReviewFeatures({ reason, config, features, onFocus, onConfirm, disabled = false }: Props) {
   // `busy` is a KEY, not a boolean — `useAction` keys it to which control was pressed so only that one
   // spins. There is one control here, so the key is only ever present or absent.
@@ -58,12 +59,18 @@ export function ReviewFeatures({ reason, config, features, onFocus, onConfirm, d
             titles here would be a second rendering of cards that are already on screen behind this bar,
             drifting the moment one is edited — and the board shows each card's description and body, which
             is what somebody checking a derivation actually needs to read. */}
-        <Text>
-          {features.length === 1
-            ? 'One feature is on the board.'
-            : `${features.length} features are on the board.`}{' '}
-          Read them, then confirm — or edit and delete cards first, and confirm when the list is right.
-        </Text>
+        {/* NO SECOND COUNT. The stop sentence directly above this says how many features were DERIVED and
+            names the smoke-harness card separately, on the argument recorded beside it: the harness came
+            from us, not from the README, so folding it in sends somebody hunting for a feature that was
+            never there. This component's `features` prop is the board, which includes it — so counting here
+            put "derived 2 features" and "3 features are on the board" on one screen, about one list.
+
+            AND IT NO LONGER INVITES DELETING ANYTHING. `setup: true` is stamped once, by the run that has
+            just finished, and `hasSetupFeature` guards it over the board AND the archive so no later
+            derivation re-awards it — so deleting the first feature here would leave the project with no
+            scaffolding feature for the rest of its life, which under `decision 51` changes how an absent
+            gate set reads. Editing a card is safe and is what this asks for. */}
+        <Text>Read them on the board below, and edit anything that is wrong. Then confirm.</Text>
       </Stack>
       <Stack gap={4} wrap>
         {/* THE SAME PICKER THE BAR CARRIES, not a second one. It renders only in express — which is its own

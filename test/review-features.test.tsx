@@ -30,17 +30,19 @@ const feature = (id: string, title = `Feature ${id}`): Card => ({
   filePath: `/tmp/p/.vibeboard/boards/features/backlog/${id}.md`,
 });
 
-const config = (over: Partial<AutopilotConfig> = {}): AutopilotConfig =>
-  ({
-    maxIterations: 100,
-    budgetUsd: 10,
-    runTimeoutMs: 1000,
-    attemptCap: 3,
-    mode: 'standard',
-    blockedColumn: 'blocked',
-    terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
-    ...over,
-  }) as AutopilotConfig;
+// NO CAST HERE EITHER, for the reason written on the card fixture above — a cast is what would hide a
+// missing required field from the check that comment is celebrating. Pointed out in review: the first
+// version practised the rule on one fixture and broke it on the one directly beneath.
+const config = (over: Partial<AutopilotConfig> = {}): AutopilotConfig => ({
+  maxIterations: 100,
+  budgetUsd: 10,
+  runTimeoutMs: 1000,
+  attemptCap: 3,
+  mode: 'standard',
+  blockedColumn: 'blocked',
+  terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
+  ...over,
+});
 
 function show(over: Partial<Parameters<typeof ReviewFeatures>[0]> = {}) {
   const onConfirm = vi.fn(async () => {});
@@ -80,14 +82,24 @@ describe('the review gate', () => {
     expect(screen.getByTestId('ap-review')).toBeTruthy();
   });
 
-  it('counts the features it is asking about', () => {
+  // ONE COUNT PER SCREEN, and this replaces two tests that asserted the second one.
+  //
+  // The first version counted the `features` prop here — the BOARD, which includes the canned smoke-harness
+  // card — while the stop sentence rendered directly above counts only what was DERIVED and names the
+  // harness separately, on the argument recorded beside it. So the screen said "derived 2 features" and
+  // "3 features are on the board" about one list. Caught in review. The component states no number at all
+  // now, which is the only version that cannot drift from the sentence.
+  it('states no count of its own, so it cannot contradict the sentence above it', () => {
     show({ features: [feature('F-001'), feature('F-002'), feature('F-003')] });
-    expect(screen.getByTestId('ap-review').textContent).toContain('3 features are on the board');
+    expect(screen.getByTestId('ap-review').textContent).not.toMatch(/\d+\s+features/);
   });
 
-  it('says `One feature` rather than `1 features`', () => {
-    show({ features: [feature('F-001')] });
-    expect(screen.getByTestId('ap-review').textContent).toContain('One feature is on the board');
+  // The other half of the same review finding: the copy used to say "edit and delete cards first". Deleting
+  // the first feature here strands the project forever — `setup: true` is stamped once and `hasSetupFeature`
+  // guards it over the board and the archive, so no later derivation re-awards it.
+  it('does not invite deleting cards', () => {
+    show();
+    expect(screen.getByTestId('ap-review').textContent).not.toContain('delete');
   });
 
   it('confirms without requiring a focus, because the whole board is an answer', async () => {

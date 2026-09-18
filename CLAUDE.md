@@ -54,7 +54,7 @@ Never `npx <tool>`. Use the project's own script or `./node_modules/.bin/<tool>`
 | `npm run storybook` | the design workbench, port 6006 |
 | `npm run mutate` | stryker; minutes, deliberately not in the pre-commit hook |
 | `npm run dev` / `npm run web:dev` | server with reload / Vite with HMR |
-| `npm run box:build` | builds the agent container by hand — the server does it on start if it is missing |
+| `npm run box:build` | builds the agent images (base, then web) by hand — the server does it on start if either is missing |
 
 `.githooks/pre-commit` runs format, all three typechecks, lint and the full suite **against the
 index, not the working tree** — read its header before you are tempted to `--no-verify`. Both halves

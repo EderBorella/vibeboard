@@ -20,7 +20,9 @@ for (const [image, file] of [
 ] as const) {
   const result = await buildAgentImage((line) => process.stdout.write(`${line}\n`), image, file);
   if (!result.ok) {
-    process.stderr.write(`\nThe build failed: ${result.last}\n`);
+    // NAMES WHICH of the two: they are built in sequence from different Dockerfiles, and a failure
+    // that said only "the build failed" left the reader guessing which file to look in.
+    process.stderr.write(`\nThe build of ${image} failed: ${result.last}\n`);
     process.exit(1);
   }
 }

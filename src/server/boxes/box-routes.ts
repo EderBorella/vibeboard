@@ -38,6 +38,35 @@ export function rebuildRefusal(activity: { runs: number; autopilot: AutopilotSta
   return null;
 }
 
+// THE FRAMES A BUILD SENDS, and the first one is LAZY. `ensureAgentImages` is idempotent, so pressing
+// the button on a machine that has both images is a legitimate no-op — and announcing a start and a done
+// around it put every open browser's build log into "running" and out again for a build that never
+// happened. Opening on the first STREAMED LINE means the frames describe something that occurred: no
+// output, no build, nothing said. `useBuildLog` only ever leaves "running" on a start, so a no-op that
+// says nothing leaves nothing behind either.
+//
+// Its own function, like `rebuildRefusal` above: the whole of the behaviour is which frames come out and
+// in what order, and asserting that through the socket would need a browser to watch it.
+export function buildFrames(send: (frame: { type: 'box:build'; state?: string; line?: string }) => void): {
+  onLine: (line: string) => void;
+  finish: (result: Awaited<ReturnType<typeof ensureAgentImages>>) => void;
+} {
+  let started = false;
+  return {
+    onLine(line) {
+      if (!started) {
+        started = true;
+        send({ type: 'box:build', state: 'start' });
+      }
+      send({ type: 'box:build', line });
+    },
+    finish(result) {
+      if (!started) return;
+      send({ type: 'box:build', state: result === 'failed' || result === 'no-docker' ? 'failed' : 'done' });
+    },
+  };
+}
+
 export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/boxes/rebuild', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
@@ -96,14 +125,9 @@ export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const before = await boxes.probe();
     if (!before.ok && before.missing !== 'image') return reply.code(409).send({ error: before.reason });
 
-    ctx.broadcast({ type: 'box:build', state: 'start' });
-    const result = await ensureAgentImages(boxes, (line: string) =>
-      ctx.broadcast({ type: 'box:build', line }),
-    );
-    ctx.broadcast({
-      type: 'box:build',
-      state: result === 'failed' || result === 'no-docker' ? 'failed' : 'done',
-    });
+    const frames = buildFrames(ctx.broadcast);
+    const result = await ensureAgentImages(boxes, frames.onLine);
+    frames.finish(result);
     req.log.info({ result }, 'agent image build finished');
     if (result === 'failed' || result === 'no-docker') {
       return reply.code(500).send({ error: 'The build failed — the streamed lines carry the reason.' });

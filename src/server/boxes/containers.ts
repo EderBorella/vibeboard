@@ -50,6 +50,11 @@ export const BASE_IMAGE = 'vibeboard-agent:base';
 // Which image a project's kind selects. `web` and no kind at all get the default image — the web
 // layer keeps the `:latest` tag precisely so every project that predates kinds behaves exactly as it
 // always did, with no digest change and no box churn. Only a kind that positively needs less gets less.
+//
+// `VIBEBOARD_AGENT_IMAGE` REDIRECTS THE WEB IMAGE AND NOTHING ELSE, which is why the base is a literal
+// here and not a second variable. The override exists so a machine can point the ordinary box at an
+// image of its own; the base is what `Dockerfile.agent` says `FROM`, so a kind that selects it is
+// selecting a name the build produces rather than a name anybody chose.
 export function imageForKind(kind: BoxKind | undefined, webImage: string = DEFAULT_IMAGE): string {
   if (kind === undefined || kind === 'web') return webImage;
   return BASE_IMAGE;

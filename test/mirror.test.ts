@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as coreAutopilot from '../src/core/autopilot.js';
 import * as coreState from '../src/core/autopilot-state.js';
 import * as coreBackends from '../src/core/backends.js';
+import * as coreBoxKinds from '../src/core/box-kinds.js';
 import * as coreDiary from '../src/core/diary.js';
 import * as coreGate from '../src/core/dispatch-gate.js';
 import { skillRel } from '../src/core/layout.js';
@@ -45,6 +46,14 @@ describe('web/shared mirrors src/core', () => {
     for (const reason of coreGate.STOP_REASONS) {
       expect(webApi.isSuccessReason(reason), reason).toBe(coreGate.isSuccessReason(reason));
     }
+  });
+
+  // A TYPE UNION HAS NO RUNTIME KEYS EITHER, so the web side exports the list and derives its union from
+  // it — the `AUTOPILOT_CONFIG_KEYS` precedent below, for the same reason. The kind decides which IMAGE a
+  // project's box is built from, so a kind the server knows and the browser does not is a project that
+  // cannot be set to it, and a kind the browser offers and the server refuses by name is worse.
+  it('mirrors the box kinds', () => {
+    expect([...web.BOX_KINDS]).toEqual([...coreBoxKinds.BOX_KINDS]);
   });
 
   // The gap slice D's review found, one level in: `AutopilotConfig` is hand-mirrored and nothing

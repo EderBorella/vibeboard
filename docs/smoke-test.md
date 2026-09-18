@@ -90,15 +90,24 @@ npm run build && npm start
 and — the line that matters — `agents run in containers (<image>)`. If it says agents are DISABLED, stop
 and read the reason; that is a finding, not a nuisance.
 
-**What silence proves.** If the agent image is already built, the start prints nothing about it. That is
-the idempotent path working. If the image is missing it builds it here, streaming into the terminal,
-which takes minutes on a first run — also correct, and the reason that build lives in the start script
-rather than in a command somebody has to know about.
+**What silence proves.** There are **two** images since kinds — the shared base and the web layer that
+stands on it — and a start holding both prints nothing about either. That is the idempotent path working:
+two `docker image inspect`s. A start missing one builds it here, streaming into the terminal, which takes
+minutes on a first run — also correct, and the reason that build lives in the start script rather than in
+a command somebody has to know about.
+
+**On the first start after upgrading into kinds, a multi-minute build here is the expected case**, not a
+finding: a machine whose `vibeboard-agent:latest` predates the split has no `vibeboard-agent:base`, so the
+base is built and the web layer, which already exists under its old tag, is left alone. Expect a line per
+box replaced too — the spec digest changed, so every existing box is thrown away once, and the server now
+says which.
 
 ## A2. The refusals refuse
 
-`POST /api/boxes/build` with an empty body. With the image present it must answer
-`{"ok":true,"already":true}` and do nothing.
+`POST /api/boxes/build` with an empty body. With **both** images present it must answer
+`{"ok":true,"already":true}`, do nothing, and — the part that is easy to miss — send no `box:build` frames
+at all: with Settings open, the build log must not flash into "running" and back for a build that did not
+happen. With only one of the two present it builds the other and answers `already: false`.
 
 Then the delete guards, which are the important ones, because this is the only recursive delete a user
 can aim. **All four must refuse and nothing may be removed:**

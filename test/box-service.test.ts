@@ -345,6 +345,41 @@ describe('the kind decides the image, resolved in one place', () => {
     );
   });
 
+  // WHAT THE READER DOES WITH A CONFIG IT CANNOT USE, which used to be one bare `catch` answering
+  // "no box settings" to every possible fault. Three different situations were one, and two of them
+  // are silent: a project mid-scaffold, a config that will not parse, and a `box:` that is not a map.
+  describe('the config reader', () => {
+    // No `settings` injected, deliberately: the reader is the subject here, so it must be the real one.
+    const boxes = (calls: string[][] = []) =>
+      new BoxService({ manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }) });
+
+    it('reads a project with no config file at all as no box settings', async () => {
+      // Mid-scaffold, or a root that is not a project yet. The only fault that is genuinely absence.
+      const root = await project();
+      const calls: string[][] = [];
+      await boxes(calls).ensure(root, 'claude-code');
+      expect(createArgv(calls)).toContain('vibeboard-agent:latest');
+    });
+
+    it('refuses a config it cannot read rather than pretending there were no settings', async () => {
+      // The silent one: a hand edit that breaks the YAML gave the project the default image and an
+      // empty package list, which is a box that is not the one the file asks for.
+      const root = await project();
+      writeFileSync(join(root, CONFIG_DIR, 'config.yaml'), 'box: {kind: web\npackages: [\n');
+      await expect(boxes().ensure(root, 'claude-code')).rejects.toThrow(
+        /the project's config could not be read: /,
+      );
+    });
+
+    it('refuses a box block that is not a map, by name', async () => {
+      const root = await project();
+      writeFileSync(join(root, CONFIG_DIR, 'config.yaml'), 'name: p\nbox: web\n');
+      await expect(boxes().ensure(root, 'claude-code')).rejects.toThrow(
+        "the project's box block must be a map — fix .vibeboard/config.yaml",
+      );
+    });
+  });
+
   // AND THE READER ITSELF, on a config file written by the real writer. Every test above injects
   // `settings`, so between them they prove only that the resolver agrees with a fake — the seam where
   // the config is actually read would be unexercised, which is how a mock comes to agree with itself.

@@ -134,13 +134,29 @@ function boxShape(backend: BoxBackend): { publishPort?: number; command: string[
 // decision 75.
 type BoxSettings = { kind?: unknown; packages?: unknown };
 
+// ONLY AN ABSENT FILE IS ABSENT SETTINGS. The bare `catch` here answered "no box settings" to every
+// possible fault, which folded three different situations into one and silenced two of them: a project
+// mid-scaffold is genuinely the default, but a config that will not parse is a file whose contents were
+// ignored — the box comes up on the default image with no packages, which is not what the file asks for
+// and says nothing about why. The `mode` precedent again (decision 72): never default past a fault the
+// person can fix.
 async function boxSettingsFor(projectRoot: string): Promise<BoxSettings> {
+  let config: { box?: unknown } | null;
   try {
-    const config = (await readConfig(projectRoot)) as { box?: BoxSettings };
-    return config.box ?? {};
-  } catch {
-    return {};
+    config = (await readConfig(projectRoot)) as { box?: unknown } | null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw new Error(`the project's config could not be read: ${(err as Error).message}`);
   }
+  const box = config?.box;
+  // `null` is an empty `box:` key, which is an empty block and holds no claim to misread. Anything else
+  // that is not a map — `box: web`, a list of names — is a person putting the value where the block goes,
+  // and defaulting it would run the box on the shape they were trying to leave.
+  if (box === undefined || box === null) return {};
+  if (typeof box !== 'object' || Array.isArray(box)) {
+    throw new Error("the project's box block must be a map — fix .vibeboard/config.yaml");
+  }
+  return box as BoxSettings;
 }
 
 // Refusals with names, because config is a hand-editable file: a mistyped kind or a shell-shaped

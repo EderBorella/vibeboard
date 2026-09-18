@@ -27,6 +27,7 @@ import { AutopilotHelp } from './AutopilotHelp';
 import { FocusPicker } from './FocusPicker';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { LifecyclePicker } from './LifecyclePicker';
+import { ReviewFeatures } from './ReviewFeatures';
 import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
@@ -576,6 +577,20 @@ export function AutopilotBar({
           the result on its own line under the button. */}
       <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
+        {/* DECISION 74 — the other thing that can be beside a stop sentence, and the only one that is not a
+            repair. It sits here for the reason the row above it cannot take it: three controls do not fit on
+            a bar that already wants 1504px of the 1277 it has. */}
+        <ReviewFeatures
+          reason={state?.reason}
+          config={autopilotConfig}
+          features={features}
+          disabled={switching !== null}
+          onFocus={chooseFocus}
+          onConfirm={async () => {
+            await startAutopilot();
+            onChanged();
+          }}
+        />
       </Stack>
 
       {open && (

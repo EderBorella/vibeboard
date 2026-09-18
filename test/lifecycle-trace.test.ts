@@ -150,9 +150,14 @@ async function start(
 // `ticks` bounds the run for the tests that are about a prefix of the lifecycle rather than all of it. The
 // state file is the loop's own stop control, so a budget expressed through it stops the loop the way a person
 // pressing Stop does rather than by reaching inside it.
-async function drive(
+// ONE SESSION OF THE LOOP. Every trace below spans TWO of them now — see `drive`.
+async function driveOnce(
   started: Started,
   opts: { ticks?: number; unreviewedGates?: string[] } = {},
+  // SHARED ACROSS BOTH SESSIONS when there is one, and that is not a detail: `ticks` is how a test says "stop
+  // part-way and look". A budget that reset at the review gate would give every such test twice the run it
+  // asked for, and several of them then walked past the state they were written to inspect.
+  budget = { left: opts.ticks ?? 60 },
 ): Promise<LoopEnded> {
   const { project } = started;
   await writeAutopilotState(project.root, {
@@ -178,14 +183,12 @@ async function drive(
     settlePollMs: 10,
     settleTimeoutMs: 60_000,
   };
-  let ticks = 0;
-  const budget = opts.ticks ?? 60;
   return await runLoop({
     client,
     readState: async () => {
       const state = await readAutopilotState(project.root, new Date().toISOString());
-      ticks += 1;
-      return ticks > budget ? { ...state, state: 'stopped' } : state;
+      budget.left -= 1;
+      return budget.left < 0 ? { ...state, state: 'stopped' } : state;
     },
     addToCounters: async (dispatches) => {
       await updateAutopilotState(project.root, new Date().toISOString(), (current) => ({
@@ -200,6 +203,29 @@ async function drive(
     // Nothing sleeps: the idle wait is five seconds in production and there is nothing to wait for here.
     wait: async () => {},
   });
+}
+
+// EVERY TRACE HERE STARTS FROM AN EMPTY BOARD, so every one of them now meets the review gate (decision 74):
+// the loop derives the feature list and stops, and a person confirms before anything is built on it. That is
+// one human step, not a phase, so driving through it belongs here rather than repeated at fifteen call sites
+// where it would be noise around the thing each test is actually about.
+//
+// IT IS ASSERTED RATHER THAN ABSORBED, and that distinction is the whole reason this is not a silent second
+// call. A helper that just ran the loop twice would let the gate be deleted without one test in this file
+// noticing — and this file is the one that would have to notice, because it is the only place the whole
+// lifecycle runs. So the first ending must BE `review`: if the gate stops firing, all eighteen fail here.
+//
+// The second session is the person pressing Confirm. It re-reads the board from disk exactly as a resumed
+// loop does, which is also why the traces below are unchanged by any of this: the phases are the same
+// phases, in the same order, either side of a stop.
+async function drive(
+  started: Started,
+  opts: { ticks?: number; unreviewedGates?: string[] } = {},
+): Promise<LoopEnded> {
+  const budget = { left: opts.ticks ?? 60 };
+  const first = await driveOnce(started, opts, budget);
+  if (first.reason !== 'review') return first;
+  return await driveOnce(started, opts, budget);
 }
 
 async function diary(project: TestProject): Promise<DiaryEntry[]> {
@@ -396,6 +422,11 @@ for (const mode of MODES) {
         // line about the run. One derived feature, so the harness is F-002 and it sorts last.
         'harness F-002',
         'ran project derive-features',
+        // DECISION 74 — THE REVIEW GATE, and its position in this trace is the whole of what it buys. The
+        // derivation's two exits are already written above it, and the first card does not move until after
+        // it: a person has read the feature list before anything is built on top of it. The second session
+        // below this line is that person having confirmed.
+        'stopped review',
         'move features/F-001 todo',
         'move features/F-001 in-progress',
         'ran F-001 break-down',

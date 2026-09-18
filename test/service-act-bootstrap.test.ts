@@ -201,6 +201,48 @@ describe('the scaffolding stamp', () => {
     expect(r.flags[0]?.card).toBe('F-001');
   });
 
+  // DECISION 74 — THE GATE. The loop derives the feature list, stamps its exits, and stops. This is the one
+  // decision in the machine that is NOT in `decideTick`, and the reason is worth keeping beside the tests:
+  // `decideTick` sees a board, and a board of freshly-derived features is indistinguishable from one that has
+  // been there for weeks. Only the loop that just ran the bootstrap knows which it is looking at.
+  it('stops for review once it has derived a feature list', async () => {
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-001'), feature('F-002', 'backlog', 20)],
+    });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.stop?.reason).toBe('review');
+    // The COUNT is the whole reason this detail replaces its canned sentence — a reader can check it against
+    // the board in one glance.
+    expect(result.stop?.detail).toContain('2 features');
+    // And it ends on the action, because this reaches a balloon that truncates.
+    expect(result.stop?.detail).toMatch(/confirm\.$/);
+  });
+
+  it('stops for review AFTER its exits are stamped, never instead of them', async () => {
+    // The order is the rule. A gate that stopped before the scaffolding flag and the harness feature were
+    // written would hand a person a list to confirm and then lose the two facts that decide what gets built
+    // from it — and the loop does not run again to finish the job.
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-001'), feature('F-002', 'backlog', 20)],
+    });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags).toEqual([{ board: 'features', card: 'F-001', body: { setup: true } }]);
+    expect(r.created.some((c) => c.title === HARNESS_FEATURE.title)).toBe(true);
+    expect(result.stop?.reason).toBe('review');
+  });
+
+  it('does not stop for review when the bootstrap derived nothing', async () => {
+    // There is nothing to review, and the attempt cap in `decideTick` is what decides when to give up — a
+    // second opinion here would be a second cap disagreeing with the first.
+    const r = recorder({ settle: [projectRun()], boardBefore: [], boardCards: [] });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.stop).toBeUndefined();
+  });
+
   it('stamps nothing when the bootstrap created no card', async () => {
     const r = recorder({ settle: [projectRun()], boardBefore: [], boardCards: [] });
     await performAction(deps(r.client), BOOTSTRAP, context);
@@ -249,9 +291,15 @@ describe('the scaffolding stamp', () => {
     expect(made).toBeGreaterThan(flagged);
   });
 
-  it('carries on when the flag could not be written, rather than stopping the loop', async () => {
+  it('carries on when the flag could not be written, rather than stopping the loop over it', async () => {
     // The stamp is the exit of a run that has already happened. Losing it costs an ordering fact; stopping
     // costs the project.
+    //
+    // REWRITTEN FOR decision 74, and the distinction is the point. This used to assert `stop` was undefined,
+    // which was a PROXY for "it did not stop because of the flag" — valid only while nothing else stopped
+    // here. The gate stops every successful derivation now, so the proxy would read a deliberate stop as the
+    // failure it was written to catch. What it always meant is asserted directly instead: `review`, the
+    // derivation's own gate, and never a failure reason.
     const r = recorder({
       settle: [projectRun()],
       boardBefore: [],
@@ -259,7 +307,7 @@ describe('the scaffolding stamp', () => {
       flags: { ok: false, reason: 'refused with 409', fatal: false },
     });
     const result = await performAction(deps(r.client), BOOTSTRAP, context);
-    expect(result.stop).toBeUndefined();
+    expect(result.stop?.reason).toBe('review');
     expect(result.dispatches).toBe(1);
   });
 });
@@ -333,9 +381,12 @@ describe('the smoke-harness feature', () => {
       create: { ok: false, reason: 'refused with 409', fatal: false },
     });
     const result = await performAction(deps(r.client), BOOTSTRAP, context);
-    expect(result.stop).toBeUndefined();
+    // `review`, not undefined, and not a failure reason — see the note on the scaffolding-flag test above.
+    expect(result.stop?.reason).toBe('review');
     expect(result.dispatches).toBe(1);
     // And no diary line claiming a card that was never made.
     expect(r.diary.some((d) => d.text.includes('smoke harness'))).toBe(false);
+    // Nor a stop sentence claiming it, which is the same rule applied to the other thing a person reads.
+    expect(result.stop?.detail).not.toContain('smoke-harness');
   });
 });

@@ -704,8 +704,10 @@ describe('the spec digest', () => {
       command: ['sleep', 'infinity'],
     });
 
+  // Last moved by decision 75, which put the project's own package list in the hashed shape: one
+  // deliberate rebuild of every box that exists, and the reason this pin is a literal.
   it('is stable for an unchanged container shape', () => {
-    expect(digestOf()).toBe('99d6a0697e379b5a');
+    expect(digestOf()).toBe('72f76a4dbc92cd4c');
   });
 
   it('changes when anything the box is made of changes', () => {
@@ -718,5 +720,17 @@ describe('the spec digest', () => {
       command: ['sleep', 'infinity'],
     });
     expect(other).not.toBe(digestOf());
+  });
+});
+
+describe('the spec digest and the package list', () => {
+  const spec = { image: 'i', mounts: [], env: {}, publish: undefined, command: undefined };
+  it('a changed package list is a different box', () => {
+    const bare = specDigest({ ...spec, packages: [] });
+    const withJq = specDigest({ ...spec, packages: ['jq'] });
+    expect(withJq).not.toBe(bare);
+  });
+  it('order does not matter, so a reordered config does not rebuild anything', () => {
+    expect(specDigest({ ...spec, packages: ['a', 'b'] })).toBe(specDigest({ ...spec, packages: ['b', 'a'] }));
   });
 });

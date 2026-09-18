@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import type { BoxKind } from '../../core/box-kinds.js';
 import { CONFIG_DIR, RUNS_DIR } from '../../core/layout.js';
 
 // The agent box: one container per (project, backend), and the only place an agent runs.
@@ -41,6 +42,18 @@ export const BACKEND_LABEL = 'io.vibeboard.backend';
 const SPEC_LABEL = 'io.vibeboard.spec';
 
 export const DEFAULT_IMAGE = process.env.VIBEBOARD_AGENT_IMAGE ?? 'vibeboard-agent:latest';
+
+// The shared base every kind stands on. Presets are LAYERS on it, never separate images — three
+// projects on three kinds must not mean three times 3.5GB. decision 75.
+export const BASE_IMAGE = 'vibeboard-agent:base';
+
+// Which image a project's kind selects. `web` and no kind at all get the default image — the web
+// layer keeps the `:latest` tag precisely so every project that predates kinds behaves exactly as it
+// always did, with no digest change and no box churn. Only a kind that positively needs less gets less.
+export function imageForKind(kind: BoxKind | undefined, webImage: string = DEFAULT_IMAGE): string {
+  if (kind === undefined || kind === 'web') return webImage;
+  return BASE_IMAGE;
+}
 
 // The docker executable. Resolved per call rather than captured, and overridable, for ONE reason:
 // the suite needs to exercise the real wrapping. `aa-exec` was transparent — it ran the host command
@@ -290,13 +303,21 @@ export function netRuleArgs(box: string, image: string): string[] {
 // What must match for a running box to be reusable. Deliberately NOT the whole argv: the labels
 // carry the project path and backend, which are already in the name, and including the digest in its
 // own input would be circular.
-export function specDigest(spec: Omit<CreateArgs, 'name' | 'projectRoot' | 'backend' | 'user'>): string {
+export function specDigest(
+  spec: Omit<CreateArgs, 'name' | 'projectRoot' | 'backend' | 'user'> & { packages?: string[] },
+): string {
   const shape = {
     image: spec.image,
     mounts: spec.mounts.map((m) => `${m.source}:${m.target}${m.readOnly ? ':ro' : ''}`),
     env: Object.entries(spec.env).sort(),
     publish: spec.publish?.containerPort ?? null,
     command: spec.command ?? null,
+    // IN THE DIGEST, because replay only runs at creation: a digest that ignored the list would leave
+    // a live box silently missing (or keeping) a package for ever — the "looks confined" class of
+    // defect, applied to the toolchain. Sorted, so a reordered config is not a rebuild. Adding this
+    // key changes every existing digest once, deliberately: the same one-shot rebuild a shape bump
+    // does, and the mechanism the comment below already documents. decision 75.
+    packages: [...(spec.packages ?? [])].sort(),
     // THE SHAPE OF THE CONTAINER ITSELF, and it is in the digest so that a box created before it changed
     // is REPLACED rather than adopted. `--init` is not a per-spec choice — every box gets it — so without
     // a marker here the digest would be identical and every existing box on every machine would keep the

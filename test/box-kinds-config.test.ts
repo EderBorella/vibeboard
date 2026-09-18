@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOX_KINDS, isBoxKind } from '../src/core/box-kinds.js';
+import { BASE_IMAGE, DEFAULT_IMAGE, imageForKind } from '../src/server/boxes/containers.js';
 import { defaultConfig } from '../src/store/project/config.js';
 
 describe('the kind vocabulary', () => {
@@ -14,5 +15,19 @@ describe('the kind vocabulary', () => {
     // New projects keep the behaviour every project had before kinds existed — the checkup can open a
     // page. Absence (an old project) means the same image, decided in imageForKind, not backfilled here.
     expect(defaultConfig('p').box).toEqual({ kind: 'web' });
+  });
+});
+
+describe('which image a kind selects', () => {
+  it('web and no-kind get the default image; game and research get the base', () => {
+    expect(imageForKind('web')).toBe(DEFAULT_IMAGE);
+    expect(imageForKind(undefined)).toBe(DEFAULT_IMAGE);
+    expect(imageForKind('game')).toBe(BASE_IMAGE);
+    expect(imageForKind('research')).toBe(BASE_IMAGE);
+  });
+
+  it('honours a caller-held web image, so the env override keeps meaning something', () => {
+    expect(imageForKind('web', 'custom:tag')).toBe('custom:tag');
+    expect(imageForKind('research', 'custom:tag')).toBe(BASE_IMAGE);
   });
 });

@@ -135,8 +135,11 @@ export class BoxService {
     return this.#manager;
   }
 
-  async probe(): Promise<ProbeResult> {
-    return this.#manager.probe(this.#image);
+  // The argument matters now: the image ensurer asks about the base and the web layer separately, and
+  // a probe that silently answered for the default image would report the base present on a machine
+  // that has never built it. decision 75.
+  async probe(image: string = this.#image): Promise<ProbeResult> {
+    return this.#manager.probe(image);
   }
 
   // Called before every agent turn, not only at project creation. Creation is when a box is normally

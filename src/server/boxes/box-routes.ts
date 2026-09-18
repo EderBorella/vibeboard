@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AutopilotStateName } from '../../core/autopilot-state.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { type BoxBackend, boxName } from './containers.js';
-import { buildAgentImage } from './image-build.js';
+import { ensureAgentImages } from './image-build.js';
 
 // Throwing a project's boxes away, and nothing else.
 //
@@ -89,15 +89,25 @@ export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     }
     // REFUSED IF DOCKER ITSELF IS DOWN, rather than spending a failed build to discover it. `probe`
     // names which of the two is missing precisely so this can be told apart.
+    //
+    // A PRESENT WEB LAYER IS NOT A FINISHED JOB, so this no longer returns early on it: the base can be
+    // absent on a machine whose `:latest` predates the split, and the ensurer is what notices. It is
+    // idempotent, so "already" falls out of its answer rather than out of a second probe. decision 75.
     const before = await boxes.probe();
-    if (before.ok) return { ok: true, already: true };
-    if (before.missing !== 'image') return reply.code(409).send({ error: before.reason });
+    if (!before.ok && before.missing !== 'image') return reply.code(409).send({ error: before.reason });
 
     ctx.broadcast({ type: 'box:build', state: 'start' });
-    const result = await buildAgentImage((line: string) => ctx.broadcast({ type: 'box:build', line }));
-    ctx.broadcast({ type: 'box:build', state: result.ok ? 'done' : 'failed', line: result.last });
-    req.log.info({ ok: result.ok }, 'agent image build finished');
-    if (!result.ok) return reply.code(500).send({ error: `The build failed: ${result.last}` });
-    return { ok: true, already: false };
+    const result = await ensureAgentImages(boxes, (line: string) =>
+      ctx.broadcast({ type: 'box:build', line }),
+    );
+    ctx.broadcast({
+      type: 'box:build',
+      state: result === 'failed' || result === 'no-docker' ? 'failed' : 'done',
+    });
+    req.log.info({ result }, 'agent image build finished');
+    if (result === 'failed' || result === 'no-docker') {
+      return reply.code(500).send({ error: 'The build failed — the streamed lines carry the reason.' });
+    }
+    return { ok: true, already: result === 'present' };
   });
 }

@@ -274,6 +274,16 @@ export const MAX_ENTRY_TEXT = 2000;
 export const BOX_KINDS = ['web', 'game', 'research'] as const;
 export type BoxKind = (typeof BOX_KINDS)[number];
 
+// greenfield = a brand-new folder (full scaffold + sample cards).
+// brownfield = adopt an existing repo: add the cockpit alongside what's already there, appending only
+// pointers to CLAUDE.md / AGENTS.md and creating no sample cards.
+//
+// Mirrors ScaffoldMode in src/store/project/scaffold.ts. HERE rather than in `api/project.ts`, where it
+// was declared, because the wizard state below carries one and `api/project.ts` imports THIS file — a
+// wire type the mirrors depend on cannot live above them. It is still re-exported from there, so the
+// barrel and its callers are unchanged.
+export type ScaffoldMode = 'greenfield' | 'brownfield';
+
 export const AUTOPILOT_CONFIG_KEYS = [
   'maxIterations',
   'budgetUsd',
@@ -355,3 +365,27 @@ export const SNAPSHOT_NOT_MIRRORED = [
 type UnlistedSnapshotField = Exclude<keyof ProjectSnapshot, (typeof SNAPSHOT_FIELDS)[number]>;
 const _everySnapshotFieldIsListed: UnlistedSnapshotField extends never ? true : UnlistedSnapshotField = true;
 void _everySnapshotFieldIsListed;
+
+// THE SETUP WIZARD'S SCRATCH STATE, mirroring src/store/project/wizard.ts. It is not the project
+// config and never becomes it: `.vibeboard/wizard.yaml` is deleted when setup finishes or is
+// abandoned, so its absence is what tells the shell there is no wizard to offer.
+//
+// A LIST, then the union derived from it, for the reason `BOX_KINDS` above is a list: a type has no
+// runtime value, so nothing could hold the two sides together. Asserted in test/mirror.test.ts.
+export const WIZARD_STEPS = ['backend', 'form', 'handoff'] as const;
+export type WizardStep = (typeof WIZARD_STEPS)[number];
+
+export interface WizardAnswers {
+  what?: string;
+  who?: string;
+  done?: string;
+}
+
+export interface WizardState {
+  mode: ScaffoldMode;
+  step: WizardStep;
+  answers?: WizardAnswers;
+  // Plain-language summaries of the foundation documents, written during the loop and dying with this
+  // file. The browser reads them; nothing here writes them.
+  resumes?: Record<string, string>;
+}

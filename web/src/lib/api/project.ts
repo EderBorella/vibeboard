@@ -1,6 +1,6 @@
 // The open project: what is open, its config, and the two ways one comes into existence.
 
-import type { ProjectConfig, ProjectSnapshot } from '../shared';
+import type { ProjectConfig, ProjectSnapshot, ScaffoldMode } from '../shared';
 import { patch, post, request } from './http';
 
 export interface ProjectRef {
@@ -25,10 +25,9 @@ export function openProject(path: string): Promise<{ snapshot: ProjectSnapshot }
   return post('/api/project/open', { path });
 }
 
-// greenfield = a brand-new folder (full scaffold + sample cards).
-// brownfield = adopt an existing repo: add the cockpit alongside what's already there,
-// appending only pointers to CLAUDE.md / AGENTS.md and creating no sample cards.
-export type ScaffoldMode = 'greenfield' | 'brownfield';
+// Declared in `../shared` with the other wire types, because the wizard's state carries one and that
+// file cannot import this one. Re-exported so every caller and the barrel keep their import path.
+export type { ScaffoldMode } from '../shared';
 
 export function scaffoldProject(
   path: string,

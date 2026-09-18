@@ -16,9 +16,9 @@ import {
 // cannot be answered at all.
 //
 // Testing this by mounting the shell would mean mocking a dozen hooks to assert on markup; testing it
-// here costs four booleans.
+// here costs five booleans.
 
-type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'work';
+type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'wizard' | 'work';
 
 interface ShellState {
   signedIn: boolean;
@@ -27,6 +27,9 @@ interface ShellState {
   ready: boolean;
   showGate: boolean;
   hasSnapshot: boolean;
+  // Whether setup is being walked through right now. Not "is there a wizard file" — a person who skips
+  // keeps the file, so the two answers differ from the moment they do.
+  wizard: boolean;
 }
 
 // Whether signing in has just happened, and everything keyed on the project counter therefore has to
@@ -48,6 +51,9 @@ export function chooseContent(state: ShellState): ShellContent {
   if (!state.signedIn) return 'signin';
   if (!state.ready) return 'loading';
   if (state.showGate) return 'gate';
+  // Before the snapshot check, because the identity step runs with no project open at all — and after
+  // the gate, because Switch Project must always win over a wizard in progress. decision 76.
+  if (state.wizard) return 'wizard';
   if (!state.hasSnapshot) return 'empty';
   return 'work';
 }

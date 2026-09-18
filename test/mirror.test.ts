@@ -12,6 +12,7 @@ import * as coreSkills from '../src/core/skills.js';
 import * as coreSuggestions from '../src/core/suggestions.js';
 import * as core from '../src/core/types.js';
 import * as serverSnapshot from '../src/server/boards/snapshot.js';
+import * as storeWizard from '../src/store/project/wizard.js';
 import * as webApi from '../web/src/lib/api.js';
 import * as web from '../web/src/lib/shared.js';
 import * as webRuns from '../web/src/organisms/runs/viewmodel.js';
@@ -54,6 +55,14 @@ describe('web/shared mirrors src/core', () => {
   // cannot be set to it, and a kind the browser offers and the server refuses by name is worse.
   it('mirrors the box kinds', () => {
     expect([...web.BOX_KINDS]).toEqual([...coreBoxKinds.BOX_KINDS]);
+  });
+
+  // Same shape and the same reason: a type union has no runtime value, so the web side exports the list
+  // and derives its union from it. The steps decide what the wizard renders and what a resumed setup
+  // comes back to, so a step the server writes and the browser cannot name is a person stuck on a blank
+  // screen with their answers still on disk.
+  it('mirrors the wizard steps', () => {
+    expect([...web.WIZARD_STEPS]).toEqual([...storeWizard.WIZARD_STEPS]);
   });
 
   // The gap slice D's review found, one level in: `AutopilotConfig` is hand-mirrored and nothing

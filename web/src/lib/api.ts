@@ -156,3 +156,4 @@ export {
   type SkillCatalogue,
 } from './api/skills';
 export { cardSuggestion, listSuggestions, patchSuggestion } from './api/suggestions';
+export { clearWizard, getWizard, putWizard } from './api/wizard';

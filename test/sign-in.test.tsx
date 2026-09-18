@@ -99,7 +99,7 @@ describe('when it stopped', () => {
 // scaffold 401s — so showing it is showing a screen whose every button fails. `!signedIn` has to come
 // first, and that is a decision worth holding in one testable place rather than in JSX.
 describe('what the shell shows', () => {
-  const base = { signedIn: true, ready: true, showGate: false, hasSnapshot: true } as const;
+  const base = { signedIn: true, ready: true, showGate: false, hasSnapshot: true, wizard: false } as const;
 
   it('shows sign-in before anything else when there is no credential', () => {
     // Every other condition says "show the board" — only the credential is missing.
@@ -114,6 +114,19 @@ describe('what the shell shows', () => {
     expect(chooseContent({ ...base, ready: false })).toBe('loading');
     expect(chooseContent({ ...base, showGate: true })).toBe('gate');
     expect(chooseContent({ ...base, hasSnapshot: false })).toBe('empty');
+    expect(chooseContent(base)).toBe('work');
+  });
+
+  // The wizard sits BETWEEN the gate and the snapshot check, and both edges are the point. Its first
+  // step scaffolds, so it has to be reachable with no project open; and Switch Project is an explicit
+  // request that must win over a setup someone left half-finished.
+  it('the wizard shows instead of the work area, and never over the gate or sign-in', () => {
+    const inWizard = { ...base, wizard: true };
+    expect(chooseContent(inWizard)).toBe('wizard');
+    expect(chooseContent({ ...inWizard, hasSnapshot: false })).toBe('wizard');
+    expect(chooseContent({ ...inWizard, showGate: true })).toBe('gate');
+    expect(chooseContent({ ...inWizard, ready: false })).toBe('loading');
+    expect(chooseContent({ ...inWizard, signedIn: false })).toBe('signin');
     expect(chooseContent(base)).toBe('work');
   });
 });

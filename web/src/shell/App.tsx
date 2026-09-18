@@ -198,6 +198,9 @@ export function App() {
     ready,
     showGate,
     hasSnapshot: Boolean(snapshot),
+    // Nothing enters the wizard yet — the doors and the surface itself are the next two steps of this
+    // phase. Stated rather than defaulted in `chooseContent`, so the shell cannot forget to answer it.
+    wizard: false,
   });
   let content: ReactNode;
   if (which === 'signin') content = <SignIn phase={signin.phase} onRetry={signin.retry} />;

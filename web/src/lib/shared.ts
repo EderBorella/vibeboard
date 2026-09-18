@@ -286,6 +286,7 @@ export interface ProjectConfig {
   maxConcurrentRuns: number;
   autopilot?: AutopilotConfig; // absent on a project created before the lifecycle existed
   enforceOneParent?: boolean; // one parent per card, applied to the copilot and the browser too
+  box?: { kind?: 'web' | 'game' | 'research'; packages?: string[] }; // absent = the pre-kinds default image
   copilot: CopilotConfig;
 }
 

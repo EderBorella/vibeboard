@@ -46,7 +46,7 @@ export async function afterProjectRun(
   // and a board that could not be read is not evidence that it did.
   // THE GATE — decision 74, and the register carries what this placement costs as well as what it buys: a
   // loop killed between these board writes and `finish` reporting the stop leaves a list nobody confirmed
-  // and no record saying so.
+  // and no record saying so. Accepted rather than overlooked, with the two ways out written down there.
   //
   // Set inside this branch and nowhere else, so the three conditions that decide
   // whether the exits are written are the same three that decide whether there is anything to review. A

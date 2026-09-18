@@ -4,6 +4,11 @@ import { fixedSandbox, liveSandbox, NOT_REQUESTED } from '../src/server/boxes/sa
 // A fake daemon whose answer can be changed between calls, and which counts how often it was asked.
 // The counting is half the point: the whole reason this is cached is that two `docker` calls cost
 // 30-40ms and three gates ask within one dispatch.
+//
+// ONE PROBE IS NOW TWO CALLS, one per image — the web layer and the shared base a `game` or `research`
+// box is built from. It answers the same for both, which models the two states a machine is actually in
+// (built, or never built); which of the two is missing is `test/sandbox.test.ts`'s subject. The counts
+// below are therefore even, and what they still pin is that four callers do not make four probes.
 function daemon(initial: boolean) {
   let ok = initial;
   let calls = 0;
@@ -15,7 +20,7 @@ function daemon(initial: boolean) {
       return calls;
     },
     service: {
-      async probe(): Promise<{ ok: true } | { ok: false; reason: string }> {
+      async probe(_image?: string): Promise<{ ok: true } | { ok: false; reason: string }> {
         calls += 1;
         return ok ? { ok: true } : { ok: false, reason: 'the agent image is not built' };
       },
@@ -63,11 +68,11 @@ describe('the sandbox status is live', () => {
     clock += 999;
     await sandbox();
     await sandbox();
-    expect(d.calls).toBe(1);
+    expect(d.calls).toBe(2);
 
     clock += 2;
     await sandbox();
-    expect(d.calls).toBe(2);
+    expect(d.calls).toBe(4);
   });
 
   // A dispatch consults the gate, the copilot consults it, and the route consults it — concurrently,
@@ -79,7 +84,8 @@ describe('the sandbox status is live', () => {
 
     const answers = await Promise.all([sandbox(), sandbox(), sandbox(), sandbox()]);
     expect(answers.every((a) => a.ok)).toBe(true);
-    expect(d.calls).toBe(1);
+    // One probe's worth — two images — and not four probes' worth, which is the whole assertion.
+    expect(d.calls).toBe(2);
   });
 
   it('carries the reason through, because that is the sentence the UI shows', async () => {

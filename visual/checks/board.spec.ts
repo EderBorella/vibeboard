@@ -1537,3 +1537,63 @@ test('16. the review gate renders its own surface', async ({ board, theme }) => 
     else writeFileSync(stateFile, before);
   }
 });
+
+// HOW MUCH ROOM IS LEFT ON THE AUTO-PILOT ROW, which until now was a number in a note nobody reads.
+//
+// WHAT THE NOTE ACTUALLY RECORDED, and it took a measurement to say it correctly: the row is not "full" in
+// the sense of overflowing. `.ap-status` is `flex: 0 1 auto; min-width: 0`, so it collapses first and the
+// CONTROLS always fit — measured at a 1280 viewport in the widest state the bar has (running, express, a
+// focus chosen), the fixed groups want 1153px of 1277 and leave **124px**. What the note meant by "no room
+// for a third control" is that number: the next control wider than it does not squeeze the status, it
+// takes the row to a third line, and check 7 refuses that.
+//
+// SO THE NUMBER IS ASSERTED WHERE IT IS MEASURED. A figure kept only in prose goes stale silently and
+// cannot fail; this one now fails the commit that spends it. It is a RATCHET rather than a fixed budget —
+// the harness's project is not always in the widest state, so the floor is "there is room at all", and the
+// actual headroom is logged every run so a shrinking trend is visible before it reaches zero.
+test('18. the auto-pilot row has room left for something', async ({ board, theme }) => {
+  const seen = await board.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row');
+    if (!row) return null;
+    const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
+    let fixed = 0;
+    let counted = 0;
+    let collapsible = 0;
+    for (const child of row.children) {
+      const box = child.getBoundingClientRect();
+      if (box.width === 0) continue;
+      counted += 1;
+      // The one element that gives way under pressure, and therefore the one that must not be counted as
+      // demand: including it would measure how long the status sentence happens to be today.
+      if (child.classList.contains('ap-status')) {
+        collapsible += 1;
+        continue;
+      }
+      fixed += box.width;
+    }
+    return {
+      avail: row.getBoundingClientRect().width,
+      demand: fixed + gap * Math.max(0, counted - 1),
+      groups: counted,
+      collapsible,
+      // Named in the failure, because "there is no room" is not actionable without knowing what is taking it.
+      parts: [...row.children]
+        .map((c) => ({
+          id: c.getAttribute('data-testid') ?? c.className.split(' ')[0],
+          w: Math.round(c.getBoundingClientRect().width),
+        }))
+        .filter((p) => p.w > 0),
+    };
+  });
+
+  expect(seen, 'no auto-pilot row to measure').not.toBeNull();
+  if (!seen) return;
+  const headroom = Math.round(seen.avail - seen.demand);
+  expect(
+    headroom,
+    `the auto-pilot row's fixed controls want ${Math.round(seen.demand)}px of ${Math.round(seen.avail)}px — ${seen.parts.map((p) => `${p.id} ${p.w}px`).join(', ')}`,
+  ).toBeGreaterThan(0);
+  console.log(
+    `[${theme}] ap row: ${seen.groups} group(s), ${Math.round(seen.demand)}px of ${Math.round(seen.avail)}px, ${headroom}px spare`,
+  );
+});

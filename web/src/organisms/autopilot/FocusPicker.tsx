@@ -16,10 +16,14 @@ export const NO_FOCUS = '';
 //
 // The id is never shortened either: it is the part that identifies the card, and it is what the config holds.
 // A CHARACTER COUNT STANDING IN FOR A PIXEL BOX, and the number is measured rather than reasoned. The select
-// is 288px wide, of which about 252 is usable once the padding and the native arrow are taken; the row's font
+// was 288px wide, of which about 252 is usable once the padding and the native arrow are taken; the row's font
 // runs about 7px per character on this text, so 38 characters overran it and clipped "(finished)" to "(finish".
-// 32 leaves room for the wide glyphs a proportional font makes no promises about.
-const LABEL_CHARS = 32;
+// 32 left room for the wide glyphs a proportional font makes no promises about.
+//
+// RE-DERIVED AT 256px (16rem), which is what the lane became when check 18 was armed — the row's fixed
+// controls wanted 1293px of 1277 and this was the only discretionary width on it. 256px leaves about 220
+// usable, so 31 characters at the same 7px; 30 keeps the same margin for wide glyphs that 32 kept at 288.
+const LABEL_CHARS = 30;
 const MIN_TITLE = 8;
 
 function label(id: string, title: string, suffix = ''): string {

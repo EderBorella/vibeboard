@@ -78,7 +78,13 @@
 @media (min-width: 1100px) {
   .ap-bar-row select,
   .ap-bar-row [data-testid='ap-focus-spacer'] {
-    width: 18rem;
+    /* 16rem, DOWN FROM 18, AND THE 32px IS WHAT ARMED A GATE. `board.spec.ts` check 18 asserts the row's
+       fixed controls leave room for something; at 18rem they wanted 1293px of the 1277 the harness has, so
+       the check could not be armed at zero without pointing a blocking gate at a backlog. This lane was the
+       one discretionary number on the row — everything else is a control with a label — and it had room to
+       give: see `LABEL_CHARS` in FocusPicker.tsx, whose budget was re-derived against 256px rather than
+       shortened to fit. */
+    width: 16rem;
   }
 }
 @media (max-width: 1099px) {

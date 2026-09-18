@@ -1,0 +1,72 @@
+# The agent box's shared base: the agent CLIs and a toolchain, and no way onto the host.
+#
+# This file USED TO SAY "one image means one build and one thing to keep current", and that rule was
+# revisited rather than forgotten — decision 75. Its reason was maintenance, never security:
+# credential isolation is done with MOUNTS (an OpenCode box simply never has the Claude credential
+# mounted into it) and is untouched by how many images exist. What changed the trade is a project's
+# KIND: the headless browser is 1.5GB that only a web project uses, so it moved to a layer
+# (Dockerfile.agent, FROM this base) and a box is created from the image its kind selects. Layers on
+# one base, never separate images — docker shares the base, so the marginal cost of a preset is its
+# delta.
+#
+# Versions are pinned to the host's deliberately: both CLIs resume sessions from state that the host
+# and the box share over a bind mount, so a version skew here is a skew across the same files.
+FROM node:22-slim
+
+# curl is not optional: agents are told to call the VibeBoard API, and curl is how they do it.
+# Without it the first API call fails with `curl: not found`, which reads like a broken instruction
+# rather than a missing package.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates curl unzip \
+ && rm -rf /var/lib/apt/lists/*
+
+ARG CLAUDE_VERSION=2.1.221
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION}
+
+ARG OPENCODE_VERSION=1.17.18
+RUN npm install -g opencode-ai@${OPENCODE_VERSION} \
+ && opencode --version
+
+# iptables is for the SIDECAR, not for this box. VibeBoard applies the box's outbound rules from a
+# throwaway container sharing its network namespace, using this same image; the box itself is created
+# without NET_ADMIN, so nothing running in it can use this binary for anything. Installed here so the
+# sidecar needs no second image and no network access of its own to fetch one.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends iptables \
+ && rm -rf /var/lib/apt/lists/*
+
+# NO `sudo`, DELIBERATELY. The box has two levels — agent turns exec as the host user, package installs
+# exec as root, brokered by VibeBoard — and what keeps them apart is that the image contains no way to
+# cross between them. This is asserted by a test, because a base image or a package could reintroduce
+# it silently: `apt-get install -y sudo` is a dependency away.
+RUN ! command -v sudo >/dev/null 2>&1
+
+# Global installs land in the agent's own writable home rather than /usr/local, which needs root. This
+# is what makes the ordinary case need no escalation at all: `npm i -g <tool>` just works for the agent.
+# HOME is set explicitly because docker derives it from /etc/passwd, and a host uid that is not 1000
+# resolves to nothing — leaving HOME=/ , which is not writable. Every unprivileged install path
+# (pip --user, cargo, go, npm -g) depends on this being right for whatever uid the user happens to be.
+ENV HOME=/home/node
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH=/home/node/.npm-global/bin:$PATH
+RUN mkdir -p /home/node/.npm-global && chmod 0777 /home/node/.npm-global
+
+# The API relay and the entrypoint that starts it. Owned by root and world-readable: the box runs as
+# the host user's uid, which is not known at build time, so nothing here may depend on a particular one.
+# PATHS RELATIVE TO THIS DIRECTORY, because the build CONTEXT is this directory — changed 2026-09-01
+# so an installed VibeBoard can build its own image. It used to be the repository root, which meant the
+# build only worked inside a git clone; see `src/server/boxes/image-build.ts`.
+COPY relay.mjs /opt/vibeboard/relay.mjs
+COPY entrypoint.sh /opt/vibeboard/entrypoint.sh
+COPY vb-install /opt/vibeboard/vb-install
+RUN chmod 0755 /opt/vibeboard/entrypoint.sh /opt/vibeboard/relay.mjs /opt/vibeboard/vb-install
+
+# The agent runs as the host user's uid, passed at `docker run` time, so everything it creates in the
+# bind mount is owned by the person who owns the project. Its home must be writable by ANY uid, because
+# that uid is not known until then — this is what lets pip/cargo/go installs work without root.
+RUN chmod 0777 /home/node
+WORKDIR /work
+ENTRYPOINT ["/opt/vibeboard/entrypoint.sh"]
+# Keeps a box alive with no agent running in it: agents arrive by `docker exec`, and a container whose
+# main process has exited cannot be exec'd into. Overridden for OpenCode, whose box runs `opencode serve`.
+CMD ["sleep", "infinity"]

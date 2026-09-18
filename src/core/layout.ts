@@ -30,6 +30,11 @@
 export const CONFIG_DIR = '.vibeboard';
 export const CONFIG_FILE = 'config.yaml';
 
+// The wizard's own scratch state — the answers, the step, the résumés. A SEPARATE file, never a
+// config key: config.yaml is a frozen format that outlives setup, and this is transient by design —
+// deleted when the wizard finishes or is abandoned, so its absence is the one durable fact. decision 76.
+export const WIZARD_FILE = `${CONFIG_DIR}/wizard.yaml`;
+
 // Card content. Under a `boards/` level rather than directly in the folder so that `.vibeboard/`
 // means one thing per child: boards/, docs/, resources/ and skills/ are content, chat/ and runs/ are
 // machine state. Reversing this decision is this one constant.

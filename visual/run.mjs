@@ -267,6 +267,13 @@ async function furnish(projectRoot) {
     ],
     stats: { costUsd: 0.0142, turns: 1, lastDurationMs: 4200, contextTokens: 9364 },
   };
+  seedChat(projectRoot, chat);
+}
+
+// One writer for both transcripts on disk, because there are two projects that need one and a second
+// copy of the path and the serialisation is how they come to disagree. See the block above for why
+// this is written as the file rather than through `ChatStore`.
+function seedChat(projectRoot, chat) {
   const chatDir = join(projectRoot, '.vibeboard', 'chat');
   mkdirSync(chatDir, { recursive: true });
   writeFileSync(join(chatDir, `${chat.id}.json`), `${JSON.stringify(chat, null, 2)}\n`, 'utf8');
@@ -314,6 +321,151 @@ await writeWizardState(midSetup, {
       'A small web app written in TypeScript, with React for the screens and Vite to build them. Vitest for the tests. Nothing that needs a server of its own to begin with.',
     packages: ['git', 'ripgrep'],
   },
+});
+
+// A THIRD PROJECT, AT THE STEP AFTER THAT ONE, AND IT IS A THIRD RATHER THAN THE SECOND MOVED ON.
+// One `wizard.yaml` names one step, so a project can render exactly one of the wizard's screens — and
+// the stack step's surface is already recorded against the second. Re-pointing that file would have
+// traded one measured screen for another; a third project keeps both, and the recording pass is
+// unchanged because it opens each surface by NAME from the picker.
+//
+// THE REVIEW RENDERS FROM THE FILE AND NOTHING ELSE, which is the whole reason it can be measured
+// here: a documents step resumed with summaries already filed opens IN the review — no kick-off turn,
+// no authorise confirm — so this surface needs no agent, and there are none (`VIBEBOARD_DOCKER_BIN`
+// is `/bin/false`). The full six summaries and an agreed stack are what a resumed review has;
+// anything less renders placeholder cards, which is a different screen.
+//
+// AND THE DOCUMENTS THEMSELVES, because `Read it all` on a card really opens the file: the five
+// foundation documents through the product's own writer, at the paths the LISTING gives the browser,
+// and the README at the project root, which is not a control file and is read through the explorer.
+// Without them every card's full-text view would open on `Opening…` forever and the one affordance
+// this screen has would be measured as a button that does nothing.
+const { writeControlFile } = await import(pathToFileURL(join(REPO, 'dist/store/project/control-files.js')));
+const { foundationRel } = await import(pathToFileURL(join(REPO, 'dist/core/layout.js')));
+const review = join(projects, 'review');
+mkdirSync(review, { recursive: true });
+await scaffoldProject(review, { name: 'Drafts to read', mode: 'greenfield', today: '2026-01-01' });
+
+// Short and honest, in the voice the step's own brief asks for — including the admitted gap, which is
+// what `wizardFrame` tells the model to write rather than a plausible blank. CODE-QUALITY.md carries
+// the `gates:` list and TESTING.md the `smoke:` command because those two are contracts the product
+// reads, and a fixture document that omitted them would be a shape setup cannot produce.
+const FOUNDATION = {
+  'STACK.md': `# The stack
+
+TypeScript throughout. React for the screens, Vite to build and serve them, Vitest for the tests.
+Nothing runs on a server yet — the list lives in the browser.
+
+**I couldn't work out:** whether this ever has to sync between two phones. Say so in a sentence and
+this document changes.
+`,
+  'CODE-QUALITY.md': `---
+gates:
+  - name: types
+    command: npm run typecheck
+  - name: lint
+    command: npm run lint
+  - name: tests
+    command: npm test
+---
+
+# Quality gates
+
+Three commands, and all three pass before anything here is called done. They are the same three the
+machine runs, so there is nothing to remember separately.
+`,
+  'TESTING.md': `---
+smoke: npm run dev
+---
+
+# Testing
+
+Unit tests sit beside the code they test. A smoke test here means one pass by hand: start the app,
+add a meal, reload the page, and see that it is still there.
+`,
+  'UX.md': `# How it feels
+
+One screen. Big targets, because this gets used on a phone with one hand while something is on the
+hob. Adding a meal is the only thing the app ever asks for.
+`,
+  'DESIGN.md': `# How it looks
+
+One accent colour, generous spacing, the system font, nothing decorative.
+
+**I couldn't work out:** whether you want a dark mode. Tell me and it goes in.
+`,
+};
+for (const [name, content] of Object.entries(FOUNDATION)) {
+  const written = await writeControlFile(review, foundationRel(name), content);
+  if (!written) die(`the review fixture could not write ${name} — is it still a foundation document?`);
+}
+writeFileSync(
+  join(review, 'README.md'),
+  `# Meals
+
+A shared list of the meals we cook, so nobody has to plan dinner out of memory. Add what you made,
+see what you ate last week, and pick something out of it.
+
+It runs in the browser. \`npm install\`, then \`npm run dev\`; there is no server to stand up and no
+account to make.
+
+The documents that steer this project are in the foundation folder, and the setup assistant wrote
+the first draft of all of them.
+`,
+  'utf8',
+);
+
+await writeWizardState(review, {
+  mode: 'greenfield',
+  step: 'docs',
+  answers: {
+    what: 'A shared list of the meals we cook, so nobody has to plan dinner out of memory.',
+    who: 'The two of us at home, on a phone in the kitchen.',
+    done: 'We can see what we ate last week and pick from it in under a minute.',
+  },
+  // AGREED, not suggested: the stack step is behind this one, so a review reached without it is a
+  // state setup cannot reach — and it is the line `wizardFrame` puts in front of the model.
+  stack:
+    'A small web app in TypeScript, with React for the screens and Vite to build them. Vitest for the tests. The list lives in the browser to begin with.',
+  // ALL SIX, because a résumé map with gaps renders placeholder cards and this surface is the review
+  // as a person reaching it actually finds it. The order is the order they are written.
+  resumes: {
+    'README.md':
+      'What this is and how to run it. It says the app is a shared list of meals for the people who cook them, and that everything runs on your own machine for now.',
+    'STACK.md':
+      'The tools this is built with: TypeScript, React, Vite and Vitest. It also says what is deliberately not here yet — no server, no database.',
+    'CODE-QUALITY.md':
+      'The three checks that must pass before anything is called done: the types, the linter and the tests. Each one is a command you can run yourself.',
+    'TESTING.md':
+      'How this is tested, and what a smoke test means here: start the app, add a meal, reload, and see it still there.',
+    'UX.md':
+      'How it should feel. One screen, big targets for a phone, and nothing that needs explaining. Adding a meal is the only thing it asks of you.',
+    'DESIGN.md':
+      'How it should look: one accent colour, generous spacing, the system font. I could not work out whether you want a dark mode, and the document says so.',
+  },
+});
+
+// THE CONVERSATION THAT WROTE THEM, because the review is the summaries BESIDE it: the panel is the
+// larger half of this surface and an empty transcript would measure its frame and call it a screen.
+// Three kinds and not the dock's four — this turn succeeded, and an error bubble invented to raise a
+// count would be a state this fixture is not in.
+seedChat(review, {
+  id: '22222222-3333-4444-8555-666666666666',
+  title: "Please set up this project's documents from my answers.",
+  backend: 'claude-code',
+  model: 'sonnet',
+  createdAt: '2026-01-01T12:00:00.000Z',
+  updatedAt: '2026-01-01T12:06:00.000Z',
+  messageCount: 3,
+  items: [
+    { kind: 'user', text: "Please set up this project's documents from my answers." },
+    { kind: 'tool', text: 'PUT /api/control/foundation/DESIGN.md — 200', toolName: 'control' },
+    {
+      kind: 'assistant',
+      text: 'All six are written, and each one has a short summary beside it. One thing I could not work out: whether you want a dark mode — it is written down as an open question rather than guessed at.',
+    },
+  ],
+  stats: { costUsd: 0.0863, turns: 1, lastDurationMs: 361_000, contextTokens: 21_480 },
 });
 
 const stateFile = join(root, 'state.json');

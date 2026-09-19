@@ -208,6 +208,63 @@ export const SURFACES: Surface[] = [
     floor: { elements: 40, text: 15, contrast: 15, focus: 10 },
   },
   {
+    name: 'wizard-review',
+    what: "the setup wizard's review — six summaries beside the conversation that wrote them",
+    // The baseline records a 47px control height here beside --ctl-h's 28px and --mark-h's 16px, and it
+    // is the DOCK'S composer arriving with the embedded panel rather than anything setup declares —
+    // already recorded on `copilot` and on the five whole-document surfaces the dock is open on. Named
+    // here for the reason `wizard-stack`'s 32px is: so the next reader of a baseline diff does not hunt.
+    root: null,
+    open: async (page) => {
+      // A THIRD PROJECT, AND IT RESUMES STRAIGHT INTO THE REVIEW. Its `wizard.yaml` names the documents
+      // step and already carries all six summaries, which is the resume the loop is built around: the
+      // step offers to write nothing, dispatches nothing and raises no confirm when it opens on a
+      // project that has them — so this screen renders from the file alone, which is the only reason a
+      // harness with no agents can measure it. See visual/run.mjs.
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      await page.locator('.gate li').filter({ hasText: 'Drafts to read' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+      // The cards, not merely the card: the step renders its heading before the summaries land.
+      await page.locator('[data-testid="doc-card"]').first().waitFor({ state: 'visible' });
+    },
+    prove: async (page) => {
+      // THE PERSON'S OWN BUTTON, which is the whole ruling this screen exists for (W3, decision 78):
+      // nothing else advances setup from here. Enabled, because a turn in flight shuts it and there
+      // is no turn.
+      await expect(page.getByRole('button', { name: 'It reads right — continue' })).toBeEnabled();
+      // ALL SIX, AND ONE OF THEM BY ITS PLAIN NAME. The count says the full set is on screen — a
+      // résumé map with gaps renders placeholder cards, which is a different screen — and the name
+      // says these are the WIZARD'S cards and not a filename list (W7).
+      // SCOPED TO THE CARDS, because the selector below offers the same six plain names and a bare
+      // text match resolves to two elements — which is itself the point: the card face and the
+      // `Talking about` options are one vocabulary, so proving the name on a card has to say card.
+      await expect(page.locator('[data-testid="doc-card"]')).toHaveCount(6);
+      await expect(page.locator('[data-testid="doc-card"]').filter({ hasText: 'Quality gates' })).toHaveCount(
+        1,
+      );
+      // The subject selector above the chat, which is the other half of "this document" having a
+      // visible answer.
+      await expect(page.getByLabel('Talking about')).toBeVisible();
+      // THE DOCK'S OWN PANEL, EMBEDDED. Half this surface by element count, and the thing that makes
+      // it a review rather than a list: `.copilot` inside the step's own wrapper, so a panel that
+      // stopped being rendered here cannot be answered for by the dock on another surface.
+      await expect(page.locator('[data-testid="verbatim-conversation"] .copilot')).toBeVisible();
+      // AND NOTHING ASKED ANYTHING. The authorise confirm is what a documents step raises when it is
+      // about to write, and a resume that raised it would be the Plan C fault this step was changed to
+      // remove — measured here because it is also what would make every number below the dialog's.
+      await gone(page, '.vb-modal[data-size="sm"]');
+      await gone(page, '.gate');
+      await gone(page, 'main.boards');
+    },
+    // 147 elements are measured here and the floor is 120, which is not slack: the near miss it has to
+    // catch is this step's OTHER screen. The writing screen renders the same six cards in the same card
+    // and differs by the conversation, the selector above it and the advance under them — and the
+    // conversation alone is 65 elements where the `copilot` surface measures it. A floor under that
+    // would record the screen before the review as the review.
+    floor: { elements: 120, text: 45, contrast: 45, focus: 25 },
+  },
+  {
     name: 'card',
     what: 'an open card in the dock — its tab strip, the card view, its runs and the skill rail',
     root: '[data-testid="dock-body"]',

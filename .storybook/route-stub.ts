@@ -49,7 +49,7 @@
 // children's — an effect-time install is exactly one render too late for the thing it exists to catch.
 
 import { createElement, type FunctionComponent, type ReactElement, useEffect, useState } from 'react';
-import type { Accounting } from '../web/src/lib/api';
+import type { Accounting, ModelOption } from '../web/src/lib/api';
 
 export type StubHandler = (req: { path: string; query: URLSearchParams; init: RequestInit }) => unknown;
 // NOT `StubHandler | unknown`: that union REDUCES to `unknown`, which silently deletes the contextual type
@@ -153,6 +153,11 @@ export const EMPTY: RouteTable = {
   '/api/explorer/tree': { entries: [] },
   '/api/explorer/list': { entries: [], truncated: false },
   '/api/explorer/file': { path: '', content: '' },
-  '/api/models': { models: [] },
+  // A BARE ARRAY AND NOT `{ models }`, and it was the second row to be the wrong shape — the one this
+  // file's own warning was written about, found the same way: by the first story to consume it.
+  // `listModels` returns the body AS the list, so `{ models: [] }` made `models.find` a TypeError and
+  // took the whole story down with it. Annotated for `emptyAccounting`'s reason: a `RouteTable` value is
+  // `object`, so nothing checked the old one.
+  '/api/models': [] as ModelOption[],
   '/api/projects': { projects: [] },
 };

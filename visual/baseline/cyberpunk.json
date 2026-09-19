@@ -286,14 +286,57 @@
         "16px"
       ],
       "examined": {
-        "elements": 50,
-        "textElements": 21,
-        "overflow": 15,
+        "elements": 51,
+        "textElements": 22,
+        "overflow": 16,
         "clipping": 6,
-        "contrast": 21,
+        "contrast": 22,
         "tokens": 51,
         "rows": 3,
         "focus": 15
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "wizard-review": {
+      "fontSizes": [
+        "12px",
+        "13px",
+        "15px",
+        "18px"
+      ],
+      "radii": [
+        "10px",
+        "4px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "16px",
+        "28px",
+        "47px"
+      ],
+      "markerHeights": [
+        "16px"
+      ],
+      "examined": {
+        "elements": 147,
+        "textElements": 57,
+        "overflow": 43,
+        "clipping": 17,
+        "contrast": 57,
+        "tokens": 51,
+        "rows": 6,
+        "focus": 34
       },
       "findings": {
         "type": 0,

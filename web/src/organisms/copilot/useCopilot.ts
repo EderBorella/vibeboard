@@ -14,6 +14,11 @@ interface TurnOptions {
   backend?: string;
   model?: string;
   effort?: EffortLevel;
+  // THE DOCUMENT THE PERSON IS LOOKING AT, BY NAME — set while setup is writing the six documents, so
+  // "make this one shorter" has a subject. The server appends one context line to the model's copy and
+  // drops any name outside the fixed set, which is why this may travel as the plain word it is: the
+  // page cannot turn it into a path. decision 78.
+  attach?: string;
 }
 
 export interface TranscriptItem {

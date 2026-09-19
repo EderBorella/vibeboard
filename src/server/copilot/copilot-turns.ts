@@ -19,6 +19,10 @@ interface CopilotOpts {
   backend?: string;
   model?: string;
   effort?: EffortLevel;
+  // WHICH DOCUMENT THE PERSON IS LOOKING AT, by name, while setup is writing them. Unchecked here on
+  // purpose: the fixed set lives in `wizardFrame`, beside the one line it composes, so there is one
+  // place to read rather than a door that trusts a guard somewhere else. decision 78.
+  attach?: string;
 }
 
 // THE CLI'S OWN SLASH COMMAND, NOT A MESSAGE. Named once because two places have to agree on it: the
@@ -95,7 +99,12 @@ export function createCopilotTurns(ctx: AppCtx): {
   // WHAT THE MODEL GETS, WHICH IS NOT WHAT THE TRANSCRIPT GETS — see the two paragraphs at the call
   // site. Both prefixes are composed here so the one text that may carry NEITHER is refused once
   // rather than at each of them.
-  async function modelCopy(root: string, text: string, credential: Credential | undefined): Promise<string> {
+  async function modelCopy(
+    root: string,
+    text: string,
+    credential: Credential | undefined,
+    attach: string | undefined,
+  ): Promise<string> {
     // A slash command prefixed is a paragraph ending in a slash command: the CLI reads it as prose,
     // compacts nothing, and answers about the word instead. Broken by the credential section since
     // authority shipped, and the frame would have been the second way to break it. The credential is
@@ -105,7 +114,7 @@ export function createCopilotTurns(ctx: AppCtx): {
     // AND THE SAME SPLIT AGAIN, for the wizard's brief: it is about the person, so the person must
     // not be reading it in their own transcript. Composed here rather than in the browser's message
     // because a brief the client sends is a brief the client can edit. decision 77.
-    const frame = wizardFrame(await readWizardState(root));
+    const frame = wizardFrame(await readWizardState(root), attach);
     const framed = frame ? `${frame}\n\n---\n\n${text}` : text;
     return credential ? withCredential(credential.token, framed) : framed;
   }
@@ -141,7 +150,7 @@ export function createCopilotTurns(ctx: AppCtx): {
       // for ending it eagerly on every chat and project change rather than only on a send. The
       // exposure and its limits are stated in full in docs/security/containment.md.
       const credential = await turnCredential(root);
-      const modelText = await modelCopy(root, text, credential);
+      const modelText = await modelCopy(root, text, credential, opts.attach);
       const choice = resolveCopilotSelection(session.config?.copilot, {
         backend: opts.backend,
         model: opts.model,
@@ -193,6 +202,7 @@ export function createCopilotTurns(ctx: AppCtx): {
       backend?: string;
       model?: string;
       effort?: EffortLevel;
+      attach?: string;
     };
     try {
       msg = JSON.parse(raw);
@@ -204,6 +214,7 @@ export function createCopilotTurns(ctx: AppCtx): {
       backend: msg.backend,
       model: msg.model,
       effort: msg.effort,
+      attach: msg.attach,
     });
     switch (msg.type) {
       case 'copilot:send':

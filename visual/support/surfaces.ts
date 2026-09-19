@@ -324,12 +324,17 @@ export const SURFACES: Surface[] = [
     // WHAT THIS SURFACE CANNOT SEE, said here so nobody reads its passing as cover for the whole
     // step: once the turn is sent this screen carries the dock's panel worn compact, inside the
     // card's own measure — and that state needs a real model, exactly as the thinking indicator does
-    // on the `copilot` surface. `docs/smoke-test.md`'s full journey is what drives it.
+    // on the `copilot` surface. `docs/smoke-test.md`'s C7, "The import, with a real list", is what
+    // drives it — including the two states no fixture can reach, a turn the person stopped and a
+    // turn refused outright.
     //
-    // 45 elements are measured here and the near miss is the QUESTION screen behind the yes-door —
-    // the same card with the two boxes replaced by the no-door, measured at 39 by removing the click
-    // in `open` and running this surface. The floor sits between them, as `wizard-stack`'s does.
-    // Focus cannot separate the two (14 either way), so that number is an anti-vacuity floor only.
+    // 46 elements are measured here, 45 until the no-door started standing behind the yes-door as
+    // well — one button, and the baseline moved by exactly one element, one text element and one
+    // focusable in all three themes. The near miss is the QUESTION screen in front of it: the same
+    // card with the two boxes replaced by nothing, measured at 39 by removing the click in `open`
+    // and running this surface, and untouched by that button since it always carried both doors.
+    // The floor sits between them, as `wizard-stack`'s does. Focus barely separates the two (15
+    // here against the question's 14), so that number is an anti-vacuity floor only.
     floor: { elements: 42, text: 17, contrast: 17, focus: 12 },
   },
   {
@@ -350,7 +355,7 @@ export const SURFACES: Surface[] = [
       await expect(page.getByText('Set up as: Web App')).toBeVisible();
       await expect(page.locator('[data-testid="verbatim-stack"]')).toBeVisible();
       await expect(
-        page.getByText('Six documents written — read them any time in Project Control'),
+        page.getByText('6 documents written — read them any time in Project Control'),
       ).toBeVisible();
       // THE READINESS, ANSWERED. This project has its six documents, its gate documents are not
       // flagged and the scaffolder's cards are on the board, so `ok` is the honest answer and this is

@@ -169,8 +169,8 @@ for (const surface of SURFACES) {
     await surface.open(board);
     // PROVEN BEFORE MEASURED. Without this the checks below would happily examine the board again and
     // report a clean conformance under this surface's name — ten measurements of one page, which looks
-    // exactly like coverage. Each `prove` names something only this surface renders, and the four
-    // top-level views additionally assert the board is gone.
+    // exactly like coverage. Each `prove` names something only this surface renders, and the five
+    // top-level views that are not the board additionally assert the board is gone.
     await surface.prove(board);
 
     const baseline = await readBaseline(theme);

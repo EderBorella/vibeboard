@@ -10,8 +10,8 @@ import { expect, type Page } from '@playwright/test';
 //
 // THE TRAP, AND WHY EVERY SURFACE CARRIES A `prove`. A harness that measures the board ten times and
 // reports it as ten surfaces is WORSE than one that measures it once, because the numbers would look
-// like coverage. So each surface names something only it renders, and the four top-level views
-// additionally assert the board is GONE — a `goto` that silently landed back on the board, or an
+// like coverage. So each surface names something only it renders, and the five top-level views that
+// are not the board additionally assert the board is GONE — a `goto` that silently landed back on the board, or an
 // `open` step whose selector stopped matching, then fails the assertion instead of measuring the wrong
 // page. That is the same construction `openBoard` in fixtures.ts already uses to tell the board apart
 // from the sign-in gate, and it was proven there by planting a broken `lastProject`.
@@ -21,7 +21,7 @@ export interface Surface {
   what: string;
   // The element whose subtree is measured, or null for the whole document.
   //
-  // Null for the five top-level views, because a view IS the page. A selector for the five surfaces
+  // Null for the six top-level views, because a view IS the page. A selector for the five surfaces
   // that render OVER a page — the open card in the dock, the archive drawer, settings, the model
   // picker, the confirm dialog — all of which leave the board behind them, so a whole-document walk
   // would report the board's numbers again under a second name.
@@ -138,6 +138,30 @@ export const SURFACES: Surface[] = [
     prove: async (page) => {
       await expect(page.locator('section.control.explorer')).toBeVisible();
       await expect(page.locator('[data-testid="explorer-item"]').first()).toBeVisible();
+      await gone(page, 'main.boards');
+    },
+    floor: { elements: 40, text: 15, contrast: 15, focus: 3 },
+  },
+  {
+    name: 'wizard',
+    what: 'the setup wizard — its identity step, reached through the New project door on the picker',
+    root: null,
+    open: async (page) => {
+      // THE DOORS ARE PART OF THE PATH ON PURPOSE. The wizard has no URL of its own, and the only way a
+      // person reaches it is the one walked here: the top bar puts the picker up, and pressing a door is
+      // what takes the picker down again — `chooseContent` gives the gate precedence, so a door that
+      // failed to dismiss it would leave this measuring the picker under the wizard's name.
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: 'New project' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+    },
+    prove: async (page) => {
+      await expect(page.locator('.wizard-card')).toBeVisible();
+      // THE PICKER IS GONE, and this is the assertion the wizard's own class exists for: `openBoard`
+      // proves the board by counting `.gate` at zero, so a setup screen wearing the picker's frame would
+      // make one proof answer for two screens. Asserted here as well as there, in both directions.
+      await gone(page, '.gate');
       await gone(page, 'main.boards');
     },
     floor: { elements: 40, text: 15, contrast: 15, focus: 3 },

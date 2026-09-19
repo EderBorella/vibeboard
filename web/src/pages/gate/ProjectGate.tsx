@@ -57,7 +57,7 @@ export function ProjectGate({ onOpened, onNewProject, onMapProject }: Props) {
         <h2>Open a project</h2>
 
         {projects.length > 0 ? (
-          <List as="ul" gap={3} className="gate-list">
+          <List as="ul" gap={3}>
             {projects.map((p) => (
               // A region of a list that takes a click, with no voice of its own — a `Row`, not a
               // `Button`, which is the line Phase 4 drew. `inset` because it draws its box at rest,

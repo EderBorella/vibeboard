@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-09-16",
+  "recorded": "2026-09-19",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -219,6 +219,48 @@
         "contrast": 0,
         "tokens": 0,
         "rows": 1,
+        "focus": 0
+      }
+    },
+    "wizard": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px",
+        "18px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "16px",
+        "28px"
+      ],
+      "markerHeights": [
+        "16px"
+      ],
+      "examined": {
+        "elements": 44,
+        "textElements": 17,
+        "overflow": 11,
+        "clipping": 6,
+        "contrast": 17,
+        "tokens": 51,
+        "rows": 3,
+        "focus": 13
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
         "focus": 0
       }
     },

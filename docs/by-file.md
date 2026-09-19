@@ -188,7 +188,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 |---|---|---|
 | `lib/api.ts` | `decisions.md` | `decision 48`, `S10` |
 | `lib/shared.ts` | `decisions.md` — a deliberate hand-mirror of `src/core/`, guarded by `test/mirror.test.ts`; never deduplicated | `decision 46`, `decision 49`, `decision 52` |
-| `styles.ts` | THE CASCADE — the one ordered list of the 41 stylesheets the app loads, imported by `main.tsx` and by `.storybook/preview.tsx` so the workbench cannot show a cascade the app does not have. 59 became 41 in the organism phase: the 47 parts the split produced were an artefact of the byte-identity contiguity constraint, and §5.1 asks for one sheet per component and per organism directory. It also records where each of the seven misfiled strays went | — |
+| `styles.ts` | THE CASCADE — the one ordered list of the 42 stylesheets the app loads, imported by `main.tsx` and by `.storybook/preview.tsx` so the workbench cannot show a cascade the app does not have. 59 became 41 in the organism phase: the 47 parts the split produced were an artefact of the byte-identity contiguity constraint, and §5.1 asks for one sheet per component and per organism directory. It also records where each of the seven misfiled strays went | — |
 | `organisms/shared/modal.css` | `Modal` — four hand-built dialogs and 21 classes in five, with the measure, the colour and the dismissability as ATTRIBUTES rather than classes | — |
 | `organisms/shared/list.css` | `List` + `Row` — the nineteen list-and-row families in five classes, and the one place `--rule` and `--tone` meet | `decision 48` |
 | `lib/useAutopilot.ts` | `decisions.md` | `decision 20` |

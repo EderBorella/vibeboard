@@ -266,7 +266,12 @@ const PRIMITIVE_LAYER = [
 // which is the same box, and that is exactly what it must not do: the browser harness proves the board by
 // counting the picker's frame at zero, and a screen that renders with a project OPEN while wearing the
 // picker's names would make that proof answer for two screens. Zero slack is restored at 221.
-const CLASS_CEILING = 221;
+// 221 -> 220 ON 2026-09-19, WITHOUT A CLASS BEING MERGED INTO ANYTHING: `.gate-list` stopped being a
+// selector when `gate.css`'s `.gate button:not(.gate-list button)` went — a surface repainting the
+// `Button` atom over every button in the picker's frame, which is what erased the doors' variants. The
+// name survives as a `className` on the recents list and styles nothing, so the union is one smaller and
+// the ceiling follows it down: slack is what stops this noticing the next class.
+const CLASS_CEILING = 220;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

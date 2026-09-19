@@ -70,6 +70,9 @@ const ws = vi.hoisted(() => {
     // docs step's reading of "did this turn fail" is a question about WHICH items, and a fake that
     // could only append live ones could not put an old one in front of it.
     items?: { kind: string; text: string; toolName?: string }[];
+    // The authority as the server reports it — pushed on connect and on every change, and the only
+    // thing the browser knows about it.
+    authorised?: boolean;
     chats?: unknown[];
     stats?: { costUsd: number; turns: number; lastDurationMs: number; contextTokens: number };
   };
@@ -407,7 +410,7 @@ describe('the two ways out', () => {
   // state file is deleted on finish or abandon, so a finish that deleted nothing left the wizard being
   // offered for ever to somebody who had completed it.
   it('finishing deletes the file BEFORE it leaves, exactly as abandoning does', async () => {
-    view({ start: 'handoff', snapshot: opened });
+    view({ start: 'ready', snapshot: opened });
 
     fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
 
@@ -419,7 +422,7 @@ describe('the two ways out', () => {
   it('offers no second ending at the last step', () => {
     // Completion IS the ending here, so `Stop offering this` would be a second button promising what
     // the first one has already done — and the two would read as a choice between them.
-    view({ start: 'handoff', snapshot: opened });
+    view({ start: 'ready', snapshot: opened });
 
     expect(screen.queryByRole('button', { name: 'Stop offering this' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Take me to the board' })).toBeTruthy();
@@ -561,7 +564,7 @@ describe('the offer to finish setup', () => {
   // wall then believes, and the bug this pins lived exactly between them — finishing deleted nothing, so
   // a completed setup was offered again on every open for ever.
   it('stops being offered once setup is finished', async () => {
-    let file: WizardState | null = { mode: 'greenfield', step: 'handoff' };
+    let file: WizardState | null = { mode: 'greenfield', step: 'ready' };
     api.getWizard.mockImplementation(async () => ({ state: file }));
     api.clearWizard.mockImplementation(async () => {
       file = null;
@@ -571,7 +574,7 @@ describe('the offer to finish setup', () => {
 
     // Wired the way the shell wires it: the wizard's only report of leaving is `onExit`, and the shell's
     // handler is `setup.leave()`.
-    view({ start: 'handoff', snapshot: opened, onExit: () => result.current.leave() });
+    view({ start: 'ready', snapshot: opened, onExit: () => result.current.leave() });
     fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
 
     await waitFor(() => expect(result.current.pending).toBe(false));
@@ -1700,7 +1703,7 @@ describe('the docs step', () => {
     // The review is what a settle reveals now rather than the next step, so this is the assertion
     // that says the settle was not believed: no layout, and nothing asked of the machine.
     expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
-    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(screen.queryByText('Do you track work somewhere today?')).toBeNull();
     expect(api.getReadiness).not.toHaveBeenCalled();
   });
 
@@ -1721,7 +1724,7 @@ describe('the docs step', () => {
     expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
   });
 
-  it('goes straight to the end when none was', async () => {
+  it('goes straight to the import when none was', async () => {
     docs();
     fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
     await waitFor(() => expect(ws.sent).toHaveLength(1));
@@ -1730,7 +1733,7 @@ describe('the docs step', () => {
     await turn(false);
     fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // "DONE" HAS TO MEAN SOMETHING WAS WRITTEN. The step read the readiness and looked at one field of
@@ -1830,7 +1833,7 @@ describe('the docs step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'greenfield',
-        step: 'handoff',
+        step: 'import',
         answers: { what: 'a tool for reading meters' },
         resumes: { 'README.md': 'What the project is, in a paragraph.' },
       }),
@@ -1905,9 +1908,9 @@ describe('the docs step', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
-      expect(await screen.findByText('That is setup done')).toBeTruthy();
+      expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
       expect(ws.sent).toHaveLength(0);
-      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'import' }));
     });
   });
 
@@ -2380,7 +2383,7 @@ describe('the gates step', () => {
     fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
 
     await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // AND THE FILE MOVES WITH IT. This step wrote nothing, so a setup finished through the reading step
@@ -2402,8 +2405,8 @@ describe('the gates step', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
 
-    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'import' }));
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. A screen that moved on before the server agreed would
@@ -2416,6 +2419,197 @@ describe('the gates step', () => {
     await waitFor(() => expect(api.getReadiness).toHaveBeenCalledTimes(2));
     expect(screen.queryByText('That is setup done')).toBeNull();
     expect(screen.getByText('One thing to read before anything runs')).toBeTruthy();
+  });
+});
+
+// THE LAST AGENT MOMENT (decision 79). Whatever the person already tracks work with walks in as cards
+// — the copilot under the import frame, watched: the panel is on the screen while it happens, because
+// a person reading the conversation IS the safety argument for the scope it runs under.
+describe('the import step', () => {
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+  });
+
+  const importing = () => view({ start: 'import', snapshot: opened });
+
+  const QUESTION = 'Do you track work somewhere today?';
+  const BRING = 'Bring it in';
+  const ADVANCE = 'Done — finish up';
+  const GRANT = 'Let it make them';
+
+  // The copilot's own state frame, as the server broadcasts it — the only thing that says a turn has
+  // begun or ended. The docs step's helper exactly, and for its reason.
+  const turn = async (running: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running } });
+    });
+  };
+
+  // What the model said, arriving the way an answer really does.
+  const said = async (text: string): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text } });
+    });
+  };
+
+  // The authority as the SERVER reports it: pushed on connect and on every change, which is the only
+  // thing the browser knows about it. A new chat or a project switch revokes it, and this is how the
+  // screen finds out.
+  const granted = async (authorised: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised });
+    });
+  };
+
+  const fill = async (list: string, note?: string): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    type(/paste your list/i, list);
+    if (note !== undefined) type(/anything the assistant/i, note);
+  };
+
+  // SKIPPING IS FIRST-CLASS (W1): most people setting a project up do not keep a list anywhere, and
+  // the no-door is their whole journey through this step. Nothing is spent and nothing is asked.
+  it('takes the no-door to the end without spending a turn', async () => {
+    importing();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'No — finish up' }));
+
+    // THE FILE MOVES WITH THE SCREEN, from a fresh read: `wizardFrame` keys on the step, so a file
+    // left at `import` would prefix every later conversation on the project with the import brief.
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'ready' }));
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+  });
+
+  // THE GRANT COMES FIRST, AND IT IS ASKED FOR RATHER THAN ASSUMED. The credential is minted per turn
+  // from the authority the server holds when the turn arrives, so a turn that overtook the grant would
+  // arrive without one and could not create a single card.
+  it('asks before it makes anything when the authority has lapsed, and has it before the turn', async () => {
+    const grant = deferred<{ authorised: boolean }>();
+    api.setAuthority.mockReturnValue(grant.promise);
+    importing();
+    await fill('Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    expect(await screen.findByText('Let the assistant make the cards?')).toBeTruthy();
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: GRANT }));
+
+    await waitFor(() => expect(api.setAuthority).toHaveBeenCalledWith(true));
+    expect(ws.sent).toHaveLength(0);
+
+    await grant.settle({ authorised: true });
+
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  // AND IT IS NOT ASKED WHEN IT IS ALREADY THERE — the other half, without which the case above only
+  // proves the question is always raised. The documents step granted it a screen ago; asking a second
+  // time for something the person can see they already gave teaches them the question means nothing.
+  it('asks nothing when the authority is still live', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    expect(screen.queryByText('Let the assistant make the cards?')).toBeNull();
+    expect(api.setAuthority).not.toHaveBeenCalled();
+  });
+
+  // ONE TURN, AND EVERY WORD IN IT IS THEIRS. The rules — the boards, the first column, no invented
+  // bodies — are the FRAME's, composed on the server at the credential seam: a brief the browser sends
+  // is one the browser can edit, and it would land in the person's own transcript on the way past.
+  //
+  // AND NO `attach`. That field names one of the six documents the review step talks about; an import
+  // is about a list the product has no copy of, and a name on this turn would put a document's path in
+  // front of a model that was asked about a todo list.
+  it('sends the paste and the one-liner as one turn, attached to nothing', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta\nFix the login bug', 'The top section is done, ignore it.');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // Exact, not a substring: what the browser composes IS the person's words and a blank line, and a
+    // sentence of the page's own invented between them would be invisible to a `toContain`.
+    expect(ws.sent[0]).toEqual({
+      type: 'copilot:send',
+      text: 'Ship the beta\nFix the login bug\n\nThe top section is done, ignore it.',
+      mode: 'bypassPermissions',
+    });
+    expect(ws.sent[0]).not.toHaveProperty('attach');
+  });
+
+  // THE WAY ON WAITS FOR THE CARDS. A turn that creates a dozen cards runs for minutes, and an advance
+  // standing there while it works is an invitation to finish setup over a half-made board.
+  it('opens the way on only once the turn has settled, and says what the assistant said', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+    await turn(true);
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+
+    await said('I made 4 cards on features and 1 on engineering.');
+    await turn(false);
+
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    // The count is the news, and it is the model's own sentence rather than a number this screen
+    // counted — nothing in the browser knows how many cards were made.
+    expect(screen.getByTestId('verbatim-made').textContent).toBe(
+      'I made 4 cards on features and 1 on engineering.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: ADVANCE }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'ready' })),
+    );
+  });
+
+  // THE TRANSCRIPT IS THE TAB'S, and the documents step's turns are still in it when this screen
+  // mounts. Reading it from the start would stand under the question reporting what THAT turn was
+  // last doing — a tool name and a closing sentence about six documents, presented as this import's.
+  it('reports nothing of the conversation it inherited', async () => {
+    importing();
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [
+          { kind: 'tool', text: '', toolName: 'Write' },
+          { kind: 'assistant', text: 'All six documents are written.' },
+        ],
+        stats: { costUsd: 0, turns: 1, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+    await turn(false);
+
+    expect(await screen.findByText(QUESTION)).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-tool')).toBeNull();
+    expect(screen.queryByTestId('verbatim-made')).toBeNull();
+  });
+
+  // A FILE FROM THE BUILD BEFORE THIS ONE. `handoff` was where setup ended and is retired from the
+  // flow; the step stays in the union so a setup parked there still reads, and this is where it lands.
+  // decision 79.
+  it('opens the import on a file left at the step that used to end setup', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'handoff' } });
+
+    view({ start: 'handoff', snapshot: opened });
+
+    expect(await screen.findByText(QUESTION)).toBeTruthy();
   });
 });
 
@@ -2598,7 +2792,7 @@ describe('the words on every step (W7)', () => {
     sweep('the questions', form.container);
     cleanup();
 
-    sweep('the hand-off', view({ start: 'handoff', snapshot: opened }).container);
+    sweep('the hand-off', view({ start: 'ready', snapshot: opened }).container);
   });
 
   // THE QUESTIONS WITH THE SCAN'S NEWS ON THEM, which is a different screen from the one above and
@@ -2690,6 +2884,49 @@ describe('the words on every step (W7)', () => {
       expect(quoted, `the exempt transcript must carry "${word}" or it proves nothing`).toContain(word);
     }
     sweep('the review layout', container);
+  });
+
+  // THE IMPORT, WHICH IS THREE SCREENS IN ONE and every word on all three is the wizard's: the
+  // question, the two fields under the yes-door, and what is left standing once the turn has run.
+  // What is exempt there is the model's — the transcript and the closing sentence pulled out of it —
+  // and the reply below is full of the words this sweeps for, so taking either handle off turns this
+  // red rather than green.
+  it('brings a list in, and reads out the assistant’s own words, in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    await screen.findByRole('button', { name: 'Yes — bring it in' });
+    sweep('the two doors', container);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yes — bring it in' }));
+    expect(screen.getByLabelText(/paste your list/i)).toBeTruthy();
+    sweep('the list and the one-liner', container);
+
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const reply =
+      'I made 4 cards. The docker container and the yaml config in your repository went to engineering, and the backend one too.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: reply } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+
+    // The premise, both halves: the exempt elements really do carry the words, or their handles
+    // prove nothing at all.
+    expect(screen.getByTestId('verbatim-made').textContent).toBe(reply);
+    expect((screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase()).toContain('docker');
+    sweep('the import once it has run', container);
   });
 
   // THE DOCUMENT ITSELF, OPENED, which is where the model's words are thicker than any summary: a

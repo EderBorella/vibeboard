@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import type { ScaffoldMode } from '../src/store/project/scaffold.js';
 import { clearWizardState, readWizardState, writeWizardState } from '../src/store/project/wizard.js';
 import { testTmp } from './helpers.js';
 
@@ -17,6 +18,17 @@ describe('the wizard state file', () => {
     await clearWizardState(root);
     expect(await readWizardState(root)).toBeNull();
     // Clearing twice is not an error — the wizard may be abandoned from two tabs.
+    await clearWizardState(root);
+  });
+
+  // A MODE IS ONE OF TWO THINGS AND EVERY STEP AFTER THE FIRST BRANCHES ON IT. The file is on a
+  // person's disk and hand-editable, and a third value would reach the browser as a `ScaffoldMode`
+  // the compiler believes in — so it is refused here, where the lie is made, rather than by whichever
+  // component happens to read it first.
+  it('a mode it does not recognise reads as no wizard', async () => {
+    await writeWizardState(root, { mode: 'sideways' as ScaffoldMode, step: 'form' });
+
+    expect(await readWizardState(root)).toBeNull();
     await clearWizardState(root);
   });
 

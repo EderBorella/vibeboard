@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import {
   clearWizardState,
+  isScaffoldMode,
   readWizardState,
+  WIZARD_STEPS,
   type WizardState,
   writeWizardState,
 } from '../../store/project/wizard.js';
@@ -22,8 +24,15 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
   api.put('/wizard', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const state = req.body as WizardState;
-    if (!state || (state.mode !== 'greenfield' && state.mode !== 'brownfield')) {
+    if (!state || !isScaffoldMode(state.mode)) {
       return reply.code(400).send({ error: 'Expected a wizard state with a mode.' });
+    }
+    // THE STEP IS WHAT A RESUMED SETUP COMES BACK TO, so a value nothing renders is a person opening
+    // their project onto a blank screen with every answer still on disk. The set is named in the
+    // refusal because the only caller hand-mirrors it, and a browser one release ahead of the server
+    // should be told which side is behind rather than merely told no.
+    if (!WIZARD_STEPS.includes(state.step)) {
+      return reply.code(400).send({ error: `Expected step to be one of: ${WIZARD_STEPS.join(', ')}.` });
     }
     await writeWizardState(ctx.session.root, state);
     return { state };

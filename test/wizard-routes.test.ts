@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { allows } from '../src/server/auth/auth.js';
 import type { Credential } from '../src/server/auth/credentials.js';
-import type { WizardState } from '../src/store/project/wizard.js';
+import { WIZARD_STEPS, type WizardState } from '../src/store/project/wizard.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
 // GET/PUT/DELETE /api/wizard — the setup wizard's scratch state, read and written by the browser
@@ -97,6 +97,24 @@ describe('GET/PUT/DELETE /api/wizard', () => {
       expect(res.statusCode, JSON.stringify(payload)).toBe(400);
     }
     // And nothing was written on the way to refusing.
+    expect((await get(project)).json()).toEqual({ state: null });
+  });
+
+  // THE STEP IS WHAT A RESUMED SETUP COMES BACK TO, and it was written unchecked: the browser is the
+  // only thing that has ever sent one, so a file naming a step nothing renders was one typo away —
+  // and the wizard would have opened on it with the answers still on disk and no way forward.
+  it('refuses a step it would not know how to come back to, and names the set', async () => {
+    const project = await open();
+    const res = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'greenfield', step: 'sideways' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    // Built from the list rather than spelled out: a refusal that does not say what was expected is
+    // one nobody can act on, and a hand-written copy of the set here would be the drift it refuses.
+    expect(res.json().error).toContain(WIZARD_STEPS.join(', '));
     expect((await get(project)).json()).toEqual({ state: null });
   });
 });

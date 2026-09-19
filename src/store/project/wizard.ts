@@ -45,6 +45,12 @@ void _everyAnswerFieldIsListed;
 
 const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 
+// WHAT A MODE IS, SAID ONCE. Both ends of this file's life hand it an `unknown` dressed as a
+// `WizardState` — `parse` below, and `req.body` a layer up — and every step after the first branches
+// on the answer. Two copies of the pair would be the drift the mirror test exists to refuse.
+export const isScaffoldMode = (value: unknown): value is ScaffoldMode =>
+  value === 'greenfield' || value === 'brownfield';
+
 // Null for absent AND for unreadable, and the CALLER is the reason: `GET /api/wizard` is the only one,
 // so a stray brace in this scratch file has to come back as "no setup in progress" and never as a 500.
 // Nothing here is in the path of opening a project. What a corrupt file costs is a place in setup,
@@ -53,7 +59,7 @@ const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 export async function readWizardState(root: string): Promise<WizardState | null> {
   try {
     const parsed = parse(await readFile(wizardPath(root), 'utf8')) as WizardState;
-    return parsed && typeof parsed === 'object' && typeof parsed.mode === 'string' ? parsed : null;
+    return parsed && typeof parsed === 'object' && isScaffoldMode(parsed.mode) ? parsed : null;
   } catch {
     return null;
   }

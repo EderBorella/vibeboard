@@ -389,3 +389,18 @@ export interface WizardState {
   // file. The browser reads them; nothing here writes them.
   resumes?: Record<string, string>;
 }
+
+// The field sets, mirroring `WIZARD_STATE_KEYS` and `WIZARD_ANSWER_KEYS` in src/store/project/wizard.ts
+// and asserted against them in test/mirror.test.ts. The steps were guarded from the start and the
+// fields were not — and `putWizard` sends the whole state, so a key this side does not know about is
+// one the browser silently deletes rather than one it merely cannot show.
+export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'resumes'] as const;
+export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
+
+// `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
+type UnlistedWizardField = Exclude<keyof WizardState, (typeof WIZARD_STATE_KEYS)[number]>;
+const _everyWizardFieldIsListed: UnlistedWizardField extends never ? true : UnlistedWizardField = true;
+void _everyWizardFieldIsListed;
+type UnlistedAnswerField = Exclude<keyof WizardAnswers, (typeof WIZARD_ANSWER_KEYS)[number]>;
+const _everyAnswerFieldIsListed: UnlistedAnswerField extends never ? true : UnlistedAnswerField = true;
+void _everyAnswerFieldIsListed;

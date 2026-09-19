@@ -26,6 +26,23 @@ export interface WizardState {
   resumes?: Record<string, string>;
 }
 
+// THE FIELD SETS AS DATA, so test/mirror.test.ts can hold the browser's hand-mirror to them — an
+// interface has no runtime keys, which is the `SNAPSHOT_KEYS` precedent. The steps were already
+// guarded and the fields were not, and this is where drift costs the most: `PUT /api/wizard` REPLACES
+// the file, so a key the browser's type does not carry is deleted on the next Continue with nothing
+// anywhere reporting it. `resumes` is exactly that shape — written by a later phase of the wizard,
+// read by this one.
+export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'resumes'] as const;
+export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
+
+// `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
+type UnlistedWizardField = Exclude<keyof WizardState, (typeof WIZARD_STATE_KEYS)[number]>;
+const _everyWizardFieldIsListed: UnlistedWizardField extends never ? true : UnlistedWizardField = true;
+void _everyWizardFieldIsListed;
+type UnlistedAnswerField = Exclude<keyof WizardAnswers, (typeof WIZARD_ANSWER_KEYS)[number]>;
+const _everyAnswerFieldIsListed: UnlistedAnswerField extends never ? true : UnlistedAnswerField = true;
+void _everyAnswerFieldIsListed;
+
 const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 
 // Null for absent AND for unreadable, and the CALLER is the reason: `GET /api/wizard` is the only one,

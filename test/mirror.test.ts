@@ -65,6 +65,20 @@ describe('web/shared mirrors src/core', () => {
     expect([...web.WIZARD_STEPS]).toEqual([...storeWizard.WIZARD_STEPS]);
   });
 
+  // AND THE FIELD SETS, which the steps alone do not cover: `WizardState` is hand-mirrored and only
+  // its `step` union was guarded, so a key added on one side is an answer that survives the trip in
+  // one direction and not the other. `resumes` is the one that makes this expensive rather than
+  // tidy — it is written by a later phase of the wizard and read by this one, and `putWizard` REPLACES
+  // the file, so a browser whose type does not carry it deletes it on the next Continue and nothing
+  // anywhere errors. Exact, both ways, for the reason the run record is exact.
+  it('mirrors every wizard state field', () => {
+    expect([...web.WIZARD_STATE_KEYS].sort()).toEqual([...storeWizard.WIZARD_STATE_KEYS].sort());
+  });
+
+  it('mirrors every wizard answer field', () => {
+    expect([...web.WIZARD_ANSWER_KEYS].sort()).toEqual([...storeWizard.WIZARD_ANSWER_KEYS].sort());
+  });
+
   // The gap slice D's review found, one level in: `AutopilotConfig` is hand-mirrored and nothing
   // guarded its FIELD SET, so a key added on one side is a setting the UI silently cannot show or
   // save. An interface has no runtime keys, so the web side exports the list explicitly.

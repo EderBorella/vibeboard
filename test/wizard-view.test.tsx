@@ -526,6 +526,26 @@ describe('the backend step', () => {
     expect(screen.queryByRole('button', { name: 'Build it now' })).toBeNull();
   });
 
+  // THE PROBE ITSELF FAILING IS NOT THE PROBE SAYING NO, and the step used to treat it as neither: a
+  // rejected read left `sandbox` null for ever, so the screen said "Checking…" under a Continue that
+  // could never enable and there was nothing to press.
+  it('says so when the check cannot be run at all, and offers to ask again', async () => {
+    api.getSandbox.mockRejectedValueOnce(new Error('the server is not answering'));
+    view({ start: 'backend', snapshot: opened });
+
+    expect(await screen.findByText(/could not run the check/i)).toBeTruthy();
+    // Not still "Checking…", which reads as an answer on its way.
+    expect(screen.queryByText('Checking…')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    // A real second ask, answered by the clean machine the beforeEach describes.
+    await waitFor(() => expect(api.getSandbox).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Connected and ready.')).toBeTruthy();
+    expect(screen.queryByText(/could not run the check/i)).toBeNull();
+  });
+
   it("streams the build over the tab's own socket and asks the machine again when it lands", async () => {
     api.getSandbox.mockResolvedValue(refused('docker', NO_IMAGE, { buildable: true }));
     view({ start: 'backend', snapshot: opened, bump: 7 });

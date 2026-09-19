@@ -280,7 +280,10 @@ function BackendStep({
   // answer, and none of them is observable any other way. `useSandbox` re-fetches on whatever it is
   // keyed to, which is this counter and nothing else on the screen.
   const [asked, setAsked] = useState(0);
-  const { sandbox } = useSandbox(asked);
+  // `failed` is the read REJECTING, which is a different answer from the machine refusing: the probe
+  // keeps its last value on a failure, and the value here starts null — so without this the step sits
+  // on "Checking…" under a Continue that can never enable, with nothing on screen to press.
+  const { sandbox, failed } = useSandbox(asked);
   // The build's output arrives over the socket as `box:build` frames rather than in the response, which
   // does not come back for minutes. `bump` is the TAB's generation, threaded from the shell: `socketFor`
   // is last-write-wins, so a literal here would replace the app's own socket rather than share it.
@@ -338,7 +341,17 @@ function BackendStep({
         />
       )}
 
-      {sandbox === null && <Text role="hint">Checking…</Text>}
+      {sandbox === null && !failed && <Text role="hint">Checking…</Text>}
+      {failed && (
+        <>
+          <Notice as="p" tone="warn">
+            We could not run the check just now. Nothing you have chosen is lost.
+          </Notice>
+          <Button disabled={busy !== null} onClick={() => setAsked((n) => n + 1)}>
+            Try again
+          </Button>
+        </>
+      )}
       {ready && (
         <Notice as="p" tone="ok">
           Connected and ready.

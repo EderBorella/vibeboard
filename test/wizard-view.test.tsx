@@ -940,7 +940,7 @@ describe('the form step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'brownfield',
-        step: 'handoff',
+        step: 'stack',
         resumes: { 'foundation/TESTING.md': 'how it is checked' },
         answers: {
           what: 'a tool for reading meters',
@@ -971,7 +971,7 @@ describe('the form step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'greenfield',
-        step: 'handoff',
+        step: 'stack',
         resumes: { 'foundation/TESTING.md': 'how it is checked' },
         answers: { what: '', who: '', done: '' },
       }),
@@ -1014,7 +1014,7 @@ describe('the form step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'brownfield',
-        step: 'handoff',
+        step: 'stack',
         suggested: {
           answers: { what: 'a timeline of releases', who: 'the field team' },
           kind: 'game',
@@ -1119,6 +1119,185 @@ describe('the form step', () => {
   });
 });
 
+// THE STACK, AFTER THE FORM AND NEVER INSIDE IT (W9). What the project is built with is a question the
+// person mostly cannot answer and the model mostly can — so it is proposed rather than asked, on a
+// screen built for overruling it. The agreement is what the docs step is briefed with and what the box
+// is built to install, which is why it is settled HERE rather than left to the first run to discover.
+describe('the stack step', () => {
+  const answers = {
+    what: 'a tool for reading meters',
+    who: 'the field team',
+    done: 'one meter read end to end',
+  };
+
+  // Re-stated per test for the scan describe's reason: `clearAllMocks` clears the CALLS and leaves the
+  // implementation, so a rejection installed by one case would be the door's answer for the rest.
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'stack', answers } });
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-2', status: 'running' } });
+  });
+
+  const stack = () => view({ start: 'stack', snapshot: opened });
+
+  // The file as it stands once the run has posted its proposal into it — what the step reads back when
+  // the run settles, and what its own write then has to carry forward.
+  const posted = (suggested: Record<string, unknown>) => ({
+    state: { mode: 'greenfield', step: 'stack', answers, suggested },
+  });
+
+  const settle = async (outcome?: string, run = 'run-2'): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run, status: 'success', ...(outcome ? { outcome } : {}) } });
+    });
+  };
+
+  it('asks for a stack in the words the person used, and says what it is doing', async () => {
+    stack();
+
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    const [skill, prompt] = api.runWizardSkill.mock.calls[0] as [string, string];
+    expect(skill).toBe('suggest-stack');
+    // THE ANSWERS AS THE SERVER HAS THEM. The form wrote them one step ago and the file is the only
+    // copy: a prompt built from what this screen happens to remember would be empty on a resume.
+    expect(prompt).toContain('a tool for reading meters');
+    expect(prompt).toContain('the field team');
+    expect(prompt).toContain('one meter read end to end');
+    // And the kind, which the form wrote to the config rather than to the wizard's own file.
+    expect(prompt).toContain('The kind of project: web');
+    expect(screen.getByText('Choosing a stack that fits…')).toBeTruthy();
+  });
+
+  // RE-ENTRY MUST NOT RE-ASK. Coming back — Back from the documents, or resuming setup tomorrow —
+  // would spend a second run to propose what has already been agreed.
+  it('does not ask twice: coming back to an agreed stack spends no run', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'greenfield', step: 'stack', answers, stack: 'Node, React and Vitest' },
+    });
+    stack();
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+  });
+
+  it('shows what the run proposed once it has read the file back', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+
+    await settle('success');
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+  });
+
+  // THE PERSON'S WORD IS FINAL (W9). A proposal typed over is not a proposal any more, and what
+  // reaches the file is what they wrote.
+  it('takes the person’s own sentence over the proposal', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+    await settle('success');
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/name your own/i), {
+      target: { value: 'Python, and nothing else' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Use this stack' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'docs', stack: 'Python, and nothing else' }),
+      ),
+    );
+  });
+
+  it('writes the agreed stack to the file and what the box installs to the config', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(
+      posted({ stack: 'Node, React and Vitest', packages: ['ffmpeg', 'imagemagick'] }),
+    );
+    await settle('success');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this stack' }));
+
+    // THE WHOLE FILE, INCLUDING WHAT THE RUN WROTE INTO IT WHILE THIS SCREEN WAS OPEN. `putWizard`
+    // replaces the file, and the copy read on entry predates the proposal being agreed to here — so a
+    // write built from the entry read would delete the suggestion it is agreeing with.
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'docs',
+        answers,
+        suggested: { stack: 'Node, React and Vitest', packages: ['ffmpeg', 'imagemagick'] },
+        stack: 'Node, React and Vitest',
+      }),
+    );
+    // W9's payoff: what the sandbox has to install is known BEFORE the step that needs one, and it is
+    // the config that decides how a box is built.
+    expect(api.patchConfig).toHaveBeenCalledWith({
+      box: { kind: 'web', packages: ['ffmpeg', 'imagemagick'] },
+    });
+  });
+
+  // A run that ended in anything but a clean success still hands over to the screen: the person can
+  // name a stack themselves, and holding them on a report about a run they never asked for is worse.
+  it('asks for one in the person’s own words when the run could not propose', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('attention');
+
+    expect(await screen.findByText('I couldn’t work one out — name your own below.')).toBeTruthy();
+    // Nothing to agree WITH, so the button cannot be pressed until there is something to agree to.
+    const go = screen.getByRole('button', { name: 'Use this stack' }) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText(/name your own/i), { target: { value: 'Go and SQLite' } });
+    expect(go.disabled).toBe(false);
+    fireEvent.click(go);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'docs', stack: 'Go and SQLite' }),
+      ),
+    );
+  });
+
+  // THE DOOR REFUSING READS THE SAME WAY. A project part-way through setup when this arrived has no
+  // such skill — `seedSkills` only writes into an absent folder — and there is nothing to do about it
+  // but ask the person.
+  it('lands on the same screen with a plain notice when the door refuses', async () => {
+    api.runWizardSkill.mockRejectedValue(Object.assign(new Error('No such skill'), { status: 404 }));
+    stack();
+
+    expect(await screen.findByText('I couldn’t ask this time — name your own below.')).toBeTruthy();
+  });
+
+  it('can be skipped onto naming one yourself', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip and name it myself' }));
+
+    expect(await screen.findByLabelText(/name your own/i)).toBeTruthy();
+    expect(screen.queryByText(/name your own below/)).toBeNull();
+  });
+
+  // The step before it is what sends anyone here, and the file has to say so too: a Continue that
+  // wrote one step and showed another is a setup you cannot resume into.
+  it('is where Continue on the questions goes', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+    view({ start: 'form', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'stack' })),
+    );
+    expect(await screen.findByText('Choosing a stack that fits…')).toBeTruthy();
+  });
+});
+
 // W7, OVER EVERY STEP AND NOT THE ONE THAT HAPPENS TO HAVE A FOLD. The tripwire lived inside the form
 // step's describe and swept four words on one screen; the three words that were actually on the wizard
 // — "container", "Repository", "copilot" — were all on the other three steps, so it passed over each of
@@ -1127,11 +1306,12 @@ describe('the form step', () => {
 // TWO EXEMPTIONS, BOTH BY ELEMENT AND NEITHER BY WORD:
 //
 //   - `<details>`, which is labelled "For engineers" and is the place those words belong.
-//   - the probe's own sentence, which is the server's and is rendered verbatim on purpose — it is the
-//     only thing on the screen that names the command or the setting that clears the fault, and the
-//     gate that will refuse the first run computes it. Rewording it here would send somebody to fix
-//     something that is not broken. It carries a test handle so this can skip it by element; the
-//     fixtures below put jargon INSIDE it, so removing the handle turns this red rather than green.
+//   - anything rendered VERBATIM because the words are not this screen's to choose. Two of those now:
+//     the probe's own sentence, which is the only thing on the screen that names the command or the
+//     setting that clears the fault — reworded here it would send somebody to fix what is not broken —
+//     and the model's stack proposal, which the person is being shown precisely so they can overrule
+//     it. Both carry a `verbatim-` test handle and this skips them by element; the fixtures below put
+//     jargon INSIDE each, so removing a handle turns this red rather than green.
 //
 // The list is every word the product's own code uses constantly, which is exactly why they leak.
 describe('the words on every step (W7)', () => {
@@ -1150,7 +1330,7 @@ describe('the words on every step (W7)', () => {
   const sweep = (what: string, container: HTMLElement): void => {
     const plain = container.cloneNode(true) as HTMLElement;
     for (const fold of plain.querySelectorAll('details')) fold.remove();
-    for (const quoted of plain.querySelectorAll('[data-testid="verbatim-reason"]')) quoted.remove();
+    for (const quoted of plain.querySelectorAll('[data-testid^="verbatim"]')) quoted.remove();
     const text = (plain.textContent ?? '').toLowerCase();
     // A step that rendered nothing would pass every assertion below it.
     expect(text.length, `${what} rendered almost nothing`).toBeGreaterThan(60);
@@ -1211,6 +1391,29 @@ describe('the words on every step (W7)', () => {
     await screen.findByText('Reading your files…');
 
     sweep('reading the folder', container);
+  });
+
+  it('chooses a stack, and reads out the model’s own words, in plain words', async () => {
+    // The waiting screen first, where "repository" wants to be said again.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'stack', answers: {} } });
+    const waiting = view({ start: 'stack', snapshot: opened });
+    await screen.findByText('Choosing a stack that fits…');
+    sweep('choosing a stack', waiting.container);
+    cleanup();
+
+    // Then the proposal, whose sentence is the MODEL'S and is rendered whole — full of the words this
+    // sweeps for, because the fixture is what proves the exemption is the element and not the word.
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'stack',
+        answers: {},
+        stack: 'A Node repository, its config in yaml, run in a Docker container',
+      },
+    });
+    const proposal = view({ start: 'stack', snapshot: opened });
+    await screen.findByRole('button', { name: 'Use this stack' });
+    sweep('the stack proposal', proposal.container);
   });
 
   it('asks its questions and hands over in plain words', async () => {

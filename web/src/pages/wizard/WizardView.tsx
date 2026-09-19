@@ -148,6 +148,10 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     setScanNotice(notice);
     setStep('form');
   }, []);
+  // Stable for the same reason: the stack step's socket subscription is keyed on the identity of what
+  // it is handed, and an inline arrow would rebuild it on every render.
+  const leaveForm = useCallback(() => setStep('stack'), []);
+  const leaveStack = useCallback(() => setStep('docs'), []);
 
   let body: ReactNode;
   if (step === 'identity')
@@ -164,9 +168,9 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     body = <BackendStep mode={mode} snapshot={snapshot} bump={bump} onContinue={setStep} />;
   else if (step === 'scan') body = <ScanStep mode={mode} bump={bump} onContinue={leaveScan} />;
   else if (step === 'form')
-    body = (
-      <FormStep mode={mode} snapshot={snapshot} notice={scanNotice} onContinue={() => setStep('handoff')} />
-    );
+    body = <FormStep mode={mode} snapshot={snapshot} notice={scanNotice} onContinue={leaveForm} />;
+  else if (step === 'stack')
+    body = <StackStep mode={mode} snapshot={snapshot} bump={bump} onContinue={leaveStack} />;
   else body = <HandoffStep />;
 
   return (
@@ -628,7 +632,7 @@ function FormStep({
   onContinue: () => void;
 }) {
   const { read, failed: readFailed, retry, saved } = useSaved(mode);
-  const state = saved('handoff');
+  const state = saved('stack');
   // WHAT THIS PERSON HAS TYPED, and an absent key is "they have not touched this box" — which is not
   // the same as an empty one, and is the only thing that can tell a cleared field from an unvisited
   // one. IdentityStep's idiom, and here it is also what lets a value arriving with the file reach a
@@ -796,6 +800,205 @@ function FormStep({
           Continue
         </Button>
       </Stack>
+      {error && <Text role="error">{error}</Text>}
+    </>
+  );
+}
+
+// WHAT THE STACK RUN HAD TO SAY FOR ITSELF, and both are read on this screen rather than the next one:
+// with no proposal there is still something to do here, which is name one.
+const STACK_UNFINISHED = 'I couldn’t work one out — name your own below.';
+const STACK_REFUSED = 'I couldn’t ask this time — name your own below.';
+
+// WHAT THE RUN IS TOLD. The answers come from the FILE and the kind from the CONFIG, because that is
+// where the step before wrote each of them — a copy carried through the browser would be a second thing
+// to keep in step, and it would be empty on a setup resumed in a new tab. decision 77.
+function stackPrompt(answers: WizardAnswers | undefined, kind: string): string {
+  const a = answers ?? {};
+  return [
+    'The person answered the setup questions like this:',
+    '',
+    `- What it is: ${a.what || '(not answered)'}`,
+    `- Who it is for: ${a.who || '(not answered)'}`,
+    `- What done looks like: ${a.done || '(not answered)'}`,
+    `- The kind of project: ${kind}`,
+  ].join('\n');
+}
+
+// THE SECOND AGENT MOMENT, AND IT IS A STEP RATHER THAN A FIELD IN THE FORM (W9). What a project should
+// be built with is a question most people setting one up cannot answer and a model usually can — so it
+// is proposed rather than asked, on a screen whose whole shape is "here is a suggestion, and your word
+// beats it".
+//
+// IT IS SETTLED BEFORE THE DOCUMENTS ARE WRITTEN, which is the point of it being here. The agreement is
+// what the copilot is briefed with on the next step and what the box is built to install, and both of
+// those are decisions that cannot be taken back cheaply once something has started running.
+function StackStep({
+  mode,
+  snapshot,
+  bump,
+  onContinue,
+}: {
+  mode: ScaffoldMode;
+  snapshot: ProjectSnapshot | null;
+  bump: number;
+  onContinue: () => void;
+}) {
+  const { read, failed: readFailed, retry, saved } = useSaved(mode);
+  // THE FILE AS THIS SCREEN LAST SAW IT, and the entry read is not it for long: the run posts its
+  // proposal INTO the file while this step is on screen. `putWizard` replaces the file whole, so a
+  // Continue built from the read taken on entry would delete the very suggestion it is agreeing to.
+  const [fresh, setFresh] = useState<WizardState>();
+  // The run this screen started, `null` until the door answers — and the subscription's key, because
+  // every run on the project broadcasts on one socket and another one settling is not this step's news.
+  const [runId, setRunId] = useState<string | null>(null);
+  // ONE DISPATCH PER VISIT, for the scan step's reason: an effect runs twice under StrictMode and each
+  // extra run of this one is a real agent costing real money.
+  const started = useRef(false);
+  // Whether there is anything to decide yet. False only while a run is still choosing.
+  const [answered, setAnswered] = useState(false);
+  const [notice, setNotice] = useState<string>();
+  // The person's own sentence. Empty until they type, and it beats the proposal the moment they do.
+  const [own, setOwn] = useState('');
+  // `undefined` is "nobody has touched this box" — FormStep's idiom, and here it is what lets a list
+  // that arrives with the run reach a field mounted long before it.
+  const [typed, setTyped] = useState<string>();
+  const ws = useSharedWs(bump);
+  const { busy, error, run } = useAction();
+
+  const state: WizardState = { ...(fresh ?? saved('docs')), step: 'docs' };
+  // The kind the form wrote, read back from the config rather than carried here.
+  const kind = snapshot?.config.box?.kind ?? 'web';
+  // What is on the table: a stack already agreed — coming back to this screen — or the one the run
+  // proposed. Either is the person's to overrule below.
+  const proposal = state.stack ?? state.suggested?.stack;
+  const agreed = own.trim() || proposal;
+  const packages = typed ?? csv(state.suggested?.packages ?? snapshot?.config.box?.packages ?? []);
+  const prompt = stackPrompt(state.answers, kind);
+
+  useEffect(() => {
+    // Gated on the READ and not merely on the mount: whether this has been answered already is on
+    // disk, and a dispatch fired before that lands spends a run to propose what the file holds.
+    if (!read || started.current) return;
+    started.current = true;
+    if (proposal !== undefined) {
+      setAnswered(true);
+      return;
+    }
+    runWizardSkill('suggest-stack', prompt)
+      .then(({ run: record }) => setRunId(record.run))
+      // Every refusal reads the same way, and the 404 is the one that will actually happen: a project
+      // part-way through setup when this arrived has no such skill, because `seedSkills` only writes
+      // into an absent folder. There is nothing to do about any of them but ask the person.
+      .catch(() => {
+        setNotice(STACK_REFUSED);
+        setAnswered(true);
+      });
+  }, [read, proposal, prompt]);
+
+  // The run posts what it chose through `PUT /api/wizard/prefill` on its way out, so the handover waits
+  // on a read of the file rather than racing one — and that read is what the write below carries.
+  const finish = useCallback(async (ok: boolean): Promise<void> => {
+    const next = await getWizard()
+      .then((r) => r.state ?? undefined)
+      .catch(() => undefined);
+    if (next) setFresh(next);
+    // A run can end tidily having proposed nothing at all, which is the same news to this screen as a
+    // run that crashed: there is nothing to agree with, so say so and ask.
+    if (!ok || next?.suggested?.stack === undefined) setNotice(STACK_UNFINISHED);
+    setAnswered(true);
+  }, []);
+
+  useEffect(() => {
+    if (runId === null) return;
+    return ws.subscribe((msg) => {
+      if (msg.type !== 'run:update') return;
+      const record = msg.record as { run?: string; status?: string; outcome?: string } | undefined;
+      if (record?.run !== runId) return;
+      if (record.status === 'running' || record.status === 'queued') return;
+      // `outcome` is the agent's own word and is absent entirely on a run that never wrote a report,
+      // so "is it a success" is the honest question — the scan step's reasoning, and the same shape.
+      void finish(record.outcome === 'success');
+    });
+  }, [ws, runId, finish]);
+
+  const go = (): void => {
+    void run(async () => {
+      await putWizard({ ...state, ...(agreed ? { stack: agreed } : {}) });
+      const extra = parseCsv(packages);
+      await patchConfig({ box: { kind, ...(extra.length > 0 ? { packages: extra } : {}) } });
+      onContinue();
+    });
+  };
+
+  return (
+    <>
+      {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
+      {!readFailed && !answered && (
+        <>
+          <Stack gap={3}>
+            <Pulse />
+            {/* The live region is the sentence and not the dots, for ThinkingIndicator's reason. */}
+            <span role="status">
+              <Text>Choosing a stack that fits…</Text>
+            </span>
+          </Stack>
+          <Text role="hint">A minute or two. You can skip this and name your own.</Text>
+          <Stack gap={4}>
+            {/* The way past a run that is taking too long, and it leaves the run alone deliberately:
+                what it finds still lands in the file, and the box below is answerable either way. */}
+            <Button onClick={() => setAnswered(true)}>Skip and name it myself</Button>
+          </Stack>
+        </>
+      )}
+      {!readFailed && answered && (
+        <>
+          <Text as="h2" size="title" ink="strong" family="display">
+            What it will be built with
+          </Text>
+          <Text role="hint">
+            A suggestion from your answers, not a decision. Anything you write below is used instead.
+          </Text>
+          {notice && (
+            <Notice as="p" tone="warn">
+              {notice}
+            </Notice>
+          )}
+          {/* THE MODEL'S OWN SENTENCE, WHOLE. It is shown precisely so it can be argued with, and a
+              wizard that reworded it would be second-guessing the thing it is asking about. Every
+              other word on this screen is swept for the nine engineer's words a beginner should never
+              meet (W7); this line is exempt BY ELEMENT, as the probe's refusal is. */}
+          {proposal && (
+            <Text as="p" testId="verbatim-stack">
+              {proposal}
+            </Text>
+          )}
+          <Field label="Or name your own stack" hint="A sentence is enough — it is read, not parsed.">
+            <Control as="textarea" rows={2} value={own} onChange={(e) => setOwn(e.target.value)} />
+          </Field>
+          {/* Everything an engineer wants behind one fold (W8), exactly as the questions do it — and
+              it is the same list the form offered, prefilled now with what the run worked out. */}
+          <details>
+            <summary>For engineers</summary>
+            <Stack direction="column" gap={4} pad={[4, 0, 0]}>
+              <Field
+                label="What the sandbox installs"
+                hint="Debian package names, comma-separated — they'll be installed into every sandbox this project gets."
+              >
+                <Control value={packages} onChange={(e) => setTyped(e.target.value)} />
+              </Field>
+            </Stack>
+          </details>
+          <Stack gap={4}>
+            {/* Nothing to agree to is a real state — a run can end having proposed nothing — and this
+                is the one press that decides what the next step is briefed with. `read` gates it for
+                `useSaved`'s reason: this write replaces the file. */}
+            <Button variant="primary" disabled={!read || !agreed || busy !== null} onClick={go}>
+              Use this stack
+            </Button>
+          </Stack>
+        </>
+      )}
       {error && <Text role="error">{error}</Text>}
     </>
   );

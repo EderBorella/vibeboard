@@ -1286,6 +1286,31 @@ describe('the stack step', () => {
     });
   });
 
+  // THE ONE SUGGESTION ON THIS SCREEN WITH A MACHINE EFFECT, and it was hidden. The packages the run
+  // proposed are installed into every sandbox this project ever gets — the stack sentence, by
+  // contrast, is read by a model and by nobody else — and the only place they appeared was inside a
+  // fold that is closed until somebody opens it. `Use this stack` then installed a list they had
+  // never been shown.
+  it('says what will be installed in the body of the screen, not only inside the fold', async () => {
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest', packages: ['jq', 'ripgrep'] }));
+    stack();
+
+    expect(await screen.findByRole('button', { name: 'Use this stack' })).toBeTruthy();
+    const said = screen.getByTestId('verbatim-packages');
+    expect(said.textContent).toBe('It will also install: jq, ripgrep');
+    // OUTSIDE the fold, which is the whole point — a `<details>` renders none of its contents until
+    // it is opened, so a sentence inside one is a sentence nobody reads.
+    expect(said.closest('details')).toBeNull();
+  });
+
+  it('says nothing about installing when nothing extra was proposed', async () => {
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+    stack();
+
+    expect(await screen.findByRole('button', { name: 'Use this stack' })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-packages')).toBeNull();
+  });
+
   // A run that ended in anything but a clean success still hands over to the screen: the person can
   // name a stack themselves, and holding them on a report about a run they never asked for is worse.
   it('asks for one in the person’s own words when the run could not propose', async () => {

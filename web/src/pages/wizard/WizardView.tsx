@@ -889,6 +889,9 @@ function StackStep({
   const proposal = state.stack ?? state.suggested?.stack;
   const agreed = own.trim() || proposal;
   const packages = typed ?? csv(state.suggested?.packages ?? snapshot?.config.box?.packages ?? []);
+  // Parsed once: the sentence in the body and what the button writes to the config are the same
+  // list, and two readings of one box is how a screen ends up promising what it does not do.
+  const installs = parseCsv(packages);
   const prompt = stackPrompt(state.answers, kind);
 
   useEffect(() => {
@@ -940,8 +943,7 @@ function StackStep({
   const go = (): void => {
     void run(async () => {
       await putWizard({ ...state, ...(agreed ? { stack: agreed } : {}) });
-      const extra = parseCsv(packages);
-      await patchConfig({ box: { kind, ...(extra.length > 0 ? { packages: extra } : {}) } });
+      await patchConfig({ box: { kind, ...(installs.length > 0 ? { packages: installs } : {}) } });
       onContinue();
     });
   };
@@ -986,6 +988,18 @@ function StackStep({
           {proposal && (
             <Text as="p" testId="verbatim-stack">
               {proposal}
+            </Text>
+          )}
+          {/* WHAT THE BOX WILL ACTUALLY INSTALL, IN THE BODY. It is the only suggestion on this
+              screen with a machine effect — every sandbox this project gets is built with these,
+              while the stack sentence is read by a model and by nobody else — and it was visible
+              only inside a fold that is closed until somebody opens it. Read from the FIELD rather
+              than from `suggested`, so it stays true the moment the list is edited. The names are
+              the model's, so the line is exempt from the plain-words sweep by element as the
+              proposal above it is. */}
+          {installs.length > 0 && (
+            <Text as="p" testId="verbatim-packages">
+              It will also install: {installs.join(', ')}
             </Text>
           )}
           <Field label="Or name your own stack" hint="A sentence is enough — it is read, not parsed.">

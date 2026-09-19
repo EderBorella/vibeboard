@@ -64,7 +64,10 @@ const ws = vi.hoisted(() => {
     state?: string | { running: boolean };
     line?: string;
     record?: { run: string; status: string; outcome?: string };
-    event?: { kind: string; name?: string; text?: string };
+    // `retryable` is set on error events only and is DECIDED ON THE SERVER (src/core/copilot-errors.ts).
+    // Carried by the fake because it gates the panel's Retry: an expired sign-in is `false`, and a
+    // screen whose only way forward was that button is a screen with no way forward at all.
+    event?: { kind: string; name?: string; text?: string; retryable?: boolean };
     // A REPLAYED TRANSCRIPT, which is how the dock's conversation arrives on connect: the copilot
     // channel replaces the client's items wholesale from what is on disk. Carried here because the
     // docs step's reading of "did this turn fail" is a question about WHICH items, and a fake that
@@ -2483,6 +2486,25 @@ describe('the import step', () => {
     expect(screen.queryByText(QUESTION)).toBeNull();
   });
 
+  // A MIS-CLICK ON THE YES-DOOR HAS A CHEAP EXIT. The no-door used to go with the question, so one
+  // click put a person in front of two boxes with no way back — and the only things left on the
+  // screen ended setup rather than this step. It stands behind the yes-door now, and it still does
+  // exactly what it says: no turn, no grant, straight to the ending.
+  it('keeps the way out standing behind the yes-door, and it still spends nothing', async () => {
+    importing();
+    await granted(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    // The premise: this really is the screen behind the yes-door and not the question.
+    expect(screen.getByLabelText(/paste your list/i)).toBeTruthy();
+    type(/paste your list/i, 'Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: 'No — finish up' }));
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'ready' }));
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+  });
+
   // THE GRANT COMES FIRST, AND IT IS ASKED FOR RATHER THAN ASSUMED. The credential is minted per turn
   // from the authority the server holds when the turn arrives, so a turn that overtook the grant would
   // arrive without one and could not create a single card.
@@ -2548,6 +2570,24 @@ describe('the import step', () => {
     expect(ws.sent[0]).not.toHaveProperty('attach');
   });
 
+  // A CAP ON THE PASTE, AND THE FIXTURE IS ONE CHARACTER EITHER SIDE OF IT. The whole box goes into
+  // one prompt, so a file dropped in by accident is minutes of turn about the wrong thing — and the
+  // dock's composer has no cap because nothing about it says "paste". The sentence is the wizard's
+  // own and the send is shut while it is on screen; at the cap exactly, neither is true.
+  it('refuses a paste past the cap, in plain words, and takes one at it', async () => {
+    importing();
+    await granted(true);
+    await fill('x'.repeat(20_001));
+
+    expect(screen.getByText(/That is a lot to send in one go/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: BRING }) as HTMLButtonElement).disabled).toBe(true);
+
+    type(/paste your list/i, 'x'.repeat(20_000));
+
+    expect(screen.queryByText(/That is a lot to send in one go/)).toBeNull();
+    expect((screen.getByRole('button', { name: BRING }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   // THE WAY ON WAITS FOR THE CARDS. A turn that creates a dozen cards runs for minutes, and an advance
   // standing there while it works is an invitation to finish setup over a half-made board.
   it('opens the way on only once the turn has settled, and says what the assistant said', async () => {
@@ -2556,6 +2596,11 @@ describe('the import step', () => {
     await fill('Ship the beta');
     fireEvent.click(screen.getByRole('button', { name: BRING }));
     await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    // AND BOTH DOORS ARE GONE, which is the other end of the no-door standing behind the yes-door:
+    // from here the ending is `Done — finish up`, and a second way out beside it would read as a
+    // choice between them.
+    expect(screen.queryByRole('button', { name: 'No — finish up' })).toBeNull();
 
     expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
     await turn(true);
@@ -2578,11 +2623,125 @@ describe('the import step', () => {
     );
   });
 
+  // A REFUSED TURN GIVES THE SCREEN BACK, which is the documents step's remedy exactly. A turn that
+  // never began raises no `copilot:state`, so nothing settles: there was no Done, and the panel's own
+  // Retry is offered only on a failure the server called retryable — so an expired sign-in left the
+  // person on a screen with the two doors gone and nothing on it that did anything.
+  //
+  // THEIR WORDS SURVIVE IT. The boxes come back filled: the paste is the one thing on this screen the
+  // person cannot be asked to produce twice.
+  it('gives the boxes back, with their words, when the turn is refused outright', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta\nFix the login bug', 'The top section is done, ignore it.');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // The premise: the boxes really are gone once the turn is away, or what is asserted below is a
+    // screen that never changed.
+    expect(screen.queryByLabelText(/paste your list/i)).toBeNull();
+
+    // VERBATIM FROM THE `auth` ROW of src/core/copilot-errors.ts, `retryable: false` included: that
+    // pair is the non-retryable class, and a sentence invented here would be a fixture that cannot
+    // reach the state this case is about.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:event',
+        event: {
+          kind: 'error',
+          text: 'The backend rejected the credentials. Sign in again with the CLI, then start a new chat.',
+          retryable: false,
+        },
+      });
+    });
+
+    // NOTHING SETTLED, so the way on never appeared — and the panel goes back with `sent`, taking
+    // the transcript with it. That is the cost of giving the boxes back and it is deliberate: the
+    // conversation is the TAB'S, so the model's own words about the failure are still in the dock,
+    // and what stands here is this screen's own sentence.
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+    expect(screen.queryByTestId('verbatim-conversation')).toBeNull();
+
+    expect(
+      screen.getByText(
+        'Something went wrong while it was making the cards — nothing was lost, and you can try again.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByLabelText(/paste your list/i) as HTMLTextAreaElement).value).toBe(
+      'Ship the beta\nFix the login bug',
+    );
+    expect((screen.getByLabelText(/anything the assistant/i) as HTMLInputElement).value).toBe(
+      'The top section is done, ignore it.',
+    );
+
+    // AND THE SECOND PRESS REALLY SENDS AGAIN, with the report from the first attempt taken down: a
+    // new turn is a new window, the documents step's rule and its reason.
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(2));
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
+  // AND THE OTHER HALF, without which the case above only proves a sentence can appear: a turn that
+  // goes through says nothing went wrong, keeps the boxes away, and opens the way on.
+  it('says nothing went wrong when the turn goes through', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await said('I made 2 cards on features.');
+    await turn(false);
+
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+    expect(screen.queryByLabelText(/paste your list/i)).toBeNull();
+  });
+
+  // A STOPPED TURN HAS NO REPORT. The Stop is the panel's, under the composer, and what a cancelled
+  // turn last said is whatever it happened to be saying — here a question about where to put the
+  // rest. Lifted onto the way on, and then onto the closing screen, that question reads as the count
+  // of what was made: the one sentence on that screen nobody can check.
+  it('reports nothing of a turn the person stopped', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await said('I have made 2 on features. Shall I put the rest on product?');
+
+    // THE PANEL'S OWN CONTROL, pressed as a person presses it: the composer swaps Send for Stop while
+    // the turn runs, which is the only Cancel on this screen.
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await turn(false);
+
+    // The way on is open — the turn ended — and it carries nothing.
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-made')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: ADVANCE }));
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
+  });
+
+  // AND THE OTHER HALF IS THE SETTLE CASE ABOVE, which shows the same sentence surviving a turn that
+  // was left alone — so this is about the cancel and not about a report that never appears.
+
   // THE TRANSCRIPT IS THE TAB'S, and the documents step's turns are still in it when this screen
   // mounts. Reading it from the start would stand under the question reporting what THAT turn was
   // last doing — a tool name and a closing sentence about six documents, presented as this import's.
+  //
+  // THE TURN HAS TO RUN FOR THIS TO CONSTRAIN ANYTHING, which is the correction: this case used to
+  // assert the two readouts were absent on a screen that had sent nothing, and nothing is rendered
+  // there whatever window is read — so `items.slice(0)` in place of `items.slice(mark.current)`
+  // passed it. Here the import really is sent and really does settle, having said nothing of its
+  // own: the readouts stay empty because the mark holds, and only because the mark holds.
   it('reports nothing of the conversation it inherited', async () => {
     importing();
+    await granted(true);
     await act(async () => {
       ws.push({
         type: 'copilot:history',
@@ -2594,9 +2753,17 @@ describe('the import step', () => {
         stats: { costUsd: 0, turns: 1, lastDurationMs: 0, contextTokens: 0 },
       });
     });
+
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
     await turn(false);
 
-    expect(await screen.findByText(QUESTION)).toBeTruthy();
+    // The premise: the turn really ran and really ended, so the way on is open — the readouts are
+    // silent because everything in the transcript is older than this turn, not because the screen
+    // is still standing under the question.
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
     expect(screen.queryByTestId('verbatim-tool')).toBeNull();
     expect(screen.queryByTestId('verbatim-made')).toBeNull();
   });
@@ -2611,6 +2778,23 @@ describe('the import step', () => {
 
     expect(await screen.findByText(QUESTION)).toBeTruthy();
   });
+
+  // AND A STEP THIS BUILD HAS NEVER HEARD OF LANDS ON THE ENDING, not here. The router's default used
+  // to be this step, so a file written by a later build — the only way to arrive with a step outside
+  // the union — put a paste box in front of somebody and sent what they typed to a credentialed
+  // conversation. The cast is the point: nothing in the type system can produce this state, and a file
+  // on disk can. The closing screen spends nothing, which is why the default must never be an agent
+  // step.
+  it('lands an unknown step on the ending rather than on an agent step', async () => {
+    const start = 'a-step-from-the-future' as ComponentProps<typeof WizardView>['start'];
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'ready' } });
+
+    view({ start, snapshot: opened });
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Yes — bring it in' })).toBeNull();
+  });
 });
 
 // THE END OF SETUP, WHICH IS A REPORT AND NOT A CELEBRATION (W1, decision 79). It says what is now in
@@ -2623,13 +2807,15 @@ describe('the import step', () => {
 // own facts is a second opinion about them.
 describe('the ready screen', () => {
   const FINISH = 'Open the board';
-  const DOCUMENTS = 'Six documents written — read them any time in Project Control';
   const ALL_SIX = Object.fromEntries(
     ['README.md', 'STACK.md', 'CODE-QUALITY.md', 'TESTING.md', 'UX.md', 'DESIGN.md'].map((name) => [
       name,
       `What ${name} says, in a sentence.`,
     ]),
   );
+  // COUNTED FROM THE FIXTURE, as the screen counts it from `DOC_NAMES`: the sentence states a number,
+  // and a hand-typed word here would go stale in exactly the way the screen's own used to.
+  const DOCUMENTS = `${Object.keys(ALL_SIX).length} documents written — read them any time in Project Control`;
 
   const finished = (state: Partial<WizardState> = {}) => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'ready', ...state } });
@@ -2652,7 +2838,7 @@ describe('the ready screen', () => {
 
   // ANYTHING UNKNOWN IS OMITTED RATHER THAN GUESSED, and a heading over nothing is the failure this
   // pins: a setup that skipped the stack and the documents has nothing to say about either, and
-  // "Six documents written" over a project with none is the one sentence this screen must never say.
+  // "6 documents written" over a project with none is the one sentence this screen must never say.
   it('omits what it cannot say, and still ends setup', async () => {
     finished();
 
@@ -2677,16 +2863,20 @@ describe('the ready screen', () => {
   // over; whether auto-pilot could start this second is the board's question, and holding somebody
   // inside the wizard over it would make the last screen a second gate on top of decision 74's.
   it('lists what is still missing without blocking the way out', async () => {
-    api.getReadiness.mockResolvedValue(
-      readiness({
-        ok: false,
-        blockers: ['foundation/UX.md has not been written yet.', 'There is no card on any board.'],
-      }),
-    );
+    // BOTH SENTENCES VERBATIM FROM `blockersFrom` in src/server/autopilot/routes.ts, which is where
+    // the endpoint composes them. The empty-board one was written here as "There is no card on any
+    // board." — a sentence this product has never answered with: the real one names the remedy, and
+    // a fixture that trims it is a screen tested against words nobody will ever read. (The short
+    // version does exist, as the LOOP's own `no-op` stop sentence in src/core/lifecycle/tick.ts,
+    // which is a different surface entirely.)
+    const missing = 'foundation/UX.md has not been written yet.';
+    const empty =
+      'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.';
+    api.getReadiness.mockResolvedValue(readiness({ ok: false, blockers: [missing, empty] }));
     finished();
 
-    expect(await screen.findByText('foundation/UX.md has not been written yet.')).toBeTruthy();
-    expect(screen.getByText('There is no card on any board.')).toBeTruthy();
+    expect(await screen.findByText(missing)).toBeTruthy();
+    expect(screen.getByText(empty)).toBeTruthy();
     expect(screen.getByText('You can fix these from the board — nothing is lost.')).toBeTruthy();
     expect(screen.queryByText('Everything auto-pilot needs is here.')).toBeNull();
 
@@ -2747,6 +2937,10 @@ describe('the ready screen', () => {
 
     expect(await screen.findByTestId('verbatim-imported')).toBeTruthy();
     expect(screen.getByTestId('verbatim-imported').textContent).toBe(made);
+    // ATTRIBUTED, AND THAT IS THE POINT OF THE LINE. The model's closing sentence can be a question,
+    // and among this screen's own plain statements an unattributed one reads as a fact the wizard
+    // checked. The label is what makes it the assistant's words.
+    expect(screen.getByText(/What the assistant said when it finished:/)).toBeTruthy();
   });
 
   // AND THE OTHER HALF, without which the case above only proves a sentence can appear: the no-door
@@ -2942,7 +3136,10 @@ describe('the words on every step (W7)', () => {
     sweep('the questions', form.container);
     cleanup();
 
-    sweep('the hand-off', view({ start: 'ready', snapshot: opened }).container);
+    // `the hand-off` until the journey grew an ending: this is the CLOSING SCREEN, and the hand-off
+    // is what happens after it — Start, the derivation, decision 74's gate. A label that names the
+    // wrong screen is what a failure message here would send somebody to read.
+    sweep('the closing screen', view({ start: 'ready', snapshot: opened }).container);
   });
 
   // THE QUESTIONS WITH THE SCAN'S NEWS ON THEM, which is a different screen from the one above and
@@ -3077,6 +3274,48 @@ describe('the words on every step (W7)', () => {
     expect(screen.getByTestId('verbatim-made').textContent).toBe(reply);
     expect((screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase()).toContain('docker');
     sweep('the import once it has run', container);
+  });
+
+  // THE TWO STATES THE IMPORT REACHES WHEN SOMETHING IS WRONG, and every word on both is the
+  // wizard's own: the sentence over a paste too big to send, and the report on a turn that was
+  // refused. Neither is on any screen the case above walks through, so neither was swept.
+  //
+  // THE PANEL IS GONE BY THE SECOND SWEEP, which is the point of the state: a refused turn gives the
+  // two boxes back, and the model's own words go with the transcript. Nothing exempt is left on the
+  // screen — what is read here is entirely this wizard's copy.
+  it('says a list too big and a list refused in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'x'.repeat(20_001) } });
+
+    // The premise: the sentence really is on the screen being swept.
+    expect(screen.getByText(/That is a lot to send in one go/)).toBeTruthy();
+    sweep('a paste too big to send', container);
+
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // VERBATIM FROM THE `auth` ROW of src/core/copilot-errors.ts — the non-retryable class, which is
+    // the one the panel offers nothing for.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:event',
+        event: {
+          kind: 'error',
+          text: 'The backend rejected the credentials. Sign in again with the CLI, then start a new chat.',
+          retryable: false,
+        },
+      });
+    });
+
+    expect(screen.getByText(/Something went wrong while it was making the cards/)).toBeTruthy();
+    sweep('the list that was refused', container);
   });
 
   // THE LAST SCREEN, WHERE THREE VOICES MEET AND ONLY ONE OF THEM IS THIS WIZARD'S. What it says about

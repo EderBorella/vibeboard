@@ -435,3 +435,129 @@ describe('the backend step', () => {
     await waitFor(() => expect(api.getSandbox).toHaveBeenCalledTimes(2));
   });
 });
+
+// THE QUESTIONS, AND THE TWO CHOICES THAT ARE NOT QUESTIONS (W6, W7, W8). Everything a beginner is asked
+// is in their own words; everything an engineer wants is behind one fold. What the step writes is two
+// stores at once — the answers to the wizard's own file, the two project choices to the config — and the
+// config half has to carry each block WHOLE or the endpoint refuses it for a key the person never saw.
+describe('the form step', () => {
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+  });
+
+  const form = (over: Partial<ProjectConfig> = {}) =>
+    view({ start: 'form', snapshot: { ...opened, config: { ...config, ...over } } as ProjectSnapshot });
+
+  // The lifecycle block a scaffolded project has. Asserted non-null because `defaultConfig` writes one:
+  // the optional key is for projects made before the lifecycle existed, and a wizard never meets one.
+  const lifecycle = config.autopilot!;
+
+  it('writes the kind from the tab and the WHOLE lifecycle block', async () => {
+    form();
+    fireEvent.click(await screen.findByRole('button', { name: 'Game' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Express' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // The whole block: `PATCH /api/config` runs the coverage check over the autopilot block it is
+    // given, so a patch carrying one key fails every check that indexes the rest.
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith({
+        box: { kind: 'game' },
+        autopilot: { ...lifecycle, mode: 'express' },
+      }),
+    );
+  });
+
+  it('drops a saved focus with the mode, exactly as the auto-pilot bar does', async () => {
+    // `FocusPicker` renders in express alone and the tick honours a focus whatever the mode says, so a
+    // focus left behind on a switch to standard confines the loop through a control nobody can see.
+    const autopilot = { ...lifecycle, mode: 'express' as const, focus: 'F-001' };
+    form({ autopilot });
+    fireEvent.click(await screen.findByRole('button', { name: 'Standard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalled());
+    const [[patch]] = api.patchConfig.mock.calls as [[{ autopilot: Record<string, unknown> }]];
+    expect(patch.autopilot.mode).toBe('standard');
+    expect('focus' in patch.autopilot).toBe(false);
+  });
+
+  it('keeps a focus the mode change never happened to', async () => {
+    // The bar's other half: it returns early on an unchanged mode and never touches the focus. Leaving
+    // the picker alone here must mean the same thing as not touching the bar at all.
+    const autopilot = { ...lifecycle, mode: 'express' as const, focus: 'F-001' };
+    form({ autopilot });
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledWith({ box: { kind: 'web' }, autopilot }));
+  });
+
+  it('parses the packages out of the line, and sends no packages key for an empty one', async () => {
+    form();
+    fireEvent.change(await screen.findByLabelText(/extra packages/i), {
+      // The trailing comma is what a person leaves while typing; it must not become an empty package.
+      target: { value: 'ffmpeg, imagemagick,' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ box: { kind: 'web', packages: ['ffmpeg', 'imagemagick'] } }),
+      ),
+    );
+
+    cleanup();
+    api.patchConfig.mockClear();
+    form();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    // `mergeConfig` replaces the box block wholesale, so an empty key would be a promise about a list
+    // nobody edited. Absent means "the image this kind implies", which is what a new project has.
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'web' } })),
+    );
+  });
+
+  it('lands the three answers in the file, with everything already in it', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'brownfield', step: 'form', resumes: { 'foundation/TESTING.md': 'how it is checked' } },
+    });
+    form();
+    fireEvent.change(await screen.findByLabelText(/what are you making/i), {
+      target: { value: 'a tool for reading meters' },
+    });
+    fireEvent.change(screen.getByLabelText(/who is it for/i), { target: { value: 'the field team' } });
+    fireEvent.change(screen.getByLabelText(/does "done" look like/i), {
+      target: { value: 'one meter read end to end' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'brownfield',
+        step: 'handoff',
+        resumes: { 'foundation/TESTING.md': 'how it is checked' },
+        answers: {
+          what: 'a tool for reading meters',
+          who: 'the field team',
+          done: 'one meter read end to end',
+        },
+      }),
+    );
+  });
+
+  it('says nothing outside the fold that only an engineer would recognise', async () => {
+    // A cheap W7 tripwire on the one surface in the product written for somebody who has never seen it.
+    // The fold is exempt by name — it is labelled "For engineers" and is where those words belong.
+    const { container } = form();
+    await screen.findByRole('button', { name: 'Continue' });
+
+    expect(container.querySelector('details')).not.toBeNull();
+    const plain = container.cloneNode(true) as HTMLElement;
+    for (const fold of plain.querySelectorAll('details')) fold.remove();
+    expect(plain.textContent).not.toBe('');
+    for (const jargon of ['config', 'yaml', 'backend', 'docker']) {
+      expect(plain.textContent?.toLowerCase()).not.toContain(jargon);
+    }
+  });
+});

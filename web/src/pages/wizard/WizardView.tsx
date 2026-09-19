@@ -14,15 +14,26 @@ import {
   type SandboxState,
   scaffoldProject,
 } from '../../lib/api';
-import type { ProjectSnapshot, ScaffoldMode, WizardState, WizardStep } from '../../lib/shared';
+import {
+  type AutopilotConfig,
+  BOX_KINDS,
+  type BoxKind,
+  type LifecycleMode,
+  type ProjectSnapshot,
+  type ScaffoldMode,
+  type WizardState,
+  type WizardStep,
+} from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { useBuildLog } from '../../lib/useBuildLog';
 import { useFetched } from '../../lib/useFetched';
 import { useSandbox } from '../../lib/useSandbox';
 import type { WizardStart } from '../../lib/useWizard';
-import { projectTarget, slugify, toNamePattern } from '../../lib/viewmodel';
+import { csv, parseCsv, projectTarget, slugify, toNamePattern } from '../../lib/viewmodel';
 import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
+import { Tabs } from '../../molecules/Tabs';
+import { LifecyclePicker } from '../../organisms/autopilot/LifecyclePicker';
 import { BackendPicker } from '../../organisms/copilot/BackendPicker';
 
 // SETTING A PROJECT UP, AS A SCREEN AND NOT A MODAL. Its later steps hold agent runs that last minutes,
@@ -38,12 +49,13 @@ interface Props {
   // starts at `identity` even with another project open, and an offer to finish resumes at the step
   // the file names.
   start: WizardStart;
-  // Null until the identity step has made one. Threaded now and read by the steps that ask about the
-  // project itself — the backend check and the questions — which are the next parts of this phase.
+  // Null until the identity step has made one — and for as long after it as the new project's first
+  // snapshot takes to arrive over the socket, which is why every step that reads the config tolerates
+  // its absence rather than assuming a project is there the moment the scaffold returns.
   snapshot: ProjectSnapshot | null;
-  // THE TAB'S ONE SOCKET GENERATION, threaded from the shell rather than invented here. Nothing on this
-  // screen reads frames yet; the step that streams a container build does, and `socketFor` is
-  // last-write-wins, so a literal key here would be a second socket silently replacing the app's.
+  // THE TAB'S ONE SOCKET GENERATION, threaded from the shell rather than invented here. The backend
+  // step streams a container build off it, and `socketFor` is last-write-wins — so a literal key here
+  // would not be a second socket beside the app's, it would silently replace it.
   bump: number;
   onOpened: () => void;
   onExit: () => void;
@@ -99,8 +111,9 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     );
   else if (step === 'backend')
     body = <BackendStep mode={mode} snapshot={snapshot} bump={bump} onContinue={() => setStep('form')} />;
-  else if (step === 'handoff') body = <HandoffStep />;
-  else body = <PendingStep onContinue={() => setStep('handoff')} />;
+  else if (step === 'form')
+    body = <FormStep mode={mode} snapshot={snapshot} onContinue={() => setStep('handoff')} />;
+  else body = <HandoffStep />;
 
   return (
     <Stack fill scroll justify="center" align="start" pad={[7, 6]}>
@@ -363,23 +376,171 @@ function BackendStep({
   );
 }
 
-// The last step between the scaffold and the hand-off, standing in for itself until it is built. It says
-// so rather than looking finished, because a step that renders nothing is indistinguishable from a step
-// that broke.
-function PendingStep({ onContinue }: { onContinue: () => void }) {
+// THE KINDS IN WORDS. `BOX_KINDS` is machinery — it picks which image a box is built from — and its
+// members are slugs for that reason; these are the same three choices said the way somebody choosing
+// between them would say them. One map, here, rather than labels invented at each site.
+const KIND_LABELS: Record<BoxKind, string> = {
+  web: 'Web App',
+  game: 'Game',
+  research: 'Research',
+};
+
+// A cleared number box gives `Number('') === NaN`, which `JSON.stringify` puts on the wire as `null` and
+// the endpoint refuses with a sentence about a key the person never touched. Clamped at source, exactly
+// as AutopilotPanel clamps it: a box that cannot express an invalid value needs no refusal.
+const atLeast = (text: string, min: number): number => {
+  const n = Number(text);
+  return Number.isFinite(n) ? Math.max(min, n) : min;
+};
+
+// THE AUTO-PILOT BAR'S EXACT RULE, copied rather than re-derived — `chooseMode` in AutopilotBar.tsx.
+// The focus is cleared WITH the mode and only with it: `FocusPicker` renders in express alone and the
+// tick honours a focus whatever the mode says, so a focus left behind on a switch to standard would
+// confine the loop to one feature through a control nobody can see any more. The bar returns early on an
+// unchanged mode, which is the other half of the rule — a mode that did not change keeps its focus.
+function withMode(ap: AutopilotConfig, mode: LifecycleMode): AutopilotConfig {
+  if (mode === ap.mode) return ap;
+  const { focus: _dropped, ...rest } = ap;
+  return { ...rest, mode };
+}
+
+// WHAT THE PROJECT IS, IN THE PERSON'S OWN WORDS, and the two choices that are not questions at all.
+//
+// The three answers go to the wizard's own file, because they are what the copilot will be told and not
+// something the product enforces. The two choices go to `config.yaml`, because they change what the
+// machine does: the kind decides which image a box is built from, and the lifecycle decides how coarsely
+// auto-pilot breaks work down. Two stores, one press — and each block is sent WHOLE.
+//
+// EVERYTHING AN ENGINEER WANTS IS BEHIND ONE FOLD (W8). A beginner never meets a package list or a
+// dollar cap, and an engineer does not have to leave setup to set them.
+function FormStep({
+  mode,
+  snapshot,
+  onContinue,
+}: {
+  mode: ScaffoldMode;
+  snapshot: ProjectSnapshot | null;
+  onContinue: () => void;
+}) {
+  const saved = useSaved(mode);
+  const [what, setWhat] = useState('');
+  const [who, setWho] = useState('');
+  const [done, setDone] = useState('');
+  const ap = snapshot?.config.autopilot;
+  const [kind, setKind] = useState<BoxKind>(snapshot?.config.box?.kind ?? 'web');
+  const [lifecycle, setLifecycle] = useState<LifecycleMode>(ap?.mode ?? 'standard');
+  // Prefilled from what the project already has, and it matters: the patch REPLACES the box block, so a
+  // field that started empty on a project with packages would delete them on the way past.
+  const [packages, setPackages] = useState(csv(snapshot?.config.box?.packages ?? []));
+  const [budgetUsd, setBudget] = useState(ap?.budgetUsd ?? 0);
+  const [maxIterations, setMax] = useState(ap?.maxIterations ?? 1);
+  const { busy, error, run } = useAction();
+
+  const go = (): void => {
+    void run(async () => {
+      await putWizard({ ...saved('handoff'), answers: { what, who, done } });
+      const extra = parseCsv(packages);
+      await patchConfig({
+        box: { kind, ...(extra.length > 0 ? { packages: extra } : {}) },
+        // Nothing written for a project with no lifecycle block: `PATCH /api/config` checks the block it
+        // is given against the board, and one assembled here from nothing would fail every check at once.
+        ...(ap ? { autopilot: { ...withMode(ap, lifecycle), budgetUsd, maxIterations } } : {}),
+      });
+      onContinue();
+    });
+  };
+
   return (
     <>
       <Text as="h2" size="title" ink="strong" family="display">
         A few questions
       </Text>
       <Text role="hint">
-        Not built yet — this step will ask what you are making, who it is for, and what done looks like.
+        Nothing here is binding — it is what your assistant reads before it starts, so a rough answer beats a
+        blank one.
       </Text>
+
+      <Field label="What are you making?" hint="A sentence or two, in your own words.">
+        <Control as="textarea" rows={3} value={what} onChange={(e) => setWhat(e.target.value)} />
+      </Field>
+      <Field label="Who is it for?">
+        <Control as="textarea" rows={2} value={who} onChange={(e) => setWho(e.target.value)} />
+      </Field>
+      <Field label={'What does "done" look like?'} hint="How you'll know the first version works.">
+        <Control as="textarea" rows={2} value={done} onChange={(e) => setDone(e.target.value)} />
+      </Field>
+
+      {/* `as="div"`, because what the label names is a picker and not a form element — a wrapping
+          `<label>` would have nothing to focus and would read the whole group out as its name. */}
+      <Field as="div" label="What kind of project is it?">
+        <Tabs
+          grouped
+          label="What kind of project is it?"
+          value={kind}
+          onChange={(next) => setKind(next as BoxKind)}
+          items={BOX_KINDS.map((value) => ({ value, label: KIND_LABELS[value] }))}
+        />
+      </Field>
+
+      <Field
+        as="div"
+        label="How carefully should it work?"
+        hint="Express plans in bigger pieces — about a third of the cost. Standard is more thorough."
+      >
+        {/* The same picker the auto-pilot bar carries, reading the mode chosen here rather than the one
+            on disk: this screen has not saved anything yet. */}
+        <LifecyclePicker
+          config={ap ? { ...ap, mode: lifecycle } : null}
+          onChange={(next) => setLifecycle(next as LifecycleMode)}
+        />
+      </Field>
+
+      <details>
+        <summary>For engineers</summary>
+        <Stack direction="column" gap={4} pad={[4, 0, 0]}>
+          <Field
+            label="Extra packages"
+            hint="Debian package names, comma-separated — they'll be installed into every sandbox this project gets."
+          >
+            <Control value={packages} onChange={(e) => setPackages(e.target.value)} />
+          </Field>
+          {ap && (
+            <>
+              <Field
+                label="Budget (USD)"
+                hint="Auto-pilot stops when this project's runs have cost this much. Zero means no dollar budget."
+              >
+                <Control
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={budgetUsd}
+                  onChange={(e) => setBudget(atLeast(e.target.value, 0))}
+                />
+              </Field>
+              <Field
+                label="Iteration cap"
+                hint="How many times auto-pilot may dispatch in one run. This is what bounds a project with no dollar budget."
+              >
+                <Control
+                  type="number"
+                  min={1}
+                  step={10}
+                  value={maxIterations}
+                  onChange={(e) => setMax(atLeast(e.target.value, 1))}
+                />
+              </Field>
+            </>
+          )}
+        </Stack>
+      </details>
+
       <Stack gap={4}>
-        <Button variant="primary" onClick={onContinue}>
+        <Button variant="primary" disabled={busy !== null} onClick={go}>
           Continue
         </Button>
       </Stack>
+      {error && <Text role="error">{error}</Text>}
     </>
   );
 }

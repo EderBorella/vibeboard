@@ -9,7 +9,22 @@ import type { ScaffoldMode } from './scaffold.js';
 // precedent. The order is the order they are walked, and the three agent moments sit where they act:
 // `scan` reads the repository before the form it prefills, `stack` proposes once the form has been
 // answered, and `gates` holds the person at the commands the copilot just wrote. decision 77.
-export const WIZARD_STEPS = ['backend', 'scan', 'form', 'stack', 'docs', 'gates', 'handoff'] as const;
+//
+// `handoff` IS IN THE LIST AND NOT IN THE JOURNEY. The walk ends at `import` then `ready`; the
+// placeholder that stood where those go is retired, and dropping it would turn a file written by the
+// build that had one into no wizard at all — the route refuses a step outside this list, so a person
+// parked there would lose the setup on disk rather than resume it. It reads as `import`. decision 79.
+export const WIZARD_STEPS = [
+  'backend',
+  'scan',
+  'form',
+  'stack',
+  'docs',
+  'gates',
+  'import',
+  'ready',
+  'handoff',
+] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardAnswers {

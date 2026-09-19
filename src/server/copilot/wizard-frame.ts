@@ -24,7 +24,30 @@ function attachLine(attach: string | undefined): string | undefined {
 // `attach` is REQUIRED though it is usually nothing: it is the only thing between a browser-supplied
 // name and the prompt, so a new call site has to decide about it rather than inherit a default.
 export function wizardFrame(state: WizardState | null, attach: string | undefined): string | undefined {
-  if (state?.step !== 'docs') return undefined;
+  if (!state) return undefined;
+  // THE IMPORT IS THE COPILOT UNDER A FRAME, NEVER A RUN (decision 79), which makes this text the only
+  // thing confining it: `assist` may create a card on any board, and nothing else says it must stop at
+  // cards. No attachment reaches it — the six documents are the other step's subject, and what this
+  // conversation is about is a list the product has no copy of.
+  if (state.step === 'import') {
+    return [
+      '## Project setup is running — before anything else, how to speak',
+      '',
+      'You are helping someone bring their existing task list into this project, and this may be',
+      'their first contact with the product. Answer in under 200 words, plain human language, no',
+      'technicalities unless they ask.',
+      '',
+      '## Your job in this conversation',
+      '',
+      'Their message carries the list (or where it lives) and a one-liner about how to read it.',
+      'Create cards on the right boards, nothing deeper: features on `features`, user-facing work on',
+      "`product`, technical work on `engineering`, everything into each board's first column. Use",
+      'their words for titles; do not invent bodies past what the list says; skip finished items',
+      'unless asked. When you cannot tell where something goes, ask — one question, not a form.',
+      'When you are done, say plainly how many cards you made on which boards.',
+    ].join('\n');
+  }
+  if (state.step !== 'docs') return undefined;
   const a = state.answers ?? {};
   const looking = attachLine(attach);
   return [

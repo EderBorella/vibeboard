@@ -27,13 +27,15 @@ describe('wizardFrame', () => {
 
   // THE GATE THAT MAKES THIS SAFE. Every other step is an ordinary conversation — a person asking
   // the copilot anything at all — and a brief about writing foundation documents prepended to that
-  // is the copilot answering a question nobody asked.
-  it('says nothing on every step but docs', () => {
+  // is the copilot answering a question nobody asked. Two steps are briefed now and the rest are
+  // still silent: the import is the copilot under a frame as well. decision 79.
+  it('says nothing on any step but the two it briefs', () => {
     for (const step of WIZARD_STEPS) {
-      if (step === 'docs') continue;
+      if (step === 'docs' || step === 'import') continue;
       expect(wizardFrame(docs({ step }), undefined), step).toBeUndefined();
     }
     expect(wizardFrame(docs(), undefined)).toBeTypeOf('string');
+    expect(wizardFrame(docs({ step: 'import' }), undefined)).toBeTypeOf('string');
   });
 
   // W7, which is the whole reason the frame exists: this is the person's first contact with the
@@ -68,6 +70,45 @@ describe('wizardFrame', () => {
     expect(frame).toContain('PUT /api/wizard/resumes/:name');
     expect(frame).toContain('PUT /api/control/foundation/:name');
     expect(frame).toContain("I couldn't work out");
+  });
+});
+
+// THE IMPORT, WHICH IS THE COPILOT UNDER A FRAME AND NEVER A RUN (decision 79). The frame is the only
+// thing confining it: `assist` can create a card anywhere, so what stops an import inventing columns,
+// bodies and links is this text and the person reading the conversation it is having.
+describe('the import brief', () => {
+  const importing = (over: Partial<WizardState> = {}): WizardState => docs({ step: 'import', ...over });
+
+  it('confines the import to cards, and carries the same voice contract', () => {
+    const frame = wizardFrame(importing(), undefined) ?? '';
+    expect(frame).toContain('cards on the right boards, nothing deeper');
+    expect(frame).toContain('under 200 words');
+  });
+
+  // WHERE THE LIST GOES AND WHAT IS NOT TO BE DONE WITH IT: the three boards by name, the first column,
+  // their words, and one question rather than a form when it cannot tell.
+  it('names the boards, the column and the one question it may ask', () => {
+    const frame = wizardFrame(importing(), undefined) ?? '';
+    expect(frame).toContain('`features`');
+    expect(frame).toContain('`product`');
+    expect(frame).toContain('`engineering`');
+    expect(frame).toContain("each board's first column");
+    expect(frame).toContain('ask — one question, not a form');
+    expect(frame).toContain('how many cards you made on which boards');
+  });
+
+  // THE CONVERSATION IS OVER AT `ready`, and a frame there is a leak in the plainest sense: the person
+  // is reading the closing screen, and the next thing they type into the dock is an ordinary question.
+  it('says nothing once setup has reached the ready screen', () => {
+    expect(wizardFrame(importing({ step: 'ready' }), undefined)).toBeUndefined();
+  });
+
+  // An import attaches nothing. The attachment is the documents step's — six named files the person
+  // might be looking at — and the import is looking at their own list, which the product has no copy of.
+  it('attaches no document, whatever the page put in the field', () => {
+    const frame = wizardFrame(importing(), 'STACK.md') ?? '';
+    expect(frame).toContain('cards on the right boards, nothing deeper');
+    expect(frame).not.toContain('The person is looking at');
   });
 });
 

@@ -372,8 +372,19 @@ void _everySnapshotFieldIsListed;
 //
 // A LIST, then the union derived from it, for the reason `BOX_KINDS` above is a list: a type has no
 // runtime value, so nothing could hold the two sides together. Asserted in test/mirror.test.ts. The
-// order is the order the steps are walked. decision 77.
-export const WIZARD_STEPS = ['backend', 'scan', 'form', 'stack', 'docs', 'gates', 'handoff'] as const;
+// order is the order the steps are walked — `handoff` excepted, which is retired from the flow and
+// kept so a file written by the build that had one still reads; it renders as `import`. decision 79.
+export const WIZARD_STEPS = [
+  'backend',
+  'scan',
+  'form',
+  'stack',
+  'docs',
+  'gates',
+  'import',
+  'ready',
+  'handoff',
+] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardAnswers {

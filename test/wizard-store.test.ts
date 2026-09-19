@@ -52,8 +52,36 @@ describe('the wizard state file', () => {
   // this sequence and a resumed setup comes back to one of them by name, so a step inserted in the
   // wrong place is a person sent to the wrong screen. The three agent moments sit where they act —
   // the scan before the form fills it, the stack after the form answers it. decision 77.
+  //
+  // `handoff` IS LAST BECAUSE IT IS NO LONGER WALKED. The journey ends at `import` then `ready`; the
+  // placeholder that stood where they go is retired from the flow and kept in the list, because a file
+  // written by the build that had one is on somebody's disk and must still read. decision 79.
   it('names a step for each of the wizard journey, in the order they are walked', () => {
-    expect([...WIZARD_STEPS]).toEqual(['backend', 'scan', 'form', 'stack', 'docs', 'gates', 'handoff']);
+    expect([...WIZARD_STEPS]).toEqual([
+      'backend',
+      'scan',
+      'form',
+      'stack',
+      'docs',
+      'gates',
+      'import',
+      'ready',
+      'handoff',
+    ]);
+  });
+
+  // THE RETIRED STEP, FROM DISK. Nothing writes it any more and the route still accepts it — a setup
+  // parked at it before the journey gained its last two steps resumes rather than reading as no
+  // wizard, which is what dropping it from the union would have made it. decision 79.
+  it('a file parked at the retired hand-off step still reads', async () => {
+    await writeWizardState(root, { mode: 'greenfield', step: 'handoff', stack: 'TypeScript' });
+
+    expect(await readWizardState(root)).toEqual({
+      mode: 'greenfield',
+      step: 'handoff',
+      stack: 'TypeScript',
+    });
+    await clearWizardState(root);
   });
 
   // WHAT AN AGENT PROPOSED AND WHAT WAS AGREED, round-tripped — and every key checked against the

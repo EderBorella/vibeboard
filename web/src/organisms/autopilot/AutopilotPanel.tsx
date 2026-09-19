@@ -66,6 +66,8 @@ export function AutopilotPanel({
   onCaps,
   autopilot,
   onAutopilotChanged,
+  setupPending = false,
+  onResumeSetup,
 }: {
   config: ProjectConfig;
   // Called with the whole set of edited caps on every change. The modal merges them into the config's
@@ -75,6 +77,13 @@ export function AutopilotPanel({
   // must not open its own.
   autopilot: AutopilotState | null;
   onAutopilotChanged: () => void;
+  // Whether this project has an unfinished setup waiting. The FILE's answer, threaded down from the
+  // shell rather than asked for here: the shell already holds it, and a second read of one question is
+  // a second answer that can disagree — which is the argument `useReadiness` is shared for, one section
+  // up this same panel.
+  setupPending?: boolean;
+  // Opening setup is the shell's act — it is a content state, and this panel sits in a modal above it.
+  onResumeSetup?: () => void;
 }) {
   const hasLifecycle = config.autopilot !== undefined;
   // The SAME hook the transport strip uses. Two fetches of one question are two answers that can
@@ -184,6 +193,17 @@ export function AutopilotPanel({
             </li>
           ))}
         </List>
+      )}
+      {/* THE WAY BACK INTO SETUP, BESIDE THE WALL SOMEBODY HITS WITHOUT IT. Most of these blockers are
+          documents the setup assistant writes, and the person reading them is usually the person who
+          skipped it — so the shortcut belongs where the refusal is, not only on the first screen.
+          Both halves required: the flag is the file's answer and the callback is the shell's lever, and
+          a project with setup finished or abandoned has neither. */}
+      {setupPending && onResumeSetup && (
+        <Stack align="stretch" gap={4}>
+          <Button onClick={onResumeSetup}>Finish setting up</Button>
+          <Text role="hint">The setup assistant can write most of this for you.</Text>
+        </Stack>
       )}
     </>
   );

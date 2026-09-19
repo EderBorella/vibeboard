@@ -76,10 +76,9 @@ export function App() {
   // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
   // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
   const autopilot = useAutopilot(bump, signin.signedIn);
-  // Which kind of setup is on screen, `null` for none — a content state rather than a dialog, so it is
-  // an answer to "what is the shell showing" and not a flag on something else. The hook is also what
-  // offers setup again on a project that has a wizard file still sitting in it.
-  const [wizard, setWizard] = useWizard(signin.signedIn, snapshot?.root);
+  // Setup: what is on screen, and what this project still has waiting. Two questions, because skipping
+  // keeps the file — see the hook, which owns that policy and is where it is tested.
+  const setup = useWizard(signin.signedIn, snapshot?.root);
 
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
@@ -204,7 +203,7 @@ export function App() {
   // not drop somebody into the middle of setting up the one they were already in.
   function enterWizard(mode: ScaffoldMode): void {
     setShowGate(false);
-    setWizard({ mode, step: 'identity' });
+    setup.show({ mode, step: 'identity' });
   }
 
   // Leaving it before a project exists goes back to the picker rather than to the shell's empty state:
@@ -212,8 +211,17 @@ export function App() {
   // there is a project to switch away from. With one open this re-states the false the gate already
   // holds, because the wizard only renders while the picker is down.
   function leaveWizard(): void {
-    setWizard(null);
+    setup.leave();
     setShowGate(snapshot === null);
+  }
+
+  // Back into setup from the readiness wall, which is where somebody who skipped meets the documents
+  // the assistant would have written. Settings closes with it: the wizard is a CONTENT state and this
+  // modal renders above the content, so re-entering without this would put the screen they asked for
+  // behind the one they asked to leave.
+  function resumeSetup(): void {
+    setSettingsOpen(false);
+    setup.resume();
   }
 
   // The dock's occupants. Cards is the only one today; a terminal would be one more entry here
@@ -227,7 +235,7 @@ export function App() {
     ready,
     showGate,
     hasSnapshot: Boolean(snapshot),
-    wizard: wizard !== null,
+    wizard: setup.entry !== null,
   });
   let content: ReactNode;
   if (which === 'signin') content = <SignIn phase={signin.phase} onRetry={signin.retry} />;
@@ -248,11 +256,11 @@ export function App() {
         onMapProject={() => enterWizard('brownfield')}
       />
     );
-  else if (which === 'wizard' && wizard !== null)
+  else if (which === 'wizard' && setup.entry !== null)
     content = (
       <WizardView
-        mode={wizard.mode}
-        start={wizard.step}
+        mode={setup.entry.mode}
+        start={setup.entry.step}
         snapshot={snapshot}
         bump={bump}
         onOpened={onOpened}
@@ -371,6 +379,8 @@ export function App() {
           onSaved={() => setSettingsOpen(false)}
           autopilot={autopilot.state}
           onAutopilotChanged={autopilot.refresh}
+          setupPending={setup.pending}
+          onResumeSetup={resumeSetup}
           confirm={confirm}
         />
       )}

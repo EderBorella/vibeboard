@@ -59,6 +59,12 @@ interface Props {
   // hold. It also meant the buttons read the PREVIOUS project's state across a switch.
   autopilot: AutopilotState | null;
   onAutopilotChanged: () => void;
+  // Straight through to AutopilotPanel, which offers the way back into an unfinished setup beside the
+  // blockers it would have cleared. Both come from the shell for the reason `autopilot` does: it holds
+  // the one copy, and opening setup is a content state this modal sits above rather than something it
+  // could do itself.
+  setupPending: boolean;
+  onResumeSetup: () => void;
   // Passed down from the shell, which owns the one confirmer and renders its dialog. Signing a browser
   // out is irreversible for the session it kills, and one of the two does it to this browser.
   confirm: Confirmer['confirm'];
@@ -77,6 +83,8 @@ export function SettingsModal({
   onSaved,
   autopilot,
   onAutopilotChanged,
+  setupPending,
+  onResumeSetup,
   confirm,
 }: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
@@ -284,6 +292,8 @@ export function SettingsModal({
         onCaps={setApCaps}
         autopilot={autopilot}
         onAutopilotChanged={onAutopilotChanged}
+        setupPending={setupPending}
+        onResumeSetup={onResumeSetup}
       />
 
       <Text caps ink="accent" className="settings-section">

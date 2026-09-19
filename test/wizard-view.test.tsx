@@ -281,7 +281,7 @@ describe('the offer to finish setup', () => {
     api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'form' } });
     const { result } = root('/work/demo');
 
-    await waitFor(() => expect(result.current[0]).toEqual({ mode: 'brownfield', step: 'form' }));
+    await waitFor(() => expect(result.current.entry).toEqual({ mode: 'brownfield', step: 'form' }));
   });
 
   it('asks nothing with no project open, and nothing before signing in', () => {
@@ -294,18 +294,52 @@ describe('the offer to finish setup', () => {
   it('does not offer again until a DIFFERENT project opens, so a skip holds', async () => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
     const { result, rerender } = root('/work/one');
-    await waitFor(() => expect(result.current[0]?.mode).toBe('greenfield'));
+    await waitFor(() => expect(result.current.entry?.mode).toBe('greenfield'));
 
     // The skip. Every later render of the same project — a card moved, a snapshot pushed — must leave it
     // skipped, which is what keying on the root rather than on a counter buys.
-    act(() => result.current[1](null));
+    act(() => result.current.leave());
     rerender({ at: '/work/one' });
-    expect(result.current[0]).toBeNull();
-    expect(api.getWizard).toHaveBeenCalledTimes(1);
+    expect(result.current.entry).toBeNull();
 
     rerender({ at: '/work/two' });
-    await waitFor(() => expect(result.current[0]?.mode).toBe('greenfield'));
-    expect(api.getWizard).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(result.current.entry?.mode).toBe('greenfield'));
+  });
+
+  // WHAT THE READINESS WALL ASKS, and it is a different question from "is the wizard on screen": a skip
+  // keeps the file, so from the moment somebody skips there is a setup waiting that nothing is showing.
+  it('keeps setup pending after a skip, and puts it back at the step the file names', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+    const { result } = root('/work/one');
+    await waitFor(() => expect(result.current.pending).toBe(true));
+
+    act(() => result.current.leave());
+    expect(result.current.entry).toBeNull();
+    // Re-read on the way out, because the wizard reports neither of its two exits: the answer to which
+    // one just happened is the file itself.
+    await waitFor(() => expect(api.getWizard).toHaveBeenCalledTimes(2));
+    expect(result.current.pending).toBe(true);
+    // AND THAT READ MUST NOT PUT IT BACK. It finds the file the skip deliberately kept, so a read that
+    // opened what it found would bounce the person straight back into the screen they just left — the
+    // assertion above cannot see it, because it runs before the answer lands.
+    expect(result.current.entry).toBeNull();
+
+    act(() => result.current.resume());
+    expect(result.current.entry).toEqual({ mode: 'greenfield', step: 'form' });
+  });
+
+  it('takes the offer away with the file when setup is abandoned', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+    const { result } = root('/work/one');
+    await waitFor(() => expect(result.current.pending).toBe(true));
+
+    // `Stop offering this` deletes the file and then leaves, so the read on the way out finds nothing.
+    api.getWizard.mockResolvedValue({ state: null });
+    act(() => result.current.leave());
+
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    act(() => result.current.resume());
+    expect(result.current.entry).toBeNull();
   });
 });
 

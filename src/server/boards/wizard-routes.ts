@@ -9,9 +9,11 @@ import {
   type WizardState,
   writeWizardState,
 } from '../../store/project/wizard.js';
+import { errorText } from '../errors.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
+import { resolveProjectDispatch } from '../runs/dispatch.js';
 
-// The wizard's scratch state. The three routes below are ADMIN ONLY, by being absent from the scope
+// The wizard's scratch state. The four routes below are ADMIN ONLY, by being absent from the scope
 // table in auth.ts — that is the default and it is right here: this file steers what the person is
 // asked and what the copilot is told, and an agent able to rewrite it could steer its own brief.
 // decision 76. What an agent may reach is the two narrow routes at the foot of this file, each granted
@@ -45,6 +47,42 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
     if (!ensureOpen(ctx.session, reply)) return;
     await clearWizardState(ctx.session.root);
     return { ok: true };
+  });
+
+  // SETUP'S OWN DISPATCH DOOR, AND WHY IT IS NOT `POST /api/runs`. Both of these runs are about the
+  // project and have no card to be dispatched from, and a card-less run is refused to every scope but
+  // `service` in runs/routes.ts — the browser included, deliberately: it is the one run confined to
+  // nothing, which is what decision 5's scope spiral is about. Loosening that guard for the wizard
+  // would grant every admin caller every card-less run for ever, so the wizard gets a narrower door
+  // than the one it was refused: exactly these two skills, only while a setup is in progress, and
+  // nothing else about the dispatch is the caller's to choose. decision 77.
+  const WIZARD_SKILLS = ['scan-project', 'suggest-stack'];
+  api.post('/wizard/run', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { skill, prompt } = (req.body ?? {}) as { skill?: string; prompt?: string };
+    if (skill === undefined || !WIZARD_SKILLS.includes(skill)) {
+      return reply.code(400).send({ error: `Setup only starts ${WIZARD_SKILLS.join(' or ')}.` });
+    }
+    if (!(await readWizardState(ctx.session.root))) {
+      return reply.code(409).send({ error: 'No setup is in progress.' });
+    }
+    // `seedSkills` only writes into an ABSENT skills folder, so a project part-way through setup when
+    // this version arrived will not have either of these — and the browser has to be able to tell
+    // that from every other refusal, because the answer to it is to skip the run and ask the person.
+    // The runner's own 404 rather than a second wording of it.
+    const resolved = await resolveProjectDispatch(ctx.session.root, ctx.session.config, {
+      project: true,
+      skill,
+      ...(prompt === undefined ? {} : { prompt }),
+    });
+    if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
+    try {
+      return { run: await ctx.runner.dispatch(resolved.input) };
+    } catch (err) {
+      // The concurrency cap, exactly as `POST /api/runs` answers it: a refusal with a sentence, not a
+      // 500 with a stack trace on the one screen a beginner is standing in front of.
+      return reply.code(409).send({ error: errorText(err) });
+    }
   });
 
   // The one agent-facing wizard write: a scan or stack run posting what it found. Narrow on purpose —

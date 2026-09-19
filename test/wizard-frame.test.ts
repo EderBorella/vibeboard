@@ -75,11 +75,16 @@ describe('wizardFrame', () => {
 // being proved is WHERE the frame is composed, which a unit test of the frame cannot see.
 interface Seam {
   send: (text: string, root: string) => Promise<void>;
+  // The dock's other button, which sends no words of its own: the CLI's own slash command.
+  compact: (root: string) => Promise<void>;
   modelText: () => string;
   transcript: () => string[];
 }
 
-function seam(): Seam {
+// `token` authorises the conversation, exactly as a person pressing Authorise does — the credential
+// section is the OTHER thing prepended at this seam, and the two together are what the compact case
+// has to survive.
+function seam(token?: string): Seam {
   const recorded: string[] = [];
   let sent = '';
   let settle: () => void = () => {};
@@ -94,7 +99,7 @@ function seam(): Seam {
       },
     },
     copilotAuthority: {
-      forTurn: async () => undefined,
+      forTurn: async () => (token === undefined ? undefined : { token }),
       endedIfChanged: () => {},
     },
     chats: {
@@ -114,15 +119,19 @@ function seam(): Seam {
   } as unknown as AppCtx;
 
   const turns = createCopilotTurns(ctx);
+  const drive = async (message: object, root: string): Promise<void> => {
+    (ctx.session as { root?: string }).root = root;
+    const done = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    turns.handleMessage(JSON.stringify(message));
+    await done;
+  };
   return {
-    send: async (text, root) => {
-      (ctx.session as { root?: string }).root = root;
-      const done = new Promise<void>((resolve) => {
-        settle = resolve;
-      });
-      turns.handleMessage(JSON.stringify({ type: 'copilot:send', text, mode: 'bypassPermissions' }));
-      await done;
-    },
+    send: (text, root) => drive({ type: 'copilot:send', text, mode: 'bypassPermissions' }, root),
+    // The browser sends no text with this one — the sentinel is the handler's, which is exactly why
+    // it has to be driven through `handleMessage` rather than composed here.
+    compact: (root) => drive({ type: 'copilot:compact', mode: 'bypassPermissions' }, root),
     modelText: () => sent,
     transcript: () => recorded,
   };
@@ -161,5 +170,30 @@ describe('the frame at the copilot seam', () => {
     await s.send('hello', root);
 
     expect(s.modelText()).toBe('hello');
+  });
+});
+
+// THE ONE MESSAGE NOTHING MAY PREFIX. `/compact` is the CLI's own command and it is only a command
+// while it is the first thing in the message — put a credential section or a frame in front of it and
+// the CLI reads a paragraph ending in the word "/compact", compacts nothing, and answers about it.
+// Broken by the credential half since authority shipped; the frame would have been the second way.
+describe('the compact sentinel', () => {
+  it('reaches the model verbatim even where both prefixes would have applied', async () => {
+    const root = await tempDir();
+    await writeWizardState(root, docs());
+    const s = seam('a-real-token');
+
+    // THE SAME CONVERSATION PROVES BOTH HALVES. An ordinary message here gets the credential section
+    // and the frame — so the assertion below is about the sentinel and not about a seam that happens
+    // to be prefixing nothing today.
+    await s.send('what should the README say?', root);
+    expect(s.modelText()).toContain('Your credential: `a-real-token`');
+    expect(s.modelText()).toContain('before anything else, how to speak');
+
+    await s.compact(root);
+
+    expect(s.modelText()).toBe('/compact');
+    // And the transcript records what the person pressed, as it does for every other turn.
+    expect(s.transcript()).toEqual(['what should the README say?', '/compact']);
   });
 });

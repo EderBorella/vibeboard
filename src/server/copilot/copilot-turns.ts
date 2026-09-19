@@ -21,6 +21,11 @@ interface CopilotOpts {
   effort?: EffortLevel;
 }
 
+// THE CLI'S OWN SLASH COMMAND, NOT A MESSAGE. Named once because two places have to agree on it: the
+// dock's compact button sends it, and the model's copy of it must carry nothing in front — a slash
+// command is only a command while it is the first thing in the text.
+const COMPACT = '/compact';
+
 // Everything the copilot channel does over /ws: turn orchestration, chat open/delete, and
 // the three broadcast shapes the client distinguishes (state, full history, chat list).
 export function createCopilotTurns(ctx: AppCtx): {
@@ -87,6 +92,24 @@ export function createCopilotTurns(ctx: AppCtx): {
     return `${assistCredentialSection(apiBase, token)}\n\n---\n\n${text}`;
   }
 
+  // WHAT THE MODEL GETS, WHICH IS NOT WHAT THE TRANSCRIPT GETS — see the two paragraphs at the call
+  // site. Both prefixes are composed here so the one text that may carry NEITHER is refused once
+  // rather than at each of them.
+  async function modelCopy(root: string, text: string, credential: Credential | undefined): Promise<string> {
+    // A slash command prefixed is a paragraph ending in a slash command: the CLI reads it as prose,
+    // compacts nothing, and answers about the word instead. Broken by the credential section since
+    // authority shipped, and the frame would have been the second way to break it. The credential is
+    // still MINTED by the caller — the summary this produces can quote a token from earlier in the
+    // conversation, which is what the redactor on the way to disk is for.
+    if (text === COMPACT) return text;
+    // AND THE SAME SPLIT AGAIN, for the wizard's brief: it is about the person, so the person must
+    // not be reading it in their own transcript. Composed here rather than in the browser's message
+    // because a brief the client sends is a brief the client can edit. decision 77.
+    const frame = wizardFrame(await readWizardState(root));
+    const framed = frame ? `${frame}\n\n---\n\n${text}` : text;
+    return credential ? withCredential(credential.token, framed) : framed;
+  }
+
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     // Read root rather than isOpen, so the cwd below needs no assertion.
     const root = session.root;
@@ -118,12 +141,7 @@ export function createCopilotTurns(ctx: AppCtx): {
       // for ending it eagerly on every chat and project change rather than only on a send. The
       // exposure and its limits are stated in full in docs/security/containment.md.
       const credential = await turnCredential(root);
-      // AND THE SAME SPLIT AGAIN, for the wizard's brief: it is about the person, so the person must
-      // not be reading it in their own transcript. Composed here rather than in the browser's message
-      // because a brief the client sends is a brief the client can edit. decision 77.
-      const frame = wizardFrame(await readWizardState(root));
-      const framed = frame ? `${frame}\n\n---\n\n${text}` : text;
-      const modelText = credential ? withCredential(credential.token, framed) : framed;
+      const modelText = await modelCopy(root, text, credential);
       const choice = resolveCopilotSelection(session.config?.copilot, {
         backend: opts.backend,
         model: opts.model,
@@ -192,7 +210,7 @@ export function createCopilotTurns(ctx: AppCtx): {
         void handleCopilotSend(msg.text ?? '', opts());
         break;
       case 'copilot:compact':
-        void handleCopilotSend('/compact', opts());
+        void handleCopilotSend(COMPACT, opts());
         break;
       case 'copilot:new':
         void (async () => {

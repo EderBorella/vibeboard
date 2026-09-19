@@ -1,8 +1,12 @@
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { FOUNDATION_FILES } from '../src/core/layout.js';
+import { FOUNDATION_FILES, skillRel } from '../src/core/layout.js';
+import type { RunRecord } from '../src/core/runs.js';
 import { allows } from '../src/server/auth/auth.js';
 import type { Credential } from '../src/server/auth/credentials.js';
 import { WIZARD_STEPS, type WizardState } from '../src/store/project/wizard.js';
+import { readProjectRun } from '../src/store/run-store.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
 // The setup wizard's scratch state. GET/PUT/DELETE /api/wizard are the browser's, admin-only, and
@@ -388,5 +392,137 @@ describe('PUT /api/wizard/resumes/:name', () => {
       expect(refused.statusCode, scope).toBe(403);
     }
     expect((await get(project)).json().state.resumes).toEqual({ 'DESIGN.md': 'Plain, dark, few colours.' });
+  });
+});
+
+// THE WIZARD'S OWN DISPATCH DOOR. Setup's two runs are about the PROJECT and have no card, and
+// `dispatchRefusal` in runs/routes.ts refuses a card-less run to every scope but `service` — the admin
+// browser included, deliberately. Loosening that guard would hand every caller the run decision 5's
+// scope spiral is about; this door is strictly narrower than it, and the tests below are what pin
+// "narrower": two named skills, only while a setup is in progress, and nobody but the browser.
+// decision 77.
+describe('POST /api/wizard/run', () => {
+  // The same shim runs/routes' own dispatch tests use: a real spawn, a real report, no model.
+  const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
+
+  const openWithAgent = async (): Promise<TestProject> =>
+    openTestProject({ name: 'W', mode: 'brownfield', runBin: SHIM });
+
+  const begin = (project: TestProject) =>
+    project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'brownfield', step: 'scan' },
+    });
+
+  const start = (project: TestProject, payload: unknown, token?: string) =>
+    project.app.inject({
+      method: 'POST',
+      url: '/api/wizard/run',
+      ...(token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } }),
+      payload: payload as object,
+    });
+
+  // Awaited rather than left running: the shim writes its report after the response has gone back, and
+  // a file landing after the app is closed is noise in whichever test happens to be next.
+  async function settled(project: TestProject, run: string): Promise<RunRecord> {
+    for (let i = 0; i < 300; i++) {
+      const record = await readProjectRun(project.root, run);
+      if (record && record.status !== 'running' && record.status !== 'queued') return record;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('the wizard run never settled');
+  }
+
+  it('starts the scan as a run about the project, with no card anywhere on it', async () => {
+    const project = await openWithAgent();
+    await begin(project);
+
+    const res = await start(project, { skill: 'scan-project' });
+
+    expect(res.statusCode).toBe(200);
+    const { run } = res.json() as { run: RunRecord };
+    expect(run.skill).toBe('scan-project');
+    // A card-less run, exactly as `POST /api/runs { project: true }` composes one: the two facts that
+    // route a record to a card's folder are both absent, so this one lives in the project store.
+    expect(run.card).toBeUndefined();
+    expect(run.board).toBeUndefined();
+    expect((await settled(project, run.run)).skill).toBe('scan-project');
+  }, 30000);
+
+  it('carries the prompt setup gathered, so the stack run can read the answers', async () => {
+    const project = await openWithAgent();
+    await begin(project);
+
+    const res = await start(project, {
+      skill: 'suggest-stack',
+      prompt: 'They said: a timeline of releases.',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { run } = res.json() as { run: RunRecord };
+    expect(run.prompt).toBe('They said: a timeline of releases.');
+    await settled(project, run.run);
+  }, 30000);
+
+  // THE WHOLE OF WHY THIS DOOR IS SAFER THAN LOOSENING THE GUARD. It can start two skills. Anything
+  // else is refused by name, and the refusal names the pair rather than saying no: the only caller is
+  // the wizard itself, so a third name here is a bug in the browser and it should say which.
+  it('refuses every skill but its own two, and says which two', async () => {
+    const project = await openWithAgent();
+    await begin(project);
+
+    for (const skill of ['derive-features', 'review', '', undefined]) {
+      const res = await start(project, skill === undefined ? {} : { skill });
+      expect(res.statusCode, String(skill)).toBe(400);
+      expect(res.json().error).toContain('scan-project');
+      expect(res.json().error).toContain('suggest-stack');
+    }
+  });
+
+  // The same rule as the two write routes above it: a door into setup is shut when there is no setup.
+  it('refuses to start anything when no setup is in progress', async () => {
+    const project = await openWithAgent();
+
+    const res = await start(project, { skill: 'scan-project' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'No setup is in progress.' });
+  });
+
+  // A PROJECT UPGRADED MID-SETUP HAS NO SUCH SKILL. `seedSkills` only writes into an ABSENT skills
+  // folder, so a project scaffolded before these two existed will never grow them — and the browser
+  // has to be able to tell that from a refusal, because the answer to it is to skip the scan and
+  // answer the questions by hand.
+  it('answers the runner’s own 404 when the skill is not in this project', async () => {
+    const project = await openWithAgent();
+    await begin(project);
+    await rm(join(project.root, skillRel('scan-project')), { recursive: true, force: true });
+
+    const res = await start(project, { skill: 'scan-project' });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: 'No such skill' });
+  });
+
+  // Admin-only by absence from the scope table, which is this file's default and is right here for the
+  // sharpest reason yet: this route STARTS AN AGENT. Both directions, as the routes above are tested —
+  // the table, and then the endpoint itself, because the table is only the default until something
+  // proves the request reaches it.
+  it('keeps the door away from every non-admin scope', () => {
+    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
+      expect(allows(cred(scope), 'POST', '/api/wizard/run', 'p'), scope).toBe(false);
+    }
+  });
+
+  it('refuses an agent credential at the endpoint itself', async () => {
+    const project = await openWithAgent();
+    await begin(project);
+
+    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
+      const agent = project.mint(scope, `run-${scope}`);
+      const res = await start(project, { skill: 'scan-project' }, agent.token);
+      expect(res.statusCode, scope).toBe(403);
+    }
   });
 });

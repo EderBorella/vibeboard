@@ -407,6 +407,49 @@ describe('the lifecycle skills', () => {
   });
 });
 
+// THE WIZARD'S TWO PROJECT RUNS. Card-less runs dispatched by setup, so nothing about a board or a
+// column reaches them: what they are is their prompt and the one route it names. Asserted as sentences
+// rather than as "a body exists", for the reason the lifecycle bodies are — a prompt's wording IS its
+// behaviour, and these two are the only agents that speak before the person has seen anything.
+describe("the wizard's project-run skills", () => {
+  const body = (slug: string): string => SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
+
+  it('seeds both of them, valid against a default config', async () => {
+    const root = await tempDir();
+    await seedSkills(root);
+    const { skills } = await readSkills(root, config);
+    const slugs = skills.map((s) => s.slug);
+    for (const slug of ['scan-project', 'suggest-stack']) expect(slugs, slug).toContain(slug);
+  });
+
+  // Their ONLY door. A skill that describes what to find and never says where to send it produces a run
+  // whose findings die in its report, which is indistinguishable from a scan that found nothing.
+  it('sends both of them to the prefill route and nowhere else on the wizard', () => {
+    for (const slug of ['scan-project', 'suggest-stack']) {
+      expect(body(slug), slug).toContain('PUT /api/wizard/prefill');
+      // `PUT /api/wizard` is admin-only and would 403: a body that names it teaches the agent to
+      // retry against a door that is shut by design. decision 77.
+      expect(body(slug), slug).not.toContain('PUT /api/wizard`');
+    }
+  });
+
+  // W7's spirit, and the whole reason a suggestion is safe to show: the person reads every field as
+  // fact until they disprove it, so a plausible wrong guess costs more than the blank it filled.
+  it('tells the scan that omitting beats inventing', () => {
+    expect(body('scan-project')).toContain('Omitting beats inventing');
+    expect(body('scan-project')).toContain('omit if you are guessing');
+    expect(body('scan-project')).toContain('Do not build or run\nanything.');
+  });
+
+  // The brownfield half of W9: a stack proposal that replaces what a repository already uses is a
+  // rewrite nobody asked for, arriving as a suggestion on setup's second screen.
+  it('tells the stack suggestion that the stack already there wins', () => {
+    expect(body('suggest-stack')).toContain('the stack that is already there\nwins unless it is unworkable');
+    expect(body('suggest-stack')).toContain('boring and well-trodden beats novel');
+    expect(body('suggest-stack')).toContain('a beginner can read');
+  });
+});
+
 // THE THREE HAND-DISPATCH SKILLS the lifecycle never uses. Frozen as exact bytes, because "untouched" is a
 // claim about this task and an assertion about a substring would not have held it.
 const FROZEN: Record<string, string> = {

@@ -1113,6 +1113,14 @@ function DocsStep({
   // A turn that never began cannot have ended: `running` is false before the first frame, and an
   // ending read off that alone would walk the person off this screen the moment they authorised.
   const ran = useRef(false);
+  // WHERE THIS TURN BEGINS IN THE TRANSCRIPT, and the transcript is the CONVERSATION'S — hydrated
+  // from disk on connect, so an error item from days ago is in it before this screen mounts.
+  // `failed` scanned the whole of it, and one of those marked every turn after it as failed.
+  //
+  // Mirrored through an effect rather than read out of `ask`'s closure: the offer is raised before
+  // the answer, and anything arriving while the question is on screen belongs to neither turn.
+  const committed = useRef(0);
+  const mark = useRef(0);
   const { busy, error, run } = useAction();
 
   // Full-auto, clamped to what this assistant actually publishes — the model is writing files
@@ -1141,6 +1149,7 @@ function DocsStep({
       // fire-and-forget for a button that reflects a state; this is a sequence.
       await setAuthority(true);
       setUnwritten(undefined);
+      mark.current = committed.current;
       send(KICKOFF, { mode: turnMode });
       setSent(true);
     });
@@ -1154,6 +1163,10 @@ function DocsStep({
     started.current = true;
     if (!written) void ask();
   }, [snapshot, read, written, ask]);
+
+  useEffect(() => {
+    committed.current = items.length;
+  }, [items.length]);
 
   useEffect(() => {
     // A RÉSUMÉ IS STORED BY A TOOL CALL, and every tool call is an item in this transcript — so the
@@ -1223,7 +1236,7 @@ function DocsStep({
   // A turn refused before it started — no credential, no assistant — arrives as an error and nothing
   // else: the server's own `copilot:state` never goes up, so nothing here would ever settle. The offer
   // comes back rather than leaving somebody on a screen with no control that does anything.
-  const failed = sent && items.some((item) => item.kind === 'error');
+  const failed = sent && items.slice(mark.current).some((item) => item.kind === 'error');
   // The latest tool the model reached for, which is the one thing in a long turn that says WHAT it is
   // doing rather than that it is doing something.
   const tool = items.filter((item) => item.kind === 'tool').at(-1)?.toolName;

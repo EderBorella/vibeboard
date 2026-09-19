@@ -54,6 +54,13 @@ const ws = vi.hoisted(() => {
     line?: string;
     record?: { run: string; status: string; outcome?: string };
     event?: { kind: string; name?: string; text?: string };
+    // A REPLAYED TRANSCRIPT, which is how the dock's conversation arrives on connect: the copilot
+    // channel replaces the client's items wholesale from what is on disk. Carried here because the
+    // docs step's reading of "did this turn fail" is a question about WHICH items, and a fake that
+    // could only append live ones could not put an old one in front of it.
+    items?: { kind: string; text: string; toolName?: string }[];
+    chats?: unknown[];
+    stats?: { costUsd: number; turns: number; lastDurationMs: number; contextTokens: number };
   };
   type Socket = { subscribe: (fn: (m: Msg) => void) => () => void; send: (payload: object) => void };
   const subscribers = new Map<number, Set<(m: Msg) => void>>();
@@ -1462,6 +1469,38 @@ describe('the docs step', () => {
     expect(await screen.findByText('Write')).toBeTruthy();
     expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
     expect(screen.getByText('README.md')).toBeTruthy();
+  });
+
+  // THE TRANSCRIPT IS THE CONVERSATION'S, NOT THIS SCREEN'S, and it is hydrated from disk on connect.
+  // "Did the turn fail" was read by scanning the whole of it, so one error item from a conversation
+  // days old made every turn after it report a failure — under a screen that was working, with the
+  // offer to write the drafts put back over a turn already running.
+  it('reads a failure out of this turn, not out of the conversation it is in', async () => {
+    docs();
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [{ kind: 'error', text: 'the sign-in had expired' }],
+        stats: { costUsd: 0, turns: 0, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+
+    expect(screen.queryByText(/Something went wrong while it was writing/)).toBeNull();
+
+    // AND THE FIXTURE IS THICK ENOUGH TO TELL THE TWO APART: an error in THIS turn still says so, so
+    // the assertion above is about which items were scanned and not about the copy being gone.
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'error', text: 'it fell over' } });
+    });
+
+    expect(
+      screen.getByText('Something went wrong while it was writing — you can ask it to try again.'),
+    ).toBeTruthy();
   });
 
   // A TURN THAT NEVER STARTED CANNOT HAVE ENDED. `running` is false before the first frame, so an

@@ -205,6 +205,19 @@ const RULES: Record<string, Rule> = {
     describe:
       '`{ command }` — declare the shell command that runs this project’s smoke test, written into the `smoke:` key of foundation/TESTING.md and nothing else in that file. Refused if it is empty, longer than one line, or the same command as one of the gates in foundation/CODE-QUALITY.md — a gate and a smoke command that are the same command are one check rather than two.',
   },
+
+  // THE SETUP WIZARD, and the narrowest row in this table. `/api/wizard` itself is absent — admin-only
+  // by default — because an agent that could rewrite the wizard's state could steer what it is asked
+  // to do next. This grants ONE BLOCK of that state: a scan or stack run may write `suggested`, which
+  // the form reads into EMPTY fields only, so a repository nobody has vetted can propose and never
+  // answer. `work` because that is the scope a project run is minted with (`#start` in
+  // runs/agent-runner.ts); the copilot is refused because it is not the thing that read the repo.
+  // decision 77.
+  'PUT /api/wizard/prefill': {
+    scopes: ['work'],
+    describe:
+      '`{ answers?: { what?, who?, done? }, kind?, stack?, packages? }` — hand the setup assistant what you inferred about this project. Suggestions only: the person sees and can overrule every field.',
+  },
 };
 
 // THE CATALOGUE AN AGENT IS GIVEN, generated from the table above rather than typed out beside it.

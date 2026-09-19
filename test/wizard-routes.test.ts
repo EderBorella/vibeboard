@@ -4,8 +4,10 @@ import type { Credential } from '../src/server/auth/credentials.js';
 import { WIZARD_STEPS, type WizardState } from '../src/store/project/wizard.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
-// GET/PUT/DELETE /api/wizard — the setup wizard's scratch state, read and written by the browser
-// while a person is being asked what they are building.
+// The setup wizard's scratch state. GET/PUT/DELETE /api/wizard are the browser's, admin-only, and
+// read and written while a person is being asked what they are building; `prefill` and `resumes` are
+// the two narrow doors an agent has into the same file, and which scope holds which is the point of
+// half the tests here. decision 77.
 
 async function open(): Promise<TestProject> {
   return openTestProject({ name: 'W', mode: 'brownfield' });
@@ -116,5 +118,101 @@ describe('GET/PUT/DELETE /api/wizard', () => {
     // one nobody can act on, and a hand-written copy of the set here would be the drift it refuses.
     expect(res.json().error).toContain(WIZARD_STEPS.join(', '));
     expect((await get(project)).json()).toEqual({ state: null });
+  });
+});
+
+// THE ONE AGENT-FACING WRITE INTO SETUP, and the reason it is safe to have one at all: it can only
+// reach `suggested`. A scan run reads a repository nobody has vetted, so whatever it sends must land
+// where the form treats it as a proposal — never over a sentence the person typed. decision 77.
+describe('PUT /api/wizard/prefill', () => {
+  it('merges what a run found into suggested, and touches neither the answers nor the step', async () => {
+    const project = await open();
+    const state: WizardState = {
+      mode: 'brownfield',
+      step: 'scan',
+      answers: { what: 'mine, in my own words' },
+    };
+    await project.app.inject({ method: 'PUT', url: '/api/wizard', payload: state });
+
+    const scan = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      payload: { answers: { what: 'a timeline of releases' }, kind: 'web', packages: ['imagemagick'] },
+    });
+    expect(scan.statusCode).toBe(200);
+    // The stack run posts later, into the same block: the keys that arrive win and the rest survive,
+    // because the two runs know different things and neither has the whole picture.
+    const stack = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      payload: { stack: 'TypeScript and Vite', packages: ['sox'] },
+    });
+    expect(stack.statusCode).toBe(200);
+
+    expect((await get(project)).json()).toEqual({
+      state: {
+        mode: 'brownfield',
+        step: 'scan',
+        answers: { what: 'mine, in my own words' },
+        suggested: {
+          answers: { what: 'a timeline of releases' },
+          kind: 'web',
+          stack: 'TypeScript and Vite',
+          packages: ['sox'],
+        },
+      },
+    });
+  });
+
+  // A run outliving the setup that dispatched it is ordinary — the person can abandon the wizard
+  // while the scan is still reading. Nothing is written back in that case, and the run is told why
+  // rather than being given a file that nothing will ever open.
+  it('refuses a prefill when no setup is in progress, and writes nothing', async () => {
+    const project = await open();
+    const res = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      payload: { stack: 'TypeScript' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'No setup is in progress.' });
+    expect((await get(project)).json()).toEqual({ state: null });
+  });
+
+  // THE SCOPE A PROJECT RUN IS ACTUALLY MINTED WITH, taken from the runner rather than assumed:
+  // `#start` in runs/agent-runner.ts mints `work`, with no card when there is no card. Asserted
+  // through a real credential at the real endpoint, because the table is only the default until
+  // something proves the request reaches it.
+  it('is open to the credential a project run is minted with, and closed to the copilot', async () => {
+    const project = await open();
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'brownfield', step: 'scan' },
+    });
+    const run = project.mint('work', 'run-scan');
+
+    const allowed = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      headers: { authorization: `Bearer ${run.token}` },
+      payload: { kind: 'web' },
+    });
+    expect(allowed.statusCode).toBe(200);
+
+    // The copilot writes documents and résumés; it never answers the form's questions, and this is
+    // the route that would let it. `checkup` and `service` have no business in setup at all.
+    for (const scope of ['assist', 'checkup', 'service'] as const) {
+      const other = project.mint(scope, `run-${scope}`);
+      const refused = await project.app.inject({
+        method: 'PUT',
+        url: '/api/wizard/prefill',
+        headers: { authorization: `Bearer ${other.token}` },
+        payload: { kind: 'game' },
+      });
+      expect(refused.statusCode, scope).toBe(403);
+    }
+    expect((await get(project)).json().state.suggested).toEqual({ kind: 'web' });
   });
 });

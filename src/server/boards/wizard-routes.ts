@@ -5,14 +5,16 @@ import {
   readWizardState,
   WIZARD_STEPS,
   type WizardState,
+  type WizardSuggestions,
   writeWizardState,
 } from '../../store/project/wizard.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 
-// The wizard's scratch state. ADMIN ONLY, by being absent from the scope table in auth.ts — that is
-// the default and it is right here: this file steers what the person is asked and what the copilot is
-// told, and an agent able to rewrite it could steer its own brief. The one agent-facing exception
-// arrives in a later phase as its own narrow route, never as a loosening of these. decision 76.
+// The wizard's scratch state. The three routes below are ADMIN ONLY, by being absent from the scope
+// table in auth.ts — that is the default and it is right here: this file steers what the person is
+// asked and what the copilot is told, and an agent able to rewrite it could steer its own brief.
+// decision 76. What an agent may reach is its own narrow route at the foot of this file, granted a
+// single block of the state rather than admitted to these. decision 77.
 export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/wizard', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
@@ -41,6 +43,24 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
   api.delete('/wizard', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     await clearWizardState(ctx.session.root);
+    return { ok: true };
+  });
+
+  // The one agent-facing wizard write: a scan or stack run posting what it found. Narrow on purpose —
+  // it can only fill `suggested`, which the form reads into EMPTY fields, so the worst a poisoned
+  // repo can do is suggest, visibly, on a screen built for second-guessing it. decision 77.
+  //
+  // A MERGE, unlike the replace above, because the two runs post at different moments and each knows
+  // half of it — and neither is the browser holding the whole state.
+  api.put('/wizard/prefill', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const current = await readWizardState(ctx.session.root);
+    // A run can outlive the setup that dispatched it — the person may abandon the wizard while the
+    // scan is still reading — and there is nothing to merge into once the file is gone.
+    if (!current) return reply.code(409).send({ error: 'No setup is in progress.' });
+    const body = req.body as WizardSuggestions;
+    const suggested = { ...current.suggested, ...body };
+    await writeWizardState(ctx.session.root, { ...current, suggested });
     return { ok: true };
   });
 }

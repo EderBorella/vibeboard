@@ -4,7 +4,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultConfig } from '../src/store/project/config.js';
 import type { SandboxState } from '../web/src/lib/api.js';
-import type { ProjectConfig, ProjectSnapshot } from '../web/src/lib/shared.js';
+import type { ProjectConfig, ProjectSnapshot, WizardState } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   scaffoldProject: vi.fn().mockResolvedValue({ snapshot: {} }),
@@ -238,6 +238,28 @@ describe('the two ways out', () => {
     expect(api.clearWizard.mock.invocationCallOrder[0]).toBeLessThan(onExit.mock.invocationCallOrder[0]);
   });
 
+  // FINISHING IS THE OTHER WAY THE FILE DIES, and it was the missing one: decision 76's row says the
+  // state file is deleted on finish or abandon, so a finish that deleted nothing left the wizard being
+  // offered for ever to somebody who had completed it.
+  it('finishing deletes the file BEFORE it leaves, exactly as abandoning does', async () => {
+    view({ start: 'handoff', snapshot: opened });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
+
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
+    expect(api.clearWizard).toHaveBeenCalledTimes(1);
+    expect(api.clearWizard.mock.invocationCallOrder[0]).toBeLessThan(onExit.mock.invocationCallOrder[0]);
+  });
+
+  it('offers no second ending at the last step', () => {
+    // Completion IS the ending here, so `Stop offering this` would be a second button promising what
+    // the first one has already done — and the two would read as a choice between them.
+    view({ start: 'handoff', snapshot: opened });
+
+    expect(screen.queryByRole('button', { name: 'Stop offering this' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Take me to the board' })).toBeTruthy();
+  });
+
   it('does not offer to stop before there is anything to stop', () => {
     // Nothing has been written yet at the identity step — the file lands with the scaffold — so a button
     // promising never to ask again would be promising about a file that does not exist.
@@ -336,6 +358,30 @@ describe('the offer to finish setup', () => {
     // `Stop offering this` deletes the file and then leaves, so the read on the way out finds nothing.
     api.getWizard.mockResolvedValue({ state: null });
     act(() => result.current.leave());
+
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    act(() => result.current.resume());
+    expect(result.current.entry).toBeNull();
+  });
+
+  // THE SCREEN AND THE HOOK OVER ONE FILE, and the fake is the file rather than either end's answer:
+  // two doubles that each returned what their own side expected would agree with themselves and prove
+  // nothing about the pair. The wizard's last button writes, the hook's read on the way out is what the
+  // wall then believes, and the bug this pins lived exactly between them — finishing deleted nothing, so
+  // a completed setup was offered again on every open for ever.
+  it('stops being offered once setup is finished', async () => {
+    let file: WizardState | null = { mode: 'greenfield', step: 'handoff' };
+    api.getWizard.mockImplementation(async () => ({ state: file }));
+    api.clearWizard.mockImplementation(async () => {
+      file = null;
+    });
+    const { result } = root('/work/one');
+    await waitFor(() => expect(result.current.pending).toBe(true));
+
+    // Wired the way the shell wires it: the wizard's only report of leaving is `onExit`, and the shell's
+    // handler is `setup.leave()`.
+    view({ start: 'handoff', snapshot: opened, onExit: () => result.current.leave() });
+    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
 
     await waitFor(() => expect(result.current.pending).toBe(false));
     act(() => result.current.resume());

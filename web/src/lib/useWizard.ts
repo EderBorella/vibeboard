@@ -16,9 +16,9 @@ export interface WizardEntry {
 }
 
 // SETUP AS THE SHELL SEES IT: what is on screen, and what the project still has waiting. They are two
-// different questions and they part company the moment somebody skips — skipping KEEPS the file, only
-// `Stop offering this` deletes it, and that difference is the whole of what "resumable later" means.
-// decision 76.
+// different questions and they part company the moment somebody skips — skipping KEEPS the file, and
+// only ENDING setup deletes it, whether that ending is finishing it or pressing `Stop offering this`.
+// That difference is the whole of what "resumable later" means. decision 76.
 export interface Setup {
   // Which kind of setup is on screen, `null` for none. A content state rather than a flag on something
   // else, so it is an answer to "what is the shell showing".
@@ -29,9 +29,9 @@ export interface Setup {
   pending: boolean;
   // Put setup on screen. A door, which always starts at `identity`.
   show: (entry: WizardEntry) => void;
-  // Off the screen, and re-read the file. The wizard reports NEITHER of its two exits — skip and
-  // abandon both arrive here as one call — so re-reading is the only way to learn which just happened,
-  // and the answer is exactly what the wall may then offer.
+  // Off the screen, and re-read the file. The wizard reports NONE of its three exits — skip, abandon
+  // and finish all arrive here as one call — so re-reading is the only way to learn which just
+  // happened, and the answer is exactly what the wall may then offer.
   leave: () => void;
   // Back on the screen, at the step the file names.
   resume: () => void;

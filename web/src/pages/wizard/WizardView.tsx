@@ -89,9 +89,10 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
   const [step, setStep] = useState<WizardStart>(start);
   const { busy, error, run } = useAction();
 
-  // Abandoning setup IS deleting the file, which is what stops it being offered on the next open. Skip
-  // keeps it, and that difference is the whole of what "resumable later" means here.
-  const stopOffering = (): void => {
+  // ENDING SETUP IS DELETING THE FILE, and finishing and abandoning are the same act on disk — its
+  // absence is what stops the wizard being offered on the next open. Skip is the third way out and the
+  // one that KEEPS the file, which is the whole of what "resumable later" means here. decision 76.
+  const endSetup = (): void => {
     void run(async () => {
       await clearWizard();
       onExit();
@@ -121,19 +122,20 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
         {body}
         <Stack gap={4} wrap>
           {/* The way out of every step, quiet and always there. At the end it is the only thing left to
-              press, so it stops being a skip and says so. */}
+              press, so it stops being a skip and ENDS setup rather than leaving it. */}
           {step === 'handoff' ? (
-            <Button variant="primary" onClick={onExit}>
+            <Button variant="primary" disabled={busy !== null} onClick={endSetup}>
               Take me to the board
             </Button>
           ) : (
             <Button onClick={onExit}>Not now — take me to the board</Button>
           )}
-          {/* Only once there is a file to delete. It is written by the scaffold, so at the identity step
-              there is nothing to stop offering — and if another project happens to be open, its file is
-              not this setup's to delete. */}
-          {step !== 'identity' && (
-            <Button variant="bare" disabled={busy !== null} onClick={stopOffering}>
+          {/* Only where there is a file to delete AND setup is not already over. Nothing is written until
+              the scaffold, so the identity step has nothing to stop offering — and if another project
+              happens to be open, its file is not this setup's to delete. At the handoff step the button
+              above has just done this, and two endings on one screen read as a choice between them. */}
+          {step !== 'identity' && step !== 'handoff' && (
+            <Button variant="bare" disabled={busy !== null} onClick={endSetup}>
               Stop offering this
             </Button>
           )}

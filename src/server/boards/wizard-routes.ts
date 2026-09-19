@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { FOUNDATION_FILES } from '../../core/layout.js';
 import {
   clearWizardState,
   isScaffoldMode,
@@ -13,8 +14,8 @@ import { type AppCtx, ensureOpen } from '../route-context.js';
 // The wizard's scratch state. The three routes below are ADMIN ONLY, by being absent from the scope
 // table in auth.ts — that is the default and it is right here: this file steers what the person is
 // asked and what the copilot is told, and an agent able to rewrite it could steer its own brief.
-// decision 76. What an agent may reach is its own narrow route at the foot of this file, granted a
-// single block of the state rather than admitted to these. decision 77.
+// decision 76. What an agent may reach is the two narrow routes at the foot of this file, each granted
+// one block of the state rather than admitted to these. decision 77.
 export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/wizard', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
@@ -61,6 +62,39 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
     const body = req.body as WizardSuggestions;
     const suggested = { ...current.suggested, ...body };
     await writeWizardState(ctx.session.root, { ...current, suggested });
+    return { ok: true };
+  });
+
+  // The copilot's door, and the other half of what `suggested` is to a run: it writes the documents,
+  // so it files the plain-language summary the person reads before opening any of them. Built from
+  // FOUNDATION_FILES rather than listed, because a name here that no document answers to is a summary
+  // of nothing sitting in the list for the rest of setup. decision 77.
+  const RESUMABLE = new Set([...FOUNDATION_FILES.map((f) => f.name), 'README.md']);
+  api.put('/wizard/resumes/:name', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { name } = req.params as { name: string };
+    if (!RESUMABLE.has(name)) {
+      return reply
+        .code(400)
+        .send({ error: `Not a document with a résumé. One of: ${[...RESUMABLE].join(', ')}.` });
+    }
+    const { summary } = (req.body ?? {}) as { summary?: string };
+    if (typeof summary !== 'string' || summary.trim() === '') {
+      return reply.code(400).send({ error: 'Expected `summary`.' });
+    }
+    // A RÉSUMÉ PAST THIS IS THE WALL OF TEXT IT REPLACES. Refused rather than truncated: the person
+    // reads these first, and half a summary reads as a finished one.
+    if (summary.length > 600) {
+      return reply
+        .code(400)
+        .send({ error: 'That summary is a wall of text — make it shorter than 600 characters.' });
+    }
+    const current = await readWizardState(ctx.session.root);
+    if (!current) return reply.code(409).send({ error: 'No setup is in progress.' });
+    await writeWizardState(ctx.session.root, {
+      ...current,
+      resumes: { ...current.resumes, [name]: summary.trim() },
+    });
     return { ok: true };
   });
 }

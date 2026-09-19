@@ -218,6 +218,16 @@ const RULES: Record<string, Rule> = {
     describe:
       '`{ answers?: { what?, who?, done? }, kind?, stack?, packages? }` — hand the setup assistant what you inferred about this project. Suggestions only: the person sees and can overrule every field.',
   },
+
+  // The other half, and the scopes are swapped for the same reason: the copilot is what writes the
+  // documents during setup, so it is what files their summaries. A run may not — it is not in the
+  // conversation the person is reading, and the summary is the part of a document they are certain
+  // to read. Capped at 600 characters by the route, which is a contract and not a hint. decision 77.
+  'PUT /api/wizard/resumes/:name': {
+    scopes: ['assist'],
+    describe:
+      '`{ summary }` — after writing a foundation document or the README during setup, store its plain-language summary (2–3 sentences, under 600 characters). `:name` is the document filename.',
+  },
 };
 
 // THE CATALOGUE AN AGENT IS GIVEN, generated from the table above rather than typed out beside it.

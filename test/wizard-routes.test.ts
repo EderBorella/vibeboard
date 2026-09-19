@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FOUNDATION_FILES } from '../src/core/layout.js';
 import { allows } from '../src/server/auth/auth.js';
 import type { Credential } from '../src/server/auth/credentials.js';
 import { WIZARD_STEPS, type WizardState } from '../src/store/project/wizard.js';
@@ -214,5 +215,122 @@ describe('PUT /api/wizard/prefill', () => {
       expect(refused.statusCode, scope).toBe(403);
     }
     expect((await get(project)).json().state.suggested).toEqual({ kind: 'web' });
+  });
+});
+
+// THE COPILOT'S HALF OF THE SAME FILE, and the only door it has into setup. A résumé summarises a
+// document that is still being argued over, so it lives in `wizard.yaml` and dies with it rather than
+// beside the document, where it would outlive setup and describe a file somebody has since rewritten
+// (decision 76). decision 77.
+describe('PUT /api/wizard/resumes/:name', () => {
+  const begin = async (project: TestProject): Promise<void> => {
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'greenfield', step: 'docs', answers: { what: 'a game' } },
+    });
+  };
+
+  const fileResume = (project: TestProject, name: string, payload: unknown, token?: string) =>
+    project.app.inject({
+      method: 'PUT',
+      url: `/api/wizard/resumes/${name}`,
+      ...(token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } }),
+      payload: payload as object,
+    });
+
+  it('files a summary per document, beside the answers, and a rewrite replaces it', async () => {
+    const project = await open();
+    await begin(project);
+
+    const first = await fileResume(project, 'STACK.md', { summary: '  TypeScript and Vite.  ' });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toEqual({ ok: true });
+    await fileResume(project, 'README.md', { summary: 'What this project is, in two lines.' });
+    // The copilot rewrites a document it has already summarised; the résumé follows it.
+    await fileResume(project, 'STACK.md', { summary: 'TypeScript, Vite and Playwright.' });
+
+    expect((await get(project)).json()).toEqual({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        answers: { what: 'a game' },
+        resumes: {
+          'STACK.md': 'TypeScript, Vite and Playwright.',
+          'README.md': 'What this project is, in two lines.',
+        },
+      },
+    });
+  });
+
+  // The name is a filename from a URL, so it is checked against the set rather than trusted: it is
+  // the key of a map the browser renders beside the documents, and a name nothing wrote would be a
+  // summary of nothing sitting in the list for ever.
+  it('refuses a name that is not a document with a résumé, and names the set', async () => {
+    const project = await open();
+    await begin(project);
+
+    const res = await fileResume(project, 'NOTES.md', { summary: 'Something else entirely.' });
+
+    expect(res.statusCode).toBe(400);
+    for (const name of [...FOUNDATION_FILES.map((f) => f.name), 'README.md']) {
+      expect(res.json().error, name).toContain(name);
+    }
+    expect((await get(project)).json().state.resumes).toBeUndefined();
+  });
+
+  // A RÉSUMÉ PAST 600 CHARACTERS IS THE WALL OF TEXT IT EXISTS TO REPLACE (W7). The person reads
+  // these before they read anything else in setup, so the length is the contract and not a hint.
+  it('refuses a wall of text, and refuses a missing summary, writing neither', async () => {
+    const project = await open();
+    await begin(project);
+
+    const long = await fileResume(project, 'TESTING.md', { summary: 'a'.repeat(1000) });
+    expect(long.statusCode).toBe(400);
+    expect(long.json().error).toContain('shorter');
+
+    for (const payload of [{}, { summary: '   ' }, { summary: 42 }]) {
+      const res = await fileResume(project, 'TESTING.md', payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+    expect((await get(project)).json().state.resumes).toBeUndefined();
+  });
+
+  it('refuses a résumé when no setup is in progress', async () => {
+    const project = await open();
+
+    const res = await fileResume(project, 'UX.md', { summary: 'How it should feel.' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'No setup is in progress.' });
+  });
+
+  // The mirror of the prefill row: the copilot writes the documents, so the copilot files the
+  // summaries. A RUN may not — it is not in the conversation the person is reading, and a summary is
+  // the one part of a document they are guaranteed to read.
+  it('is open to the copilot and closed to a run', async () => {
+    const project = await open();
+    await begin(project);
+    const copilot = project.mint('assist', 'chat-1');
+
+    const allowed = await fileResume(
+      project,
+      'DESIGN.md',
+      { summary: 'Plain, dark, few colours.' },
+      copilot.token,
+    );
+    expect(allowed.statusCode).toBe(200);
+
+    for (const scope of ['work', 'checkup', 'service'] as const) {
+      const run = project.mint(scope, `run-${scope}`);
+      const refused = await fileResume(
+        project,
+        'DESIGN.md',
+        { summary: 'Something a run wrote.' },
+        run.token,
+      );
+      expect(refused.statusCode, scope).toBe(403);
+    }
+    expect((await get(project)).json().state.resumes).toEqual({ 'DESIGN.md': 'Plain, dark, few colours.' });
   });
 });

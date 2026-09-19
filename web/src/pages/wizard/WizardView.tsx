@@ -542,17 +542,6 @@ function ScanStep({
       .catch(() => onContinue(SCAN_REFUSED));
   }, [read, scanned, onContinue]);
 
-  // The file is what the questions are filled from and the run wrote to it on its way out, so the
-  // handover waits on a read of it rather than racing one. A read that fails is not worth stopping
-  // for: the next screen reads for itself, and blank questions are answerable.
-  const finish = useCallback(
-    async (notice?: string): Promise<void> => {
-      await getWizard().catch(() => {});
-      onContinue(notice);
-    },
-    [onContinue],
-  );
-
   useEffect(() => {
     if (runId === null) return;
     return ws.subscribe((msg) => {
@@ -563,9 +552,14 @@ function ScanStep({
       // ANYTHING BUT A CLEAN SUCCESS IS SAID PLAINLY. `outcome` is the agent's own word and is absent
       // entirely on a run that never wrote a report, so "is it a success" is the honest question —
       // asking whether it is `attention` would let a crash hand over silently.
-      void finish(record.outcome === 'success' ? undefined : SCAN_UNFINISHED);
+      //
+      // STRAIGHT OVER, with no read of its own. There was one, and its answer was discarded: the run
+      // posts its prefill BEFORE the record this frame carries, and the questions read the file for
+      // themselves on the way in and again at Continue. All the wait bought was a round trip between
+      // a run ending and the person seeing anything.
+      onContinue(record.outcome === 'success' ? undefined : SCAN_UNFINISHED);
     });
-  }, [ws, runId, finish]);
+  }, [ws, runId, onContinue]);
 
   return (
     <>
@@ -686,8 +680,16 @@ function FormStep({
 
   const go = (): void => {
     void run(async () => {
+      // THE FILE AS IT STANDS AT THE PRESS, not as it stood when this screen opened. The scan step
+      // hands over the moment its run settles and the run posts what it found into this same file,
+      // so a suggestion can land while somebody is typing — and `putWizard` replaces the file whole.
+      // The stack step's settle-read, taken here because this step has no run of its own to watch.
+      const latest = await getWizard()
+        .then((r) => r.state ?? undefined)
+        .catch(() => undefined);
       await putWizard({
-        ...state,
+        ...(latest ?? state),
+        step: 'stack',
         answers: { what: value('what'), who: value('who'), done: value('done') },
       });
       const extra = parseCsv(packages);
@@ -1043,6 +1045,9 @@ const KICKOFF = "Please set up this project's documents from my answers.";
 // screen is where they first meet these — so the wizard names them the way somebody would say them
 // out loud, and the filename stays on the surfaces that open the file. The order is the order they
 // are written and the order they are listed in.
+// How often the summaries are re-read while a turn is writing them. See the effect that uses it.
+const RESUME_POLL_MS = 3_000;
+
 const DOC_NAMES: Record<string, string> = {
   'README.md': 'The introduction',
   'STACK.md': 'The stack',
@@ -1168,15 +1173,26 @@ function DocsStep({
     committed.current = items.length;
   }, [items.length]);
 
+  // A READ PER TRANSCRIPT ITEM IS A READ PER TOOL CALL, and a turn that writes six documents makes
+  // dozens of those — every one of them a request for a file that changes six times in as many
+  // minutes. Keyed on the TURN instead: once when it starts, then on a clock while it runs.
+  //
+  // A CLOCK RATHER THAN THE RESULT AND USAGE EVENTS, which was the other candidate and is the one
+  // that reads better on paper. It is backend-dependent: the Claude backend emits `usage` per
+  // assistant message, so summaries would appear roughly as they land, but OpenCode emits it once —
+  // so half the product would show an empty list for the whole turn and all six at the end. Three
+  // seconds is far below the interval between documents and far above a burst.
   useEffect(() => {
-    // A RÉSUMÉ IS STORED BY A TOOL CALL, and every tool call is an item in this transcript — so the
-    // transcript growing is the cue to read the file. A clock would ask most often while nothing is
-    // happening, and never at the moment something did.
-    if (items.length === 0) return;
-    void getWizard()
-      .then(({ state }) => setPolled(state?.resumes ?? {}))
-      .catch(() => {});
-  }, [items.length]);
+    if (!running) return;
+    const look = (): void => {
+      void getWizard()
+        .then(({ state }) => setPolled(state?.resumes ?? {}))
+        .catch(() => {});
+    };
+    look();
+    const timer = setInterval(look, RESUME_POLL_MS);
+    return () => clearInterval(timer);
+  }, [running]);
 
   // WHERE SETUP GOES NEXT, AND THE FILE SAYING SO. The step used to move the screen and write nothing,
   // so the file sat at `docs` after every exit but the last — and `wizardFrame` keys on that step, so
@@ -1259,8 +1275,10 @@ function DocsStep({
       {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
       {running && <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />}
       {/* ONE LINE, THE LATEST, as the build log shows itself on the machine check: what a person needs
-          from a turn this long is evidence it is still moving, not the transcript. */}
-      {tool && <Readout>{tool}</Readout>}
+          from a turn this long is evidence it is still moving, not the transcript. The word is the
+          CLI'S — a tool name, not a sentence this screen wrote — so it is exempt from the plain-words
+          sweep by element, exactly as the model's own proposal and summaries are. */}
+      {tool && <Readout testId="verbatim-tool">{tool}</Readout>}
       {/* THE SUMMARIES AS THEY LAND, which is the only part of this a beginner can read while it runs.
           The words are the model's and are rendered whole, so they are exempt from the plain-words
           sweep by element exactly as the stack proposal is. */}

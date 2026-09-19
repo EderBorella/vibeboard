@@ -838,22 +838,22 @@ describe('the scan step (map mode)', () => {
     expect(screen.getByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
   });
 
-  // The file is what the questions are filled from, so the handover waits on a read of it rather than
-  // racing one: the run posts what it found through `PUT /api/wizard/prefill` on its way out.
-  it('does not hand over until it has read the file back', async () => {
+  // IT USED TO WAIT ON A READ IT THREW AWAY. The answer was discarded, so the wait protected nothing:
+  // the run posts its prefill BEFORE the frame that says it settled, and the questions read the file
+  // for themselves on the way in and again at Continue. All it bought was a round trip between a run
+  // ending and the person seeing anything.
+  it('hands over as soon as its run settles, without waiting on a read of its own', async () => {
     scan();
     await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
     const read = deferred<{ state: WizardState | null }>();
     api.getWizard.mockReturnValue(read.promise);
 
     await settle('success', 'success');
-    expect(screen.queryByText('A few questions')).toBeNull();
-
-    await read.settle({
-      state: { mode: 'brownfield', step: 'scan', suggested: { answers: { what: 'a timeline' } } },
-    });
 
     expect(await screen.findByText('A few questions')).toBeTruthy();
+    await read.settle({
+      state: { mode: 'brownfield', step: 'form', suggested: { answers: { what: 'a timeline' } } },
+    });
   });
 
   // AN UPGRADED MID-SETUP PROJECT HAS NO SUCH SKILL: `seedSkills` only writes into an absent folder, so
@@ -1027,6 +1027,34 @@ describe('the form step', () => {
         mode: 'greenfield',
         step: 'stack',
         resumes: { 'foundation/TESTING.md': 'how it is checked' },
+        answers: { what: '', who: '', done: '' },
+      }),
+    );
+  });
+
+  // A SCAN CAN LAND WHILE THE QUESTIONS ARE ON SCREEN. The step before hands over the moment its run
+  // settles, and the run posts what it found into the same file — so a person may already be typing
+  // when the suggestion arrives. `putWizard` REPLACES the file, so a Continue built from the read
+  // taken on entry deletes it. The stack step's settle-read, taken at the press because this step
+  // has no run of its own to watch.
+  it('does not delete a suggestion that landed after it was opened', async () => {
+    form();
+    const go = await screen.findByRole('button', { name: 'Continue' });
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'form',
+        suggested: { stack: 'TypeScript and Vite', packages: ['ripgrep'] },
+      },
+    });
+    fireEvent.click(go);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'stack',
+        suggested: { stack: 'TypeScript and Vite', packages: ['ripgrep'] },
         answers: { what: '', who: '', done: '' },
       }),
     );
@@ -1451,7 +1479,6 @@ describe('the docs step', () => {
     docs();
     fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
     await waitFor(() => expect(ws.sent).toHaveLength(1));
-    await turn(true);
 
     api.getWizard.mockResolvedValue({
       state: {
@@ -1460,15 +1487,39 @@ describe('the docs step', () => {
         resumes: { 'README.md': 'What the project is, in a paragraph.' },
       },
     });
-    // A TOOL CALL IS THE CUE TO LOOK. A résumé is stored BY a tool call, and every tool call is an
-    // item in the transcript — so the transcript growing is what asks the file for the summaries.
+    // THE TURN STARTING IS THE CUE TO LOOK, and a clock keeps looking while it runs.
+    await turn(true);
+
+    expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
+    expect(screen.getByText('README.md')).toBeTruthy();
+
+    // The tool name comes off the transcript rather than out of the file, so it needs no read.
     await act(async () => {
       ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name: 'Write' } });
     });
-
     expect(await screen.findByText('Write')).toBeTruthy();
-    expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
-    expect(screen.getByText('README.md')).toBeTruthy();
+  });
+
+  // A READ PER TRANSCRIPT ITEM IS A READ PER TOOL CALL. A turn that writes six documents makes dozens
+  // of them, each one a request for a file that changes six times in as many minutes — and every
+  // extra item in the transcript, a hidden one included, asked again.
+  it('does not ask the file again for every tool call', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await waitFor(() => expect(api.getWizard.mock.calls.length).toBeGreaterThan(1));
+    const asked = api.getWizard.mock.calls.length;
+
+    for (const name of ['Write', 'Edit', 'Bash', 'Read', 'Write', 'Edit']) {
+      await act(async () => {
+        ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name } });
+      });
+    }
+
+    expect(api.getWizard.mock.calls.length).toBe(asked);
+    // And the screen is still following the turn, so this is a throttle rather than a switch-off.
+    expect(await screen.findByText('Edit')).toBeTruthy();
   });
 
   // THE TRANSCRIPT IS THE CONVERSATION'S, NOT THIS SCREEN'S, and it is hydrated from disk on connect.
@@ -1959,10 +2010,15 @@ describe('the words on every step (W7)', () => {
         step: 'stack',
         answers: {},
         stack: 'A Node repository, its config in yaml, run in a Docker container',
+        // The package names are the model's too, and they are said in the BODY of the screen now
+        // rather than only inside the fold — so `verbatim-packages` is a third exemption, and the
+        // fixture is what proves it is the element and not the word.
+        suggested: { packages: ['docker-cli', 'yamllint'] },
       },
     });
     const proposal = view({ start: 'stack', snapshot: opened });
     await screen.findByRole('button', { name: 'Use this stack' });
+    expect(screen.getByTestId('verbatim-packages').textContent).toContain('docker-cli');
     sweep('the stack proposal', proposal.container);
   });
 
@@ -2011,5 +2067,53 @@ describe('the words on every step (W7)', () => {
     cleanup();
 
     sweep('the hand-off', view({ start: 'handoff', snapshot: opened }).container);
+  });
+
+  // THE QUESTIONS WITH THE SCAN'S NEWS ON THEM, which is a different screen from the one above and
+  // the one a person brought a folder in actually sees. The notice is written on the step BEFORE and
+  // read on this one, so neither step's own sweep covers it — and it is the sentence most likely to
+  // reach for "repository", because it is about the files that were just read.
+  it('says what the reading run could not do, in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    const { container } = view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run: 'run-1', status: 'attention', outcome: 'attention' } });
+    });
+
+    // The premise: the notice really is on the screen being swept, not merely somewhere in the app.
+    expect(await screen.findByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+    sweep('the questions after a half-read folder', container);
+  });
+
+  // THE DOCUMENTS BEING WRITTEN, which is where the model's own words are thickest: the tool it
+  // reached for and the summaries it filed are both on screen, both exempt by element, and neither
+  // was covered — the case above this one reads the question and stops there.
+  it('shows the writing in plain words, around the words that are not its own', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs' } });
+    const { container } = view({ start: 'docs', snapshot: opened });
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        // A summary FULL of the words this sweeps for, because it is the model's prose and the
+        // exemption is the element. A fixture without them would leave the handle untested.
+        resumes: { 'STACK.md': 'A Node repository, its config in yaml, run in a Docker container.' },
+      },
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name: 'DockerBuild' } });
+    });
+
+    expect(await screen.findByTestId('verbatim-tool')).toBeTruthy();
+    expect(await screen.findByTestId('verbatim-resume')).toBeTruthy();
+    sweep('the documents being written', container);
   });
 });

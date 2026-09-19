@@ -1,6 +1,13 @@
-// The setup wizard's scratch state, and the door setup starts its own runs through. All of them are
-// admin-only on the server: no agent reads or writes what a person is being asked, and none of them
-// is reachable by anything but this browser.
+// The setup wizard's scratch state, and the door setup starts its own runs through. Every call in
+// this file is admin-only on the server, by being absent from the scope table — the browser is the
+// only thing that reaches any of them.
+//
+// WHICH IS NOT THE SAME AS "NO AGENT TOUCHES THE FILE", and this header said it was. Two routes into
+// the same state ARE agent-facing and are deliberately not here, because nothing in the browser
+// calls them: a run fills `suggested` through `PUT /api/wizard/prefill`, and the copilot files its
+// summaries through `PUT /api/wizard/resumes/:name`. Each is granted one block of the state rather
+// than the state, which is what makes them narrow — see src/server/boards/wizard-routes.ts.
+// decision 77.
 
 import type { WizardState } from '../shared';
 import { post, put, request } from './http';

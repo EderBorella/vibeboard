@@ -25,7 +25,10 @@ const meta = {
   title: 'Pages/Gate',
   component: ProjectGate,
   parameters: { layout: 'fullscreen' },
-  decorators: [withRoutes({ ...EMPTY, '/api/projects': { projects } })],
+  // A BARE ARRAY, because `listProjects` returns the body AS the list. `{ projects }` made every story
+  // below render "no projects yet" over the three rows written above them — the empty state, under a
+  // title that promises a list, in the workbench built to show the list.
+  decorators: [withRoutes({ ...EMPTY, '/api/projects': projects })],
   args: { onOpened: () => {}, onNewProject: () => {}, onMapProject: () => {} },
 } satisfies Meta<typeof ProjectGate>;
 export default meta;

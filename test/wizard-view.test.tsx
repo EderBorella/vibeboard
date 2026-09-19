@@ -20,6 +20,9 @@ const api = vi.hoisted(() => ({
     .mockResolvedValue({ ok: true, backend: 'managed', agentRefusal: null, refusalKind: null }),
   buildAgentImage: vi.fn().mockResolvedValue({ ok: true, already: false }),
   patchConfig: vi.fn().mockResolvedValue({}),
+  // The wizard's own dispatch door. A card-less run is refused to this browser through `POST /api/runs`,
+  // so setup's two runs have one of their own — see src/server/boards/wizard-routes.ts.
+  runWizardSkill: vi.fn().mockResolvedValue({ run: { run: 'run-1', status: 'running' } }),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -28,7 +31,15 @@ vi.mock('../web/src/lib/api.js', () => api);
 // the TAB's socket generation rather than on a literal, which `socketFor` would answer by replacing the
 // tab's own connection.
 const ws = vi.hoisted(() => {
-  type Msg = { type: string; state?: string; line?: string };
+  // `record` is the run frame's payload, the shape `run:update` broadcasts. Typed loosely on purpose:
+  // what the scan step reads off it is an id, a status and an outcome, and a fixture carrying a whole
+  // RunRecord would hide which three of its fields the step actually depends on.
+  type Msg = {
+    type: string;
+    state?: string;
+    line?: string;
+    record?: { run: string; status: string; outcome?: string };
+  };
   const subscribers = new Map<number, Set<(m: Msg) => void>>();
   const sockets = new Map<number, { subscribe: (fn: (m: Msg) => void) => () => void }>();
   const asked: number[] = [];
@@ -666,6 +677,170 @@ describe('the backend step', () => {
   });
 });
 
+// THE FIRST AGENT MOMENT, and it only exists in map mode: almost every answer the next screen asks
+// for is already written down in the folder the person is bringing in. A run reads it and fills the
+// form in — as SUGGESTIONS, into empty fields only, which is the whole of what decision 77 lets an
+// agent that has read an unvetted folder do.
+describe('the scan step (map mode)', () => {
+  // Re-stated per test, because `clearAllMocks` clears the CALLS and leaves the implementation: the
+  // rejection one case below installs would otherwise be the door's answer for the rest of the file.
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-1', status: 'running' } });
+  });
+
+  const scan = () => view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+
+  // A `run:update` frame as the server broadcasts one, on the tab's own socket generation.
+  const settle = async (status: string, outcome?: string, run = 'run-1'): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run, status, ...(outcome ? { outcome } : {}) } });
+    });
+  };
+
+  it('reads the folder through the wizard’s own door, and says what it is doing', async () => {
+    scan();
+
+    // ONE ARGUMENT, and the door takes no others: which skill is the only thing the browser chooses.
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalledWith('scan-project'));
+    expect(screen.getByText('Reading your files…')).toBeTruthy();
+    expect(
+      screen.getByText('A minute or two. You can skip this and answer everything yourself.'),
+    ).toBeTruthy();
+  });
+
+  // RE-ENTRY MUST NOT RE-SCAN. The file already holds what the last run found, and a second run would
+  // cost real money to produce the same suggestions over the answers the first one already made.
+  it('does not read it twice: coming back with suggestions goes straight to the questions', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'brownfield', step: 'scan', suggested: { answers: { what: 'a timeline of releases' } } },
+    });
+    scan();
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+  });
+
+  // Nothing is dispatched until the file has been READ, for `useSaved`'s reason turned around: the
+  // answer to "has this already been scanned" is on disk, and a dispatch fired before it lands is the
+  // second run the case above exists to prevent.
+  it('waits for the file before it starts anything', async () => {
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+    scan();
+
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+
+    await read.settle({ state: { mode: 'brownfield', step: 'scan' } });
+
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalledWith('scan-project'));
+  });
+
+  it('hands over to the questions when the run has read what it can', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('success', 'success');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.queryByText(/blanks are yours/)).toBeNull();
+  });
+
+  // THE FRAME IS FILTERED TO THE RUN THIS STEP STARTED. Every run on the project broadcasts on this
+  // socket — auto-pilot's, a run started from a card in another tab — and any of them settling would
+  // otherwise walk the person off a scan that is still reading.
+  it('ignores another run settling, and moves on when its own does', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('success', 'success', 'some-other-run');
+    expect(screen.getByText('Reading your files…')).toBeTruthy();
+
+    await settle('success', 'success');
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+  });
+
+  // A run that ended in anything but a clean success still hands over: the questions are answerable
+  // without it, and holding a person on a screen about a run they did not ask for is the worst of both.
+  it('carries on with a plain notice when the run could not read everything', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('attention', 'attention');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.getByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+  });
+
+  // The same handover for a run that never produced a report at all. `outcome` is absent on a crash —
+  // `withReport` is what sets it — so "not a success" is the honest test rather than "attention".
+  it('carries on when the run failed outright', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('failed');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.getByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+  });
+
+  // The file is what the questions are filled from, so the handover waits on a read of it rather than
+  // racing one: the run posts what it found through `PUT /api/wizard/prefill` on its way out.
+  it('does not hand over until it has read the file back', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+
+    await settle('success', 'success');
+    expect(screen.queryByText('A few questions')).toBeNull();
+
+    await read.settle({
+      state: { mode: 'brownfield', step: 'scan', suggested: { answers: { what: 'a timeline' } } },
+    });
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+  });
+
+  // AN UPGRADED MID-SETUP PROJECT HAS NO SUCH SKILL: `seedSkills` only writes into an absent folder, so
+  // a project scaffolded before these two existed will never grow them. The door answers 404 and the
+  // only thing to do about it is ask the person, which is what the next screen does anyway.
+  it('lands on the blank questions with a plain notice when the door refuses', async () => {
+    api.runWizardSkill.mockRejectedValue(Object.assign(new Error('No such skill'), { status: 404 }));
+    scan();
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(
+      screen.getByText('I couldn’t read your files this time — the questions below are all yours.'),
+    ).toBeTruthy();
+    expect((screen.getByLabelText(/what are you making/i) as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('can be skipped onto the blank questions, with nothing said about it', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip and answer them myself' }));
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.queryByText(/blanks are yours/)).toBeNull();
+    expect((screen.getByLabelText(/what are you making/i) as HTMLTextAreaElement).value).toBe('');
+  });
+
+  // The step before it is what sends anyone here, and only in map mode: a new project has nothing to
+  // read, so it goes straight to the questions.
+  it('is where Continue on the machine check goes when a folder was brought in', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'backend' } });
+    view({ mode: 'brownfield', start: 'backend', snapshot: opened });
+
+    const go = await screen.findByRole('button', { name: 'Continue' });
+    await waitFor(() => expect((go as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(go);
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'brownfield', step: 'scan' }));
+  });
+});
+
 // THE QUESTIONS, AND THE TWO CHOICES THAT ARE NOT QUESTIONS (W6, W7, W8). Everything a beginner is asked
 // is in their own words; everything an engineer wants is behind one fold. What the step writes is two
 // stores at once — the answers to the wizard's own file, the two project choices to the config — and the
@@ -803,6 +978,136 @@ describe('the form step', () => {
     );
   });
 
+  // WHAT THE PERSON SAID WINS, ALWAYS, and this is the screen where a scan's words and a person's
+  // words meet. A suggestion fills a field that has no answer in the file and says so where it does;
+  // over an answer it is not shown at all, which is decision 77's "propose, never answer" made
+  // visible rather than merely enforced at the route.
+  const SUGGESTED = 'Suggested from your files — edit anything wrong.';
+
+  it('fills only the blanks from what the run found, and marks the ones it filled', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: 'mine, in my own words' },
+        suggested: {
+          answers: { what: 'a timeline of releases', who: 'the field team' },
+          kind: 'game',
+        },
+      },
+    });
+    form();
+
+    const box = (label: RegExp) => screen.getByLabelText(label) as HTMLTextAreaElement;
+    await screen.findByRole('button', { name: 'Continue' });
+    // The answered field keeps the person's sentence and is not marked.
+    expect(box(/what are you making/i).value).toBe('mine, in my own words');
+    // The empty one takes the suggestion and IS marked.
+    expect(box(/who is it for/i).value).toBe('the field team');
+    expect(box(/does "done" look like/i).value).toBe('');
+    expect(screen.getAllByText(SUGGESTED)).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // AND THE WRITE IS THE PROOF. A form that showed the answer and sent the suggestion would look
+    // right on screen and overwrite the person's words on disk.
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'brownfield',
+        step: 'handoff',
+        suggested: {
+          answers: { what: 'a timeline of releases', who: 'the field team' },
+          kind: 'game',
+        },
+        answers: { what: 'mine, in my own words', who: 'the field team', done: '' },
+      }),
+    );
+    // The suggested kind is preselected, because nobody has pressed a tab.
+    expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'game' } }));
+  });
+
+  it('lets a suggestion be typed over, and stops calling it a suggestion', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        suggested: { answers: { what: 'a timeline of releases' }, kind: 'game' },
+      },
+    });
+    form();
+
+    const what = (await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement;
+    expect(what.value).toBe('a timeline of releases');
+    fireEvent.change(what, { target: { value: 'actually a meter reader' } });
+    expect(screen.queryByText(SUGGESTED)).toBeNull();
+    // And a tab pressed beats the suggested kind, which is the other half of overruling.
+    fireEvent.click(screen.getByRole('button', { name: 'Web App' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answers: { what: 'actually a meter reader', who: '', done: '' },
+        }),
+      ),
+    );
+    expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'web' } }));
+  });
+
+  // A KIND THE PRODUCT DOES NOT HAVE is a real answer from a scan — `WizardSuggestions.kind` is a free
+  // string for exactly that reason — and it must not preselect a tab that does not exist, nor blank
+  // the one the project already has.
+  it('ignores a suggested kind that is not one of the three', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'brownfield', step: 'form', suggested: { kind: 'embedded-firmware' } },
+    });
+    form();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'web' } })),
+    );
+  });
+
+  // AN ANSWER SAVED AS AN EMPTY STRING IS AN EMPTY FIELD, and it is the ordinary case rather than an
+  // exotic one: Continue writes all three answers whatever was typed, so anybody who has passed this
+  // screen once has three of them on disk. Read as "answered", a suggestion would be marked on the
+  // field and then not shown in it — the hint and the box disagreeing about the same fact.
+  it('treats an answer saved as empty as a blank the suggestion may fill', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: '', who: '', done: '' },
+        suggested: { answers: { what: 'a timeline of releases' } },
+      },
+    });
+    form();
+
+    const what = (await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement;
+    expect(what.value).toBe('a timeline of releases');
+    expect(screen.getAllByText(SUGGESTED)).toHaveLength(1);
+  });
+
+  // THE ANSWERS COME BACK ON RE-ENTRY, with no suggestion anywhere near it. Pressing Back — or
+  // resuming setup a day later — used to show three empty boxes over three saved answers, and
+  // Continue then wrote the blanks over them.
+  it('shows what was answered last time, unmarked', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: 'a meter reader', who: 'the field team', done: 'one meter read' },
+      },
+    });
+    form();
+
+    expect(((await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement).value).toBe(
+      'a meter reader',
+    );
+    expect(screen.queryByText(SUGGESTED)).toBeNull();
+  });
+
   it('keeps everything an engineer wants behind one fold', async () => {
     // W8. The words INSIDE the fold are where the jargon belongs, and the sweep below exempts it by
     // element for that reason — so this is what proves the fold is really there to be exempted.
@@ -854,6 +1159,9 @@ describe('the words on every step (W7)', () => {
 
   beforeEach(() => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
+    // The scan sweep below needs a door that answers and a run that does not settle, so the screen it
+    // is reading is the waiting one. Re-stated here for the reason the scan describe re-states it.
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-1', status: 'running' } });
   });
 
   it('asks for a project in plain words, through either door', () => {
@@ -893,6 +1201,16 @@ describe('the words on every step (W7)', () => {
       sweep(`the ${refusalKind} refusal`, container);
       cleanup();
     }
+  });
+
+  it('says what it is doing while it reads, in plain words', async () => {
+    // The waiting screen is where "repository" wants to be said, which is why it is swept here: the
+    // person it is talking to brought in a FOLDER, and that is the word they used for it themselves.
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    const { container } = view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+    await screen.findByText('Reading your files…');
+
+    sweep('reading the folder', container);
   });
 
   it('asks its questions and hands over in plain words', async () => {

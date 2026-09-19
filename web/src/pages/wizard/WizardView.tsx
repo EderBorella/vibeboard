@@ -1,6 +1,7 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Pulse } from '../../atoms/Pulse';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
@@ -11,6 +12,7 @@ import {
   getWizard,
   patchConfig,
   putWizard,
+  runWizardSkill,
   type SandboxState,
   scaffoldProject,
 } from '../../lib/api';
@@ -21,6 +23,7 @@ import {
   type LifecycleMode,
   type ProjectSnapshot,
   type ScaffoldMode,
+  type WizardAnswers,
   type WizardState,
   type WizardStep,
 } from '../../lib/shared';
@@ -30,6 +33,7 @@ import { useFetched } from '../../lib/useFetched';
 import { useSandbox } from '../../lib/useSandbox';
 import type { WizardStart } from '../../lib/useWizard';
 import { csv, parseCsv, projectTarget, slugify, toNamePattern } from '../../lib/viewmodel';
+import { useSharedWs } from '../../lib/ws';
 import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
 import { Tabs } from '../../molecules/Tabs';
@@ -134,6 +138,17 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     });
   };
 
+  // WHAT THE SCAN HAD TO SAY FOR ITSELF, read on the screen it hands over to rather than on its own:
+  // a run that could not finish is news about the QUESTIONS — some of them will be blank — and the
+  // step that produced it is unmounted by the time anybody could read it there.
+  const [scanNotice, setScanNotice] = useState<string>();
+  // Stable across renders, because the scan step subscribes to the socket with it in a dependency
+  // list: an inline arrow here would tear that subscription down and rebuild it on every render.
+  const leaveScan = useCallback((notice?: string) => {
+    setScanNotice(notice);
+    setStep('form');
+  }, []);
+
   let body: ReactNode;
   if (step === 'identity')
     body = (
@@ -146,9 +161,12 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
       />
     );
   else if (step === 'backend')
-    body = <BackendStep mode={mode} snapshot={snapshot} bump={bump} onContinue={() => setStep('form')} />;
+    body = <BackendStep mode={mode} snapshot={snapshot} bump={bump} onContinue={setStep} />;
+  else if (step === 'scan') body = <ScanStep mode={mode} bump={bump} onContinue={leaveScan} />;
   else if (step === 'form')
-    body = <FormStep mode={mode} snapshot={snapshot} onContinue={() => setStep('handoff')} />;
+    body = (
+      <FormStep mode={mode} snapshot={snapshot} notice={scanNotice} onContinue={() => setStep('handoff')} />
+    );
   else body = <HandoffStep />;
 
   return (
@@ -310,7 +328,10 @@ function BackendStep({
   mode: ScaffoldMode;
   snapshot: ProjectSnapshot | null;
   bump: number;
-  onContinue: () => void;
+  // WHICH step is next is this one's to say, because it is the mode that decides it and the mode is
+  // here. The file and the screen then move together — a Continue that wrote one step and showed
+  // another is a setup you cannot resume into.
+  onContinue: (next: WizardStep) => void;
 }) {
   const { read, failed: readFailed, retry, saved } = useSaved(mode);
   // Re-asked on entry, after the assistant changes, and after a build lands: all three change the
@@ -354,8 +375,12 @@ function BackendStep({
 
   const go = (): void => {
     void run(async () => {
-      await putWizard(saved('form'));
-      onContinue();
+      // MAP MODE READS WHAT IS ALREADY THERE before it asks anything: almost every answer the next
+      // screen wants is written down in the folder being brought in. A new project has nothing to
+      // read, so it goes straight to the questions. decision 77.
+      const next: WizardStep = mode === 'brownfield' ? 'scan' : 'form';
+      await putWizard(saved(next));
+      onContinue(next);
     }, 'continue');
   };
 
@@ -443,6 +468,112 @@ function BackendStep({
   );
 }
 
+// WHAT THE SCAN SAYS FOR ITSELF, and both of these are read on the next screen rather than this one.
+// A run that could not finish is news about the QUESTIONS — some of them will be blank — and holding
+// somebody on a report about a run they never asked for is the worse of the two evils.
+const SCAN_UNFINISHED = 'I couldn’t read everything — the blanks are yours.';
+const SCAN_REFUSED = 'I couldn’t read your files this time — the questions below are all yours.';
+
+// THE FIRST AGENT MOMENT, AND IT ONLY HAPPENS IN MAP MODE: what the next screen asks for is mostly
+// already written down in the folder the person is bringing in. A run reads it and fills the form in —
+// as SUGGESTIONS, into empty fields only, which is the whole of what decision 77 lets an agent that
+// has read an unvetted folder do.
+//
+// EVERY WAY OUT OF THIS SCREEN LEADS TO THE SAME PLACE. The run settling, the run failing, the door
+// refusing and the person skipping all arrive at the questions; the only difference between them is
+// whether anything is said about it. The form works identically with and without suggestions, which is
+// what makes that safe.
+function ScanStep({
+  mode,
+  bump,
+  onContinue,
+}: {
+  mode: ScaffoldMode;
+  bump: number;
+  onContinue: (notice?: string) => void;
+}) {
+  const { read, failed: readFailed, retry, saved } = useSaved(mode);
+  // The run this screen started, `null` until the door answers — and the subscription's key: every run
+  // on this project broadcasts on one socket, and a frame about another one is not this step's news.
+  const [runId, setRunId] = useState<string | null>(null);
+  // ONE DISPATCH PER VISIT. An effect runs twice under StrictMode and again on every state change it
+  // causes, and each extra run of this one is a real agent costing real money.
+  const started = useRef(false);
+  // The TAB's socket generation, threaded from the shell for the reason the build log is: `socketFor`
+  // is last-write-wins, so a literal here would replace the app's own connection rather than share it.
+  const ws = useSharedWs(bump);
+  // Already scanned. Coming back here — Back from the questions, or resuming setup tomorrow — must not
+  // spend another run to produce the suggestions the file already holds.
+  const scanned = saved('scan').suggested !== undefined;
+
+  useEffect(() => {
+    // Gated on the READ and not merely on the mount: the answer to "has this already been scanned" is
+    // on disk, and a dispatch fired before it lands is exactly the second run `scanned` prevents.
+    if (!read || started.current) return;
+    started.current = true;
+    if (scanned) {
+      onContinue();
+      return;
+    }
+    runWizardSkill('scan-project')
+      .then(({ run }) => setRunId(run.run))
+      // Every refusal reads the same way here, and the 404 is the one that will actually happen: a
+      // project part-way through setup when this arrived has no such skill, because `seedSkills` only
+      // writes into an absent folder. There is nothing to do about any of them but ask the person.
+      .catch(() => onContinue(SCAN_REFUSED));
+  }, [read, scanned, onContinue]);
+
+  // The file is what the questions are filled from and the run wrote to it on its way out, so the
+  // handover waits on a read of it rather than racing one. A read that fails is not worth stopping
+  // for: the next screen reads for itself, and blank questions are answerable.
+  const finish = useCallback(
+    async (notice?: string): Promise<void> => {
+      await getWizard().catch(() => {});
+      onContinue(notice);
+    },
+    [onContinue],
+  );
+
+  useEffect(() => {
+    if (runId === null) return;
+    return ws.subscribe((msg) => {
+      if (msg.type !== 'run:update') return;
+      const record = msg.record as { run?: string; status?: string; outcome?: string } | undefined;
+      if (record?.run !== runId) return;
+      if (record.status === 'running' || record.status === 'queued') return;
+      // ANYTHING BUT A CLEAN SUCCESS IS SAID PLAINLY. `outcome` is the agent's own word and is absent
+      // entirely on a run that never wrote a report, so "is it a success" is the honest question —
+      // asking whether it is `attention` would let a crash hand over silently.
+      void finish(record.outcome === 'success' ? undefined : SCAN_UNFINISHED);
+    });
+  }, [ws, runId, finish]);
+
+  return (
+    <>
+      {readFailed ? (
+        <ReadFailed retry={retry} busy={false} />
+      ) : (
+        <>
+          <Stack gap={3}>
+            <Pulse />
+            {/* THE LIVE REGION IS THE SENTENCE, not the dots — ThinkingIndicator's reason, and the
+                same shape: three dots are not information and each is aria-hidden. */}
+            <span role="status">
+              <Text>Reading your files…</Text>
+            </span>
+          </Stack>
+          <Text role="hint">A minute or two. You can skip this and answer everything yourself.</Text>
+        </>
+      )}
+      <Stack gap={4}>
+        {/* THE WAY PAST A RUN THAT IS TAKING TOO LONG, and it leaves the run alone deliberately: what
+            it finds still lands in the file, and the questions are the same questions either way. */}
+        <Button onClick={() => onContinue()}>Skip and answer them myself</Button>
+      </Stack>
+    </>
+  );
+}
+
 // THE KINDS IN WORDS. `BOX_KINDS` is machinery — it picks which image a box is built from — and its
 // members are slugs for that reason; these are the same three choices said the way somebody choosing
 // between them would say them. One map, here, rather than labels invented at each site.
@@ -486,18 +617,27 @@ function withMode(ap: AutopilotConfig, mode: LifecycleMode): AutopilotConfig {
 function FormStep({
   mode,
   snapshot,
+  notice,
   onContinue,
 }: {
   mode: ScaffoldMode;
   snapshot: ProjectSnapshot | null;
+  // What the step before had to say for itself, when a scan ran and could not finish. Absent in
+  // every other case, including a scan that went perfectly.
+  notice?: string;
   onContinue: () => void;
 }) {
   const { read, failed: readFailed, retry, saved } = useSaved(mode);
-  const [what, setWhat] = useState('');
-  const [who, setWho] = useState('');
-  const [done, setDone] = useState('');
+  const state = saved('handoff');
+  // WHAT THIS PERSON HAS TYPED, and an absent key is "they have not touched this box" — which is not
+  // the same as an empty one, and is the only thing that can tell a cleared field from an unvisited
+  // one. IdentityStep's idiom, and here it is also what lets a value arriving with the file reach a
+  // box that was mounted before the read landed.
+  const [typed, setTyped] = useState<Partial<Record<keyof WizardAnswers, string>>>({});
   const ap = snapshot?.config.autopilot;
-  const [kind, setKind] = useState<BoxKind>(snapshot?.config.box?.kind ?? 'web');
+  // `null` until a tab is pressed, for the same reason: without it the suggested kind could never win
+  // over the default every scaffolded project is written with.
+  const [chosenKind, setKind] = useState<BoxKind | null>(null);
   const [lifecycle, setLifecycle] = useState<LifecycleMode>(ap?.mode ?? 'standard');
   // Prefilled from what the project already has, and it matters: the patch REPLACES the box block, so a
   // field that started empty on a project with packages would delete them on the way past.
@@ -506,9 +646,31 @@ function FormStep({
   const [maxIterations, setMax] = useState(ap?.maxIterations ?? 1);
   const { busy, error, run } = useAction();
 
+  // WHAT THE PERSON SAID WINS, ALWAYS. A suggestion fills a field only where the file holds no answer
+  // for it, and the `||` is deliberate over `??`: an answer saved as an empty string is a field
+  // somebody cleared, which is exactly where a proposal is welcome. decision 77.
+  const answered = state.answers ?? {};
+  const proposed = state.suggested?.answers ?? {};
+  const value = (key: keyof WizardAnswers): string => typed[key] ?? (answered[key] || proposed[key] || '');
+  const suggested = (key: keyof WizardAnswers): boolean =>
+    typed[key] === undefined && !answered[key] && Boolean(proposed[key]);
+  // Said on the field it applies to rather than once at the top: which of the three was filled in for
+  // them is the whole of what a person needs to know here, and a banner cannot say it.
+  const hintFor = (key: keyof WizardAnswers, own?: string): string | undefined =>
+    suggested(key) ? 'Suggested from your files — edit anything wrong.' : own;
+  const write = (key: keyof WizardAnswers, next: string): void =>
+    setTyped((all) => ({ ...all, [key]: next }));
+  // A kind the product does not have is a real answer from a scan — `kind` is a free string for that
+  // reason — so it is looked up rather than cast, and an unknown one leaves the project's own.
+  const kind: BoxKind =
+    chosenKind ?? BOX_KINDS.find((k) => k === state.suggested?.kind) ?? snapshot?.config.box?.kind ?? 'web';
+
   const go = (): void => {
     void run(async () => {
-      await putWizard({ ...saved('handoff'), answers: { what, who, done } });
+      await putWizard({
+        ...state,
+        answers: { what: value('what'), who: value('who'), done: value('done') },
+      });
       const extra = parseCsv(packages);
       await patchConfig({
         box: { kind, ...(extra.length > 0 ? { packages: extra } : {}) },
@@ -531,15 +693,35 @@ function FormStep({
       </Text>
 
       {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
+      {/* The step before's news, if it had any: a scan that could not finish is a fact about the boxes
+          below, so it is read here rather than on the screen that produced it. */}
+      {notice && (
+        <Notice as="p" tone="warn">
+          {notice}
+        </Notice>
+      )}
 
-      <Field label="What are you making?" hint="A sentence or two, in your own words.">
-        <Control as="textarea" rows={3} value={what} onChange={(e) => setWhat(e.target.value)} />
+      <Field label="What are you making?" hint={hintFor('what', 'A sentence or two, in your own words.')}>
+        <Control
+          as="textarea"
+          rows={3}
+          value={value('what')}
+          onChange={(e) => write('what', e.target.value)}
+        />
       </Field>
-      <Field label="Who is it for?">
-        <Control as="textarea" rows={2} value={who} onChange={(e) => setWho(e.target.value)} />
+      <Field label="Who is it for?" hint={hintFor('who')}>
+        <Control as="textarea" rows={2} value={value('who')} onChange={(e) => write('who', e.target.value)} />
       </Field>
-      <Field label={'What does "done" look like?'} hint="How you'll know the first version works.">
-        <Control as="textarea" rows={2} value={done} onChange={(e) => setDone(e.target.value)} />
+      <Field
+        label={'What does "done" look like?'}
+        hint={hintFor('done', "How you'll know the first version works.")}
+      >
+        <Control
+          as="textarea"
+          rows={2}
+          value={value('done')}
+          onChange={(e) => write('done', e.target.value)}
+        />
       </Field>
 
       {/* `as="div"`, because what the label names is a picker and not a form element — a wrapping

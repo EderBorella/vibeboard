@@ -169,6 +169,9 @@ export const SURFACES: Surface[] = [
   {
     name: 'wizard-stack',
     what: "the setup wizard's stack step — the proposal, the box to overrule it and what the sandbox installs",
+    // This surface records a THIRD control height, 32px, beside --ctl-h's 28px and --mark-h's 16px:
+    // the two-row `Or name your own stack` textarea, an intrinsic height no gate reads. Named here so
+    // the next reader of the baseline diff does not hunt for it.
     root: null,
     open: async (page) => {
       // A DIFFERENT PROJECT, AND THAT IS THE ONLY WAY IN. These steps have no door of their own: the

@@ -46,7 +46,11 @@
    the frame — so the `Map an existing repository` door was drawn filled even though it asks for the
    default variant, and the exception in its `:not()` was there because the recents rows would have been
    painted too. Whatever paints a button is the atom's to say. decision 76. */
-.gate button:disabled { opacity: 0.5; cursor: default; }
+/* `.gate button:disabled` IS GONE, AND IT WAS THE ATOM'S RULE WRITTEN A SECOND TIME. `opacity: 0.5;
+   cursor: default` is `.vb-btn:disabled` declaration for declaration, and every button inside this
+   frame is a `Button` — the recents rows are `<li>`s, which a `button` selector never reached. Same
+   reasoning as the paint rule above it: whatever a button looks like is the atom's to say, and a
+   surface that says it again is a second place for it to drift. decision 76. */
 /* AN INLINE `<code>` IN PROSE IS A TYPE SELECTOR NOW, in atoms/prose.css — see there. It was
    `.gate-preview code, .ap-help-body code`: one rule naming TWO surfaces from inside an atom's sheet,
    which is the fifth of the seven misfiled strays and the shape the layer gate exists to refuse. */

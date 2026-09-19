@@ -189,7 +189,11 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     // The resolved px and never `var(--s-5)`: an expectation written as the token compares one literal to
     // the same literal and asserts nothing — this file's own rule, and control-boxes' before it.
     expect(box(panel('raised', 'gate-card')).gap).toBe('12px');
-    expect(box(at('<div class="gate-card"><ul class="gate-list"></ul></div>', 'ul')).margin).toBeUndefined();
+    // THE RECENTS LIST AS THE PICKER ACTUALLY RENDERS IT — a `List as="ul"`, which wears `.vb-list`.
+    // This fixture said `.gate-list`, a name no stylesheet defines any more, so it read back the box of
+    // nothing at all and would have passed whatever happened to the real list. The 16px this row is
+    // about belonged to `.gate-card .gate-list`; what answers now is the atom's own UA reset.
+    expect(box(at('<div class="gate-card"><ul class="vb-list"></ul></div>', 'ul')).margin).toBe('0');
     expect(box(at('<div class="gate-card"><h3>h</h3></div>', 'h3')).margin).toBe('0');
     expect(box(at('<div class="gate"><div class="vb-field"></div></div>', '.vb-field'))['margin-top']).toBe(
       undefined,

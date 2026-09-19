@@ -147,6 +147,10 @@ export function App() {
   const onMoveCard = (card: Card, columnSlug: string): void => {
     void placeCard(card.board, card.id, columnSlug, null);
   };
+  // HIDDEN, NOT ENDED — the session keeps running, which is what the ✕ on the dock says. Named rather
+  // than written inline at each call site because there are two of them now: the dock, and the panel
+  // setup embeds beside the documents it has just written.
+  const hideCopilot = (): void => setCopilotOpen(false);
   // Start a fresh chat on a backend switch, since a session belongs to the backend that
   // created it. Coordinating that is the shell's job; useCopilotChoice owns the override state.
   const onBackend = (backend: string): void => {
@@ -263,6 +267,25 @@ export function App() {
         start={setup.entry.step}
         snapshot={snapshot}
         bump={bump}
+        // THE SAME PANEL THE DOCK GETS, ON THE SAME CONVERSATION. Setup's documents step embeds the
+        // copilot beside the summaries it has just written, and it is `copilot` above — this tab's one
+        // instance — rather than a second `useCopilot` of its own, which would be two transcripts of
+        // one server-side chat. The set is `CopilotPanel`'s own, which is what WorkArea hands it
+        // below. decision 78.
+        copilot={{
+          copilot,
+          backend: choice.backend,
+          mode: copilotMode,
+          model: choice.model,
+          effort: choice.effort,
+          overridden,
+          onMode: setCopilotMode,
+          onModel: setModel,
+          onEffort: setEffort,
+          onBackend,
+          onReset: onResetCopilot,
+          onClose: hideCopilot,
+        }}
         onOpened={onOpened}
         onExit={leaveWizard}
       />
@@ -295,7 +318,7 @@ export function App() {
           onEffort: setEffort,
           onBackend,
           onReset: onResetCopilot,
-          onClose: () => setCopilotOpen(false),
+          onClose: hideCopilot,
         }}
         dispatch={dispatch}
         boards={{

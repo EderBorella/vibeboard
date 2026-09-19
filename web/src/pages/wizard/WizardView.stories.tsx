@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { ComponentProps } from 'react';
 import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
 import type { WizardState } from '../../lib/shared';
 import { WizardView } from './WizardView';
@@ -19,6 +20,46 @@ import { WizardView } from './WizardView';
 // than a screen that looks right.
 const pending: { state: WizardState | null } = { state: null };
 
+// THE TAB'S CONVERSATION, WHICH THE SHELL OWNS AND THIS SCREEN IS HANDED. Both stories below are the
+// identity step, which renders none of it — the panel appears only in the documents step's review —
+// but the prop is required, and a written-out stub says what the shell passes where a cast would hide
+// it. Typed off the component so a field added to the dock shows up here as an error rather than as a
+// story that renders half a panel.
+const quiet = { current: null };
+const conversation: ComponentProps<typeof WizardView>['copilot'] = {
+  copilot: {
+    items: [],
+    running: false,
+    authorised: false,
+    setCopilotAuthority: () => {},
+    sessionId: undefined,
+    model: undefined,
+    stats: { costUsd: 0, turns: 0, lastDurationMs: 0, contextTokens: 0 },
+    chats: [],
+    currentChatId: undefined,
+    send: () => {},
+    compact: () => {},
+    newSession: () => {},
+    openChat: () => {},
+    deleteChat: () => {},
+    cancel: () => {},
+    sentAt: quiet,
+    lastEventAt: quiet,
+    sawText: { current: false },
+  },
+  backend: 'claude-code',
+  mode: 'bypassPermissions',
+  model: 'sonnet',
+  effort: 'medium',
+  overridden: false,
+  onMode: () => {},
+  onModel: () => {},
+  onEffort: () => {},
+  onBackend: () => {},
+  onReset: () => {},
+  onClose: () => {},
+};
+
 const meta = {
   title: 'Pages/Wizard',
   component: WizardView,
@@ -29,6 +70,7 @@ const meta = {
     start: 'identity',
     snapshot: null,
     bump: 0,
+    copilot: conversation,
     onOpened: () => {},
     onExit: () => {},
   },

@@ -346,6 +346,32 @@ describe('the offer to finish setup', () => {
     await waitFor(() => expect(result.current.entry?.mode).toBe('greenfield'));
   });
 
+  // SIGNING IN IS NOT OPENING A PROJECT, and the effect is keyed on both. `signedIn` flips false→true
+  // on the sign-in re-bind the shell performs, and every flip re-ran the read AND re-opened what it
+  // found — so a person who had skipped setup was put back inside it by an event that has nothing to
+  // say about their project. The reviewer reproduced it; only a changed ROOT may re-offer.
+  it('does not offer again when the same project is signed into a second time', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
+    const { result, rerender } = renderHook(({ on, at }) => useWizard(on, at), {
+      initialProps: { on: true, at: '/work/one' as string | undefined },
+    });
+    await waitFor(() => expect(result.current.entry?.mode).toBe('greenfield'));
+
+    // The skip. The file stays, which is the point — so the read on the way back in finds it again.
+    act(() => result.current.leave());
+    await waitFor(() => expect(api.getWizard).toHaveBeenCalledTimes(2));
+    expect(result.current.entry).toBeNull();
+
+    rerender({ on: false, at: '/work/one' });
+    rerender({ on: true, at: '/work/one' });
+
+    await waitFor(() => expect(api.getWizard).toHaveBeenCalledTimes(3));
+    await act(async () => {});
+    expect(result.current.entry).toBeNull();
+    // And the read still happened: `pending` is what the readiness wall asks, and it must stay true.
+    expect(result.current.pending).toBe(true);
+  });
+
   // WHAT THE READINESS WALL ASKS, and it is a different question from "is the wizard on screen": a skip
   // keeps the file, so from the moment somebody skips there is a setup waiting that nothing is showing.
   it('keeps setup pending after a skip, and puts it back at the step the file names', async () => {

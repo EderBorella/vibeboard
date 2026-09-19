@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getWizard } from './api';
 import type { ScaffoldMode, WizardStep } from './shared';
 
@@ -40,10 +40,18 @@ export interface Setup {
 // The one thing that puts setup on screen without a press: a project whose wizard file is still on disk
 // is setup half-done, so opening it offers to finish.
 //
-// KEYED ON THE OPEN PROJECT'S ROOT AND NOT ON THE SHELL'S `bump`. Four other things pull that counter —
-// signing in, a backend change, a forgiven run, a cleared attempt count — so an offer hung off it would
-// walk a person straight back into the wizard they had just skipped. The root changes exactly when a
-// different project is opened, which is the question this asks.
+// OFFERED ON A CHANGED ROOT AND ON NOTHING ELSE. "A different project has been opened" is the question,
+// and the shell's `bump` is not it: four other things pull that counter — signing in, a backend change,
+// a forgiven run, a cleared attempt count — so an offer hung off it would walk a person straight back
+// into the wizard they had just skipped.
+//
+// THE ROOT ALONE IS NOT THE EFFECT'S KEY, THOUGH, AND THAT WAS THE HOLE. `signedIn` has to be a
+// dependency — with no credential the read 401s — and it flips false→true on the re-bind the shell
+// performs, which put the skipped wizard back on screen for an event that says nothing about the
+// project. So the last root OFFERED FOR is held, and only a genuinely different one may open the
+// screen. Recorded when the answer lands rather than when the read starts, because StrictMode mounts
+// twice and the first mount's answer is dropped — recording it on the way out would spend the one
+// offer on a read nobody sees.
 //
 // A HOOK RATHER THAN AN EFFECT IN `App.tsx`, for the reason templates/shell.ts gives about the content
 // order: nothing in this repository mounts the shell, so a rule written inside it is a rule nothing can
@@ -59,9 +67,15 @@ export function useWizard(
   // What the FILE last said, which outlives a skip. `entry` is taken off the screen by leaving; this is
   // taken away only by the file going.
   const [saved, setSaved] = useState<WizardEntry | null>(null);
+  // The root the offer was last SPENT on. A ref and not state: nothing renders from it, and it must
+  // survive the render its own answer causes.
+  const offeredFor = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!signedIn || !openRoot) return;
+    // Read on every run, offered only on a new root: `pending` is what the readiness wall asks and it
+    // has to be current, even on a run that may not put anything on screen.
+    const unoffered = offeredFor.current !== openRoot;
     // An answer that lands after the project moved on is DROPPED — the same flag `useFetched` carries
     // and for the same reason: the previous project's setup must not open over the one now on screen.
     let live = true;
@@ -70,9 +84,10 @@ export function useWizard(
         if (!live) return;
         const next = state ? { mode: state.mode, step: state.step } : null;
         setSaved(next);
+        offeredFor.current = openRoot;
         // Opening is the READ's doing, and only this read's: the one on the way out must never put back
         // on screen what was just taken off it.
-        if (next) setEntry(next);
+        if (next && unoffered) setEntry(next);
       })
       .catch(() => {});
     return () => {

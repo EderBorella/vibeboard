@@ -1,16 +1,67 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectSnapshot } from '../web/src/lib/shared.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defaultConfig } from '../src/store/project/config.js';
+import type { SandboxState } from '../web/src/lib/api.js';
+import type { ProjectConfig, ProjectSnapshot } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   scaffoldProject: vi.fn().mockResolvedValue({ snapshot: {} }),
   putWizard: vi.fn().mockResolvedValue({ state: {} }),
   clearWizard: vi.fn().mockResolvedValue(undefined),
   getWizard: vi.fn().mockResolvedValue({ state: null }),
+  // The backend step's three calls: the live check, the one remedy the product can carry out itself,
+  // and the write that records which assistant was chosen.
+  // A clean machine by default, so a test about something else does not have to describe one. The step
+  // mounts with a live check whatever the test is about.
+  getSandbox: vi
+    .fn()
+    .mockResolvedValue({ ok: true, backend: 'managed', agentRefusal: null, refusalKind: null }),
+  buildAgentImage: vi.fn().mockResolvedValue({ ok: true, already: false }),
+  patchConfig: vi.fn().mockResolvedValue({}),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
+
+// The shared socket, faked the way the REAL one is keyed: one object per `bump`, memoised. A fake that
+// ignored its argument would un-gate the thing that matters here — that the build log is subscribed on
+// the TAB's socket generation rather than on a literal, which `socketFor` would answer by replacing the
+// tab's own connection.
+const ws = vi.hoisted(() => {
+  type Msg = { type: string; state?: string; line?: string };
+  const subscribers = new Map<number, Set<(m: Msg) => void>>();
+  const sockets = new Map<number, { subscribe: (fn: (m: Msg) => void) => () => void }>();
+  const asked: number[] = [];
+  const useSharedWs = (bump: number) => {
+    asked.push(bump);
+    const existing = sockets.get(bump);
+    if (existing) return existing;
+    const set = new Set<(m: Msg) => void>();
+    subscribers.set(bump, set);
+    const socket = {
+      subscribe: (fn: (m: Msg) => void) => {
+        set.add(fn);
+        return () => set.delete(fn);
+      },
+    };
+    sockets.set(bump, socket);
+    return socket;
+  };
+  return {
+    useSharedWs,
+    asked,
+    reset: () => {
+      sockets.clear();
+      subscribers.clear();
+      asked.length = 0;
+    },
+    push: (msg: Msg, bump = 0) => {
+      for (const fn of subscribers.get(bump) ?? []) fn(msg);
+    },
+  };
+});
+vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
+vi.mock('../web/src/lib/ws', () => ({ useSharedWs: ws.useSharedWs }));
 
 const { WizardView } = await import('../web/src/pages/wizard/WizardView.js');
 const { useWizard } = await import('../web/src/lib/useWizard.js');
@@ -18,9 +69,11 @@ const { useWizard } = await import('../web/src/lib/useWizard.js');
 const onOpened = vi.fn();
 const onExit = vi.fn();
 
-// The wizard reads the snapshot as ONE BIT — is a project open — so a stub is honest here. The steps
-// that read its config are later parts of this phase, and they will need a real one.
-const opened = { name: 'demo', root: '/work/demo' } as unknown as ProjectSnapshot;
+// The identity step reads the snapshot as ONE BIT — is a project open — but every step after it reads
+// the project's config, so the stub carries a real one: the same `defaultConfig` a scaffold writes, cast
+// across the tsc/Vite seam the way the settings tests cast it.
+const config = defaultConfig('demo') as unknown as ProjectConfig;
+const opened = { name: 'demo', root: '/work/demo', config } as unknown as ProjectSnapshot;
 
 const view = (over: Partial<ComponentProps<typeof WizardView>> = {}) =>
   render(
@@ -42,6 +95,7 @@ const type = (label: RegExp, value: string): void => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  ws.reset();
 });
 
 // WHERE A NEW PROJECT GOES, and these assertions were the project gate's until the form became two
@@ -252,5 +306,132 @@ describe('the offer to finish setup', () => {
     rerender({ at: '/work/two' });
     await waitFor(() => expect(result.current[0]?.mode).toBe('greenfield'));
     expect(api.getWizard).toHaveBeenCalledTimes(2);
+  });
+});
+
+// THE STEP THAT CANNOT BE ARGUED WITH (W2). The check is live, Continue is gated on it, and every
+// refusal the probe can give arrives with the remedy that clears it — including the one remedy the
+// product can carry out itself, which is a button here rather than a command in a terminal.
+describe('the backend step', () => {
+  // Verbatim from `REASON_EXPIRED` in src/server/boxes/credential-freshness.ts. The sentence on screen is
+  // the probe's own, so the fixture is the probe's own too: a reason invented here from the description
+  // would be wrong in exactly the way the code would be, and this file would still be green.
+  const EXPIRED = [
+    'the Claude Code sign-in on this machine has expired, so every agent turn would fail to authenticate.',
+    'This project is set to the Claude Code backend; a project set to OpenCode is unaffected.',
+    'Run "claude" in a terminal on the host to refresh it',
+  ].join(' ');
+  // From `probe` in src/server/boxes/box-manager.ts, both of them — one kind, two remedies.
+  const NO_IMAGE = 'the agent image vibeboard-agent:latest is not built yet';
+  const NO_DAEMON = 'Docker is not available — no daemon';
+
+  const clear = (over: Partial<SandboxState> = {}): SandboxState => ({
+    ok: true,
+    backend: 'managed',
+    agentRefusal: null,
+    refusalKind: null,
+    ...over,
+  });
+  // `agentRefusal` is composed the way `agentRefusal()` composes it, because the step reads THAT rather
+  // than `ok` — a project attached to a server VibeBoard did not start answers `ok: true` and still
+  // cannot run an agent.
+  const refused = (
+    refusalKind: NonNullable<SandboxState['refusalKind']>,
+    reason: string,
+    over: Partial<SandboxState> = {},
+  ): SandboxState =>
+    clear({ ok: false, reason, refusalKind, agentRefusal: `Agents are disabled: ${reason}.`, ...over });
+
+  // What the step before left behind. `putWizard` REPLACES the state, so these answers are what proves
+  // the step reads the file before it writes it.
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'greenfield', step: 'backend', answers: { what: 'a game' } },
+    });
+    api.getSandbox.mockResolvedValue(clear());
+  });
+
+  it('will not let you past a machine that cannot run an agent, and puts the fix on the screen', async () => {
+    api.getSandbox.mockResolvedValue(refused('credential', EXPIRED));
+    view({ start: 'backend', snapshot: opened });
+
+    // The probe's sentence, whole: it is the only thing on the screen that names the command to run.
+    expect(await screen.findByText(EXPIRED)).toBeTruthy();
+    // The heading says what KIND of thing is being asked, which the server's sentence cannot: this one
+    // is work outside the app, and the build below is work the app can do.
+    expect(screen.getByText('Almost — one thing to do outside VibeBoard')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('opens the way on when the check comes back clean, and writes the file WHOLE', async () => {
+    view({ start: 'backend', snapshot: opened });
+
+    const go = await screen.findByRole('button', { name: 'Continue' });
+    await waitFor(() => expect((go as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(go);
+
+    // The answers survive a step that never asked for them. A write assembled from what this step knows
+    // — `{ mode, step }` — would delete them, and nothing else in the wizard would notice.
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'form',
+        answers: { what: 'a game' },
+      }),
+    );
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+  });
+
+  it('offers to build when a build is what would fix it', async () => {
+    api.getSandbox.mockResolvedValue(refused('docker', NO_IMAGE, { buildable: true }));
+    view({ start: 'backend', snapshot: opened });
+
+    expect(await screen.findByRole('button', { name: 'Build it now' })).toBeTruthy();
+    expect(screen.getByText(NO_IMAGE)).toBeTruthy();
+  });
+
+  it('does not offer to build against a daemon that is not running', async () => {
+    // The same refusal KIND with a different remedy. A button that cannot work is worse than no button:
+    // it sends somebody to build an image on a machine where nothing can build anything.
+    api.getSandbox.mockResolvedValue(refused('docker', NO_DAEMON));
+    view({ start: 'backend', snapshot: opened });
+
+    expect(await screen.findByText(NO_DAEMON)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Build it now' })).toBeNull();
+  });
+
+  it("streams the build over the tab's own socket and asks the machine again when it lands", async () => {
+    api.getSandbox.mockResolvedValue(refused('docker', NO_IMAGE, { buildable: true }));
+    view({ start: 'backend', snapshot: opened, bump: 7 });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Build it now' }));
+    await waitFor(() => expect(api.buildAgentImage).toHaveBeenCalledTimes(1));
+    act(() => ws.push({ type: 'box:build', state: 'start', line: 'Step 3/9 : RUN apt-get update' }, 7));
+
+    expect(await screen.findByText('Step 3/9 : RUN apt-get update')).toBeTruthy();
+    // `socketFor` is last-write-wins: a literal key here would not open a second socket beside the tab's,
+    // it would REPLACE it, and the board would stop receiving anything. Asked for the generation it was
+    // handed, and for no other.
+    expect(ws.asked).not.toHaveLength(0);
+    expect(ws.asked.every((n) => n === 7)).toBe(true);
+    // A finished build changes the answer, so the answer is asked for again.
+    await waitFor(() => expect(api.getSandbox).toHaveBeenCalledTimes(2));
+  });
+
+  it('writes the WHOLE assistant block, and re-asks about the one just chosen', async () => {
+    view({ start: 'backend', snapshot: opened });
+    await waitFor(() => expect(api.getSandbox).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'OpenCode' }));
+
+    // The whole block, not `{ backend }` alone: `backends` holds each assistant's remembered model, and
+    // the per-assistant slots exist so one choice does not discard the other's.
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith({
+        copilot: { ...config.copilot, backend: 'opencode' },
+      }),
+    );
+    // And the check beside it answers for the assistant just chosen rather than the one just left.
+    await waitFor(() => expect(api.getSandbox).toHaveBeenCalledTimes(2));
   });
 });

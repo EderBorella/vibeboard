@@ -62,14 +62,17 @@ interface Props {
 }
 
 // Where a repository already on disk would be brought in from. The folder IS the answer here, so the
-// path is what was typed and the name is its last segment slugified — NOT `projectTarget`, which builds
-// a path out of a parent and a name and would, for a folder whose name is not already a slug, name a
-// directory that does not exist.
+// path is what was typed — NOT `projectTarget`, which builds a path out of a parent and a name and
+// would, for a folder whose name is not already a slug, name a directory that does not exist.
+//
+// THE DERIVED NAME IS A SUGGESTION AND NOT A GATE. It used to blank the path when it came out empty,
+// which is what a folder with no ASCII letters in its name does — so `/work/日本語` gave an absolute
+// path, no complaint about it, and a button that did nothing when pressed. The name is a field now and
+// the two answers are independent: this one only proposes.
 function adoptTarget(input: string): { relative: boolean; path: string; name: string } {
   const path = input.replace(/\/+$/, '');
   const relative = path !== '' && !path.startsWith('/');
-  const name = slugify(path.split('/').pop() ?? '');
-  return { relative, path: relative || !name ? '' : path, name };
+  return { relative, path: relative ? '' : path, name: slugify(path.split('/').pop() ?? '') };
 }
 
 // THE FILE IS THE ONLY COPY OF WHAT HAS BEEN ANSWERED, and `putWizard` replaces it whole. This screen
@@ -161,13 +164,19 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
 // project open and the sandbox probe answering for it.
 function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded: () => void }) {
   const [parent, setParent] = useState('');
-  const [name, setName] = useState('');
+  // `null` is "nobody has typed a name", which is not the same as an empty one: bringing a folder in
+  // proposes the folder's own name, and a person who clears the box has chosen to clear it.
+  const [name, setName] = useState<string | null>(null);
   const [repo, setRepo] = useState('');
   const { busy, error, run } = useAction();
 
   const greenfield = mode === 'greenfield';
-  const nameSlug = slugify(name);
-  const target = greenfield ? { ...projectTarget(parent, nameSlug), name: nameSlug } : adoptTarget(repo);
+  const folder = adoptTarget(repo);
+  const typed = name ?? (greenfield ? '' : folder.name);
+  const nameSlug = slugify(typed);
+  const target = greenfield
+    ? { ...projectTarget(parent, nameSlug), name: nameSlug }
+    : { relative: folder.relative, path: folder.path, name: nameSlug };
 
   const create = (): void => {
     void run(async () => {
@@ -195,31 +204,30 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
       </Text>
 
       {greenfield ? (
-        <>
-          <Field label="Location (parent folder)">
-            <Control
-              value={parent}
-              placeholder="/path/to/projects"
-              onChange={(e) => setParent(e.target.value)}
-            />
-          </Field>
-          <Field label="Name (dash-separated, lowercase)" error={error}>
-            <Control
-              value={name}
-              placeholder="my-project"
-              onChange={(e) => setName(toNamePattern(e.target.value))}
-            />
-          </Field>
-        </>
+        <Field label="Location (parent folder)">
+          <Control
+            value={parent}
+            placeholder="/path/to/projects"
+            onChange={(e) => setParent(e.target.value)}
+          />
+        </Field>
       ) : (
-        <Field
-          label="Repository (full path)"
-          hint="The folder that holds the project you want to bring in."
-          error={error}
-        >
+        <Field label="Repository (full path)" hint="The folder that holds the project you want to bring in.">
           <Control value={repo} placeholder="/path/to/repository" onChange={(e) => setRepo(e.target.value)} />
         </Field>
       )}
+      {/* ASKED IN BOTH MODES, and bringing a folder in is the half that was missing: its name was
+          derived from the last segment of the path and never shown, so the first place anyone could
+          read it was the top bar of a project that already existed. Prefilled with that derivation
+          rather than replacing it — the proposal is right almost always, and where it is not there is
+          now somewhere to say so. */}
+      <Field label="Name (dash-separated, lowercase)" error={error}>
+        <Control
+          value={typed}
+          placeholder="my-project"
+          onChange={(e) => setName(toNamePattern(e.target.value))}
+        />
+      </Field>
 
       {target.relative && (
         <Text as="p">
@@ -235,7 +243,10 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
       )}
 
       <Stack gap={4}>
-        <Button variant="primary" disabled={busy !== null || !target.path} onClick={create}>
+        {/* BOTH ANSWERS, SEPARATELY. A path with no name and a name with no path are different things
+            missing, and the fields that hold them are both on screen — which is what the one merged
+            condition could not say when it was the folder that had failed to yield a name. */}
+        <Button variant="primary" disabled={busy !== null || !target.path || !target.name} onClick={create}>
           {greenfield ? 'Create the project' : 'Bring it in'}
         </Button>
       </Stack>

@@ -207,7 +207,8 @@ describe('the identity step, bringing in a repository', () => {
 
     expect(screen.getByText('Repository (full path)')).toBeTruthy();
     expect(screen.getByText('The folder that holds the project you want to bring in.')).toBeTruthy();
-    // The two boxes of a new project are not asked for: the folder already exists and already has a name.
+    // Where a new project goes is not asked: the folder already exists and is the answer. Its NAME is
+    // asked, prefilled from the path — see the two cases below.
     expect(screen.queryByLabelText(/location/i)).toBeNull();
   });
 
@@ -221,6 +222,41 @@ describe('the identity step, bringing in a repository', () => {
     // which for a folder whose name is not already one would name a directory that does not exist.
     expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'my-repo', 'brownfield');
     await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'brownfield', step: 'backend' }));
+  });
+
+  // THE NAME IS A FIELD AND NOT A DERIVATION, and the reason is a button that died in silence: the
+  // project's name was the folder's last segment slugified, so a folder whose name has no ASCII letters
+  // in it derived the empty string — and the screen, with no name to show and nothing wrong with the
+  // path to complain about, simply refused to do anything when pressed.
+  it('asks for a name when the folder cannot give one, rather than refusing in silence', () => {
+    view({ mode: 'brownfield' });
+    type(/repository/i, '/work/日本語');
+
+    const bring = screen.getByRole('button', { name: 'Bring it in' }) as HTMLButtonElement;
+    expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('');
+    expect(bring.disabled).toBe(true);
+    // Nothing is wrong with the path — it is absolute — so the one hint this screen has does not apply.
+    expect(screen.queryByText(/absolute path/i)).toBeNull();
+
+    type(/^name/i, 'meter-reader');
+
+    expect(bring.disabled).toBe(false);
+    fireEvent.click(bring);
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/日本語', 'meter-reader', 'brownfield');
+  });
+
+  it('shows the name it derived from the folder, and lets it be changed', () => {
+    // It was derived and never shown, so the one place a person could learn what their project would be
+    // called was the top bar after it had been created.
+    view({ mode: 'brownfield' });
+    type(/repository/i, '/work/My Repo/');
+
+    expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('my-repo');
+
+    type(/^name/i, 'meters');
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'meters', 'brownfield');
   });
 
   it('will not bring in a relative path either', () => {

@@ -163,6 +163,21 @@ describe('the frame at the copilot seam', () => {
     expect(s.transcript()).toEqual(['what does the archive drawer do?']);
   });
 
+  // THROUGH THE DOOR THE DOCS STEP ACTUALLY LEAVES BY, and it is the half the pure test above cannot
+  // reach: the step wrote no step at all, so the file sat at `docs` after every exit and this frame
+  // prefixed EVERY later conversation on the project with a brief about writing foundation documents.
+  // `gates` is the step it moves to when it tripped the gate block, and the frame has to be gone the
+  // moment it does.
+  it('is gone the moment setup has moved past the documents', async () => {
+    const root = await tempDir();
+    await writeWizardState(root, docs({ step: 'gates' }));
+    const s = seam();
+
+    await s.send('what is a gate command?', root);
+
+    expect(s.modelText()).toBe('what is a gate command?');
+  });
+
   it('is absent entirely on a project with no setup running', async () => {
     const root = await tempDir();
     const s = seam();

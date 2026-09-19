@@ -2,8 +2,9 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FOUNDATION_FILES } from '../src/core/layout.js';
 import { defaultConfig } from '../src/store/project/config.js';
-import type { SandboxState } from '../web/src/lib/api.js';
+import type { Readiness, SandboxState } from '../web/src/lib/api.js';
 import type { ProjectConfig, ProjectSnapshot, WizardState } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
@@ -28,7 +29,9 @@ const api = vi.hoisted(() => ({
   // listing and the read the gate step opens each document's text with. A clean project by default, so
   // a test about the turn does not have to describe a block that is not there.
   setAuthority: vi.fn().mockResolvedValue({ authorised: true }),
-  getReadiness: vi.fn().mockResolvedValue({ unreviewedGates: [] }),
+  // Answered per test from `readiness()` below, which is the endpoint's REAL shape: the docs step
+  // reads three of its fields and a fixture carrying one of them would pass the other two's check.
+  getReadiness: vi.fn(),
   acknowledgeGates: vi.fn().mockResolvedValue({ ok: true }),
   listControlFiles: vi.fn().mockResolvedValue([]),
   getControlFile: vi.fn().mockResolvedValue({ content: '' }),
@@ -107,6 +110,23 @@ const onExit = vi.fn();
 const config = defaultConfig('demo') as unknown as ProjectConfig;
 const opened = { name: 'demo', root: '/work/demo', config } as unknown as ProjectSnapshot;
 
+// WHAT THE READINESS ENDPOINT ACTUALLY ANSWERS, whole. The docs step reads `unreviewedGates`,
+// `foundation.missing` AND `readme.ok` from one response — "did it actually write anything" is the
+// other half of "may auto-pilot start" — so a fixture carrying only the first would let the other two
+// checks pass over fields that were never there. `present` is the real list for the same reason the
+// probe fixtures are the probe's own.
+const readiness = (over: Partial<Readiness> = {}): Readiness => ({
+  ok: true,
+  blockers: [],
+  readme: { ok: true, path: 'README.md' },
+  foundation: { present: FOUNDATION_FILES.map((f) => f.name), missing: [], ok: true },
+  gates: { ok: true, count: 1 },
+  smoke: { ok: true },
+  phases: { problems: [], count: 6 },
+  unreviewedGates: [],
+  ...over,
+});
+
 const view = (over: Partial<ComponentProps<typeof WizardView>> = {}) =>
   render(
     <WizardView
@@ -141,6 +161,12 @@ function deferred<T>(): { promise: Promise<T>; settle: (value: T) => Promise<voi
     },
   };
 }
+
+// A READY project by default. `clearAllMocks` clears the CALLS and leaves the implementation, so a
+// case that describes a half-written project would otherwise be the answer for the rest of the file.
+beforeEach(() => {
+  api.getReadiness.mockResolvedValue(readiness());
+});
 
 afterEach(() => {
   cleanup();
@@ -1329,7 +1355,7 @@ describe('the docs step', () => {
       state: { mode: 'greenfield', step: 'docs', answers: { what: 'a tool for reading meters' } },
     });
     api.setAuthority.mockResolvedValue({ authorised: true });
-    api.getReadiness.mockResolvedValue({ unreviewedGates: [] });
+    api.getReadiness.mockResolvedValue(readiness());
   });
 
   const docs = () => view({ start: 'docs', snapshot: opened });
@@ -1429,7 +1455,7 @@ describe('the docs step', () => {
   // WRITING THE TWO EXECUTED DOCUMENTS AS AN AGENT TRIPS THE BLOCK BY DESIGN (decision 51). The wizard
   // surfaces the reading in its own voice rather than letting a refused Start do it later.
   it('goes to the reading step when a gate document was rewritten', async () => {
-    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md'] });
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
     docs();
     fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
     await waitFor(() => expect(ws.sent).toHaveLength(1));
@@ -1449,6 +1475,104 @@ describe('the docs step', () => {
     await turn(false);
 
     expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // THE FILE HAS TO MOVE WITH THE SCREEN, and this step wrote nothing at all: the file sat at `docs`
+  // after every exit but the last, so `wizardFrame` prefixed EVERY later conversation on the project
+  // with a brief about writing foundation documents — and resuming re-offered the question that
+  // rewrites all six over whatever had been edited since.
+  //
+  // FROM A FRESH READ, not the one taken on entry. The copilot files its summaries INTO this file
+  // while the turn runs, and `putWizard` replaces it whole — so the entry read is stale by exactly
+  // the thing this step produced. The stack step's settle-read, for the same reason.
+  it('writes the step it moved to, carrying the summaries the turn filed', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        answers: { what: 'a tool for reading meters' },
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      },
+    });
+    await turn(false);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'handoff',
+        answers: { what: 'a tool for reading meters' },
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      }),
+    );
+  });
+
+  it('writes the reading step too, when a gate document was rewritten', async () => {
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'gates' })),
+    );
+  });
+
+  // COMING BACK TO A STEP THAT HAS ALREADY RUN. The question is "let the assistant write the drafts?"
+  // and the answer rewrites the README and all five documents — so raising it over a project that has
+  // them is an offer to destroy work, phrased as an offer to start.
+  describe('resuming with the summaries already filed', () => {
+    const written = {
+      mode: 'greenfield',
+      step: 'docs',
+      answers: { what: 'a tool for reading meters' },
+      resumes: {
+        'README.md': 'What the project is, in a paragraph.',
+        'STACK.md': 'TypeScript, Vite and vitest.',
+      },
+    };
+
+    it('asks nothing, sends nothing, and shows what was written', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      expect(await screen.findByRole('button', { name: 'Carry on writing' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+      expect(screen.queryByText('Let the assistant write the drafts?')).toBeNull();
+      expect(ws.sent).toHaveLength(0);
+      expect(api.setAuthority).not.toHaveBeenCalled();
+      expect(screen.getByText('What the project is, in a paragraph.')).toBeTruthy();
+      expect(screen.getByText('TypeScript, Vite and vitest.')).toBeTruthy();
+    });
+
+    it('puts the question back when asked to carry on', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Carry on writing' }));
+
+      expect(await screen.findByText('Let the assistant write the drafts?')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Let it write' }));
+      await waitFor(() => expect(ws.sent).toHaveLength(1));
+    });
+
+    it('moves on without a turn when asked to continue, and writes the step', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+      expect(await screen.findByText('That is setup done')).toBeTruthy();
+      expect(ws.sent).toHaveLength(0);
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+    });
   });
 });
 
@@ -1485,7 +1609,7 @@ describe('the gates step', () => {
 
   beforeEach(() => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
-    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] });
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }));
     api.listControlFiles.mockResolvedValue(foundation);
     api.getControlFile.mockResolvedValue({ content: 'gates:\n  - npm test\n' });
     api.acknowledgeGates.mockResolvedValue({ ok: true });
@@ -1511,13 +1635,36 @@ describe('the gates step', () => {
 
   it('clears the block and moves on once the server agrees it is clear', async () => {
     api.getReadiness
-      .mockResolvedValueOnce({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] })
-      .mockResolvedValue({ unreviewedGates: [] });
+      .mockResolvedValueOnce(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }))
+      .mockResolvedValue(readiness());
     gates();
 
     fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
 
     await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // AND THE FILE MOVES WITH IT. This step wrote nothing, so a setup finished through the reading step
+  // left `docs` on disk — which is what `wizardFrame` keys on, and what a resume re-offers the
+  // rewrite from. From a fresh read for the docs step's reason: the summaries the copilot filed are
+  // in the file and not in this screen, and `putWizard` replaces it whole.
+  it('writes the step it moved to, carrying what is in the file', async () => {
+    const written = {
+      mode: 'greenfield',
+      step: 'gates',
+      answers: { what: 'a tool for reading meters' },
+      resumes: { 'CODE-QUALITY.md': 'The commands your work has to pass.' },
+    };
+    api.getWizard.mockResolvedValue({ state: written });
+    api.getReadiness
+      .mockResolvedValueOnce(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }))
+      .mockResolvedValue(readiness());
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
     expect(await screen.findByText('That is setup done')).toBeTruthy();
   });
 
@@ -1664,7 +1811,7 @@ describe('the words on every step (W7)', () => {
     // And the gate step, whose documents are full of the words this sweeps for — inside the fold,
     // where they belong, so what is read here is the sentence asking somebody to open one.
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
-    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md'] });
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
     api.listControlFiles.mockResolvedValue([
       {
         key: 'foundation',

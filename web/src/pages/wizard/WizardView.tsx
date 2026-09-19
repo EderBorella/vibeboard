@@ -183,8 +183,9 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     body = <FormStep mode={mode} snapshot={snapshot} notice={scanNotice} onContinue={leaveForm} />;
   else if (step === 'stack')
     body = <StackStep mode={mode} snapshot={snapshot} bump={bump} onContinue={leaveStack} />;
-  else if (step === 'docs') body = <DocsStep snapshot={snapshot} bump={bump} onContinue={setStep} />;
-  else if (step === 'gates') body = <GatesStep onContinue={leaveGates} />;
+  else if (step === 'docs')
+    body = <DocsStep mode={mode} snapshot={snapshot} bump={bump} onContinue={setStep} />;
+  else if (step === 'gates') body = <GatesStep mode={mode} onContinue={leaveGates} />;
   else body = <HandoffStep />;
 
   return (
@@ -1033,20 +1034,28 @@ const KICKOFF = "Please set up this project's documents from my answers.";
 // generation, so the turn sent here is the same conversation the dock shows, with the same transcript
 // on the server.
 function DocsStep({
+  mode,
   snapshot,
   bump,
   onContinue,
 }: {
+  mode: ScaffoldMode;
   snapshot: ProjectSnapshot | null;
   bump: number;
   // WHICH step is next is this one's to say, because the answer is the readiness the turn just
-  // changed — the backend step's rule, for the same reason.
+  // changed. The FILE is this step's to move too, and it is a fresh read that moves it — see
+  // `leave` below: the copilot writes its summaries into the file while the turn runs, so the copy
+  // read on entry is stale by exactly the thing this step produced.
   onContinue: (next: WizardStep) => void;
 }) {
+  const { read, failed: readFailed, retry, saved } = useSaved(mode);
   const { confirm, dialog } = useConfirm();
   const { items, running, send, cancel, sentAt, lastEventAt } = useCopilot(bump);
   const [sent, setSent] = useState(false);
-  const [resumes, setResumes] = useState<Record<string, string>>({});
+  // The summaries as the poll below last saw them. `undefined` is "not read since this screen
+  // mounted", which falls back to the file's own — a setup resumed here shows what was written last
+  // time rather than an empty list under a heading about writing.
+  const [polled, setPolled] = useState<Record<string, string>>();
   const started = useRef(false);
   // A turn that never began cannot have ended: `running` is false before the first frame, and an
   // ending read off that alone would walk the person off this screen the moment they authorised.
@@ -1056,7 +1065,14 @@ function DocsStep({
   // Full-auto, clamped to what this assistant actually publishes — the model is writing files
   // unattended, which is the whole of what this step is. Nothing else is sent with the turn: the
   // config holds the assistant, the model and the effort, and the server falls back to them.
-  const { mode } = clampToCaps(resolveChoice(snapshot?.config.copilot, {}), 'bypassPermissions');
+  const { mode: turnMode } = clampToCaps(resolveChoice(snapshot?.config.copilot, {}), 'bypassPermissions');
+  const resumes = polled ?? saved('docs').resumes ?? {};
+  // ALREADY WRITTEN FOR, and the question this screen opens with rewrites the README and all five
+  // documents. Raising it over a project that has them is an offer to destroy work phrased as an
+  // offer to start, so a resume lands on the summaries instead and asks nothing. Plan D replaces this
+  // holding screen with the review layout — the résumé cards beside the conversation — and the person's
+  // own button becomes the only way past.
+  const written = read && Object.keys(saved('docs').resumes ?? {}).length > 0;
 
   const ask = useCallback(async (): Promise<void> => {
     const ok = await confirm({
@@ -1071,18 +1087,19 @@ function DocsStep({
       // and could not write a single foundation document. `setCopilotAuthority` on the hook is
       // fire-and-forget for a button that reflects a state; this is a sequence.
       await setAuthority(true);
-      send(KICKOFF, { mode });
+      send(KICKOFF, { mode: turnMode });
       setSent(true);
     });
-  }, [confirm, run, send, mode]);
+  }, [confirm, run, send, turnMode]);
 
   useEffect(() => {
-    // Waits for the project's own settings: what the turn is sent WITH is read off the snapshot, and
-    // asking before it lands would send one assistant's mode to whichever one is configured.
-    if (!snapshot || started.current) return;
+    // Waits for the project's own settings AND for the file. What the turn is sent WITH is read off
+    // the snapshot; WHETHER to offer one at all is read off the summaries already on disk, and an
+    // offer raised before that lands is the rewrite this step must not perform unasked.
+    if (!snapshot || !read || started.current) return;
     started.current = true;
-    void ask();
-  }, [snapshot, ask]);
+    if (!written) void ask();
+  }, [snapshot, read, written, ask]);
 
   useEffect(() => {
     // A RÉSUMÉ IS STORED BY A TOOL CALL, and every tool call is an item in this transcript — so the
@@ -1090,9 +1107,30 @@ function DocsStep({
     // happening, and never at the moment something did.
     if (items.length === 0) return;
     void getWizard()
-      .then(({ state }) => setResumes(state?.resumes ?? {}))
+      .then(({ state }) => setPolled(state?.resumes ?? {}))
       .catch(() => {});
   }, [items.length]);
+
+  // WHERE SETUP GOES NEXT, AND THE FILE SAYING SO. The step used to move the screen and write nothing,
+  // so the file sat at `docs` after every exit but the last — and `wizardFrame` keys on that step, so
+  // it prefixed every later conversation on the project with a brief about writing documents, and a
+  // resume re-offered the rewrite.
+  //
+  // FROM A FRESH READ rather than the entry one, because the copilot files its summaries into this
+  // file during the turn and `putWizard` replaces it whole. The stack step's settle-read exactly.
+  //
+  // A FAILED WRITE STILL ADVANCES: the documents exist, and holding somebody on the screen that offers
+  // to write them again is the worse of the two — a file left at `docs` resumes onto the summaries.
+  const leave = useCallback(
+    async (next: WizardStep): Promise<void> => {
+      const latest = await getWizard()
+        .then((r) => r.state ?? undefined)
+        .catch(() => undefined);
+      await putWizard({ ...(latest ?? saved(next)), step: next }).catch(() => {});
+      onContinue(next);
+    },
+    [onContinue, saved],
+  );
 
   const finish = useCallback(async (): Promise<void> => {
     // Writing CODE-QUALITY.md or TESTING.md as an agent blocks auto-pilot until a person has read it
@@ -1101,8 +1139,8 @@ function DocsStep({
     const unread = await getReadiness()
       .then((r) => r.unreviewedGates)
       .catch(() => []);
-    onContinue(unread.length > 0 ? 'gates' : 'handoff');
-  }, [onContinue]);
+    await leave(unread.length > 0 ? 'gates' : 'handoff');
+  }, [leave]);
 
   useEffect(() => {
     if (running) {
@@ -1122,16 +1160,22 @@ function DocsStep({
   // doing rather than that it is doing something.
   const tool = items.filter((item) => item.kind === 'tool').at(-1)?.toolName;
 
+  // The holding screen, and only until this visit sends a turn of its own: `Carry on writing` is an
+  // ordinary offer once accepted, and the turn it starts belongs on the writing screen.
+  const holding = written && !sent;
+
   return (
     <>
       <Text as="h2" size="title" ink="strong" family="display">
         Writing it all down
       </Text>
       <Text role="hint">
-        Your assistant writes the README and five short guiding documents from your answers. Where it has to
-        guess, it says so in the document rather than guessing quietly.
+        {holding
+          ? 'These are already written. Read them below, ask for more, or carry on — nothing here is changed unless you ask for it.'
+          : 'Your assistant writes the README and five short guiding documents from your answers. Where it has to guess, it says so in the document rather than guessing quietly.'}
       </Text>
 
+      {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
       {running && <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />}
       {/* ONE LINE, THE LATEST, as the build log shows itself on the machine check: what a person needs
           from a turn this long is evidence it is still moving, not the transcript. */}
@@ -1153,7 +1197,19 @@ function DocsStep({
           Something went wrong while it was writing — you can ask it to try again.
         </Notice>
       )}
-      {!running && (!sent || failed) && (
+      {holding && (
+        <Stack gap={4}>
+          {/* The offer, put back deliberately rather than raised on arrival: the person asking for
+              more writing knows what they have, and the effect above does not. */}
+          <Button disabled={busy !== null} onClick={() => void ask()}>
+            Carry on writing
+          </Button>
+          <Button variant="primary" disabled={busy !== null} onClick={() => void finish()}>
+            Continue
+          </Button>
+        </Stack>
+      )}
+      {!holding && !running && (!sent || failed) && (
         <Stack gap={4}>
           <Button variant="primary" disabled={busy !== null} onClick={() => void ask()}>
             Write the drafts
@@ -1190,21 +1246,39 @@ function GateDocument({ name, path }: { name: string; path?: string }) {
 // either blocks auto-pilot until somebody has read it. The block is cleared by a person saying they
 // have, and by nothing else; this is that moment, put where the change happened rather than left to a
 // refused Start days later.
-function GatesStep({ onContinue }: { onContinue: () => void }) {
+function GatesStep({ mode, onContinue }: { mode: ScaffoldMode; onContinue: () => void }) {
   // Asked again after the acknowledgement, and that second answer is what moves the screen on.
   const [asked, setAsked] = useState(0);
+  const { saved } = useSaved(mode);
   const { readiness } = useReadiness(asked);
   const { value: groups } = useFetched(listControlFiles, [], NO_GROUPS);
   const { busy, error, run } = useAction();
   const names = readiness?.unreviewedGates ?? [];
   const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
+  // Once, whatever the effect below is re-run by. `leave` is rebuilt on every render — `saved` is —
+  // so without this the write would repeat for as long as the parent took to unmount this step.
+  const moved = useRef(false);
+
+  // THE FILE MOVES WITH THE SCREEN, from a fresh read, for the docs step's reason: the summaries the
+  // copilot filed are in the file rather than in this screen, and `putWizard` replaces it whole. A
+  // setup finished through this step used to leave `docs` on disk, which is the step `wizardFrame`
+  // keys on and the step a resume re-offers the rewrite from.
+  const leave = useCallback(async (): Promise<void> => {
+    const latest = await getWizard()
+      .then((r) => r.state ?? undefined)
+      .catch(() => undefined);
+    await putWizard({ ...(latest ?? saved('handoff')), step: 'handoff' }).catch(() => {});
+    onContinue();
+  }, [onContinue, saved]);
 
   // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. Acknowledging is the server's to accept, and a screen
   // that moved on before it answered would put somebody past a block that is still there — and the
   // next thing they press is Start.
   useEffect(() => {
-    if (asked > 0 && names.length === 0) onContinue();
-  }, [asked, names.length, onContinue]);
+    if (moved.current || asked === 0 || names.length > 0) return;
+    moved.current = true;
+    void leave();
+  }, [asked, names.length, leave]);
 
   const acknowledge = (): void => {
     void run(async () => {

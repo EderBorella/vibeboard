@@ -12,6 +12,7 @@ import {
   PROJECT_LOG_FILE,
   RESULTS_DIR,
   RUNS_DIR,
+  WIZARD_FILE,
 } from '../src/core/layout.js';
 import { isIgnored, ProjectSession } from '../src/server/boards/session.js';
 import type { ProjectSnapshot } from '../src/server/boards/snapshot.js';
@@ -86,6 +87,7 @@ describe('isIgnored', () => {
     `/p/${RUNS_DIR}/r1.log.jsonl`,
     `/p/${PROJECT_LOG_FILE}`,
     `/p/${AUTOPILOT_STATE_FILE}`,
+    `/p/${WIZARD_FILE}`,
   ])('ignores %s', (p) => {
     expect(isIgnored(p)).toBe(true);
   });
@@ -101,6 +103,8 @@ describe('isIgnored', () => {
     `/p/docs/${PROJECT_LOG_FILE.split('/').pop()}`,
     // Same again for the state file: one exact path, not a filename anywhere in the tree.
     `/p/docs/${AUTOPILOT_STATE_FILE.split('/').pop()}`,
+    // And for the wizard's scratch file — a project of somebody's own may hold a `wizard.yaml`.
+    `/p/docs/${WIZARD_FILE.split('/').pop()}`,
   ])('watches %s', (p) => {
     expect(isIgnored(p)).toBe(false);
   });

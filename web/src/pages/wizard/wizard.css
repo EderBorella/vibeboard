@@ -20,9 +20,21 @@
    386px, 686px and 926px and check 3 finds nothing.
    THE WHOLE STEP AND NOT THE REVIEW ALONE: the writing screen renders the same cards in the same box,
    so a width that changed when the review opened would slide six documents sideways at the moment
-   somebody starts reading them — and the heading and hint above them are full-width on both screens
-   either way, so restricting it buys no prose back.
+   somebody starts reading them.
+   THE HEADING AND THE HINT ARE NOT PART OF THE BARGAIN, and this comment used to say they were: "full-
+   width on both screens either way, so restricting it buys no prose back". They were, and it bought
+   1198px of hint at a 1280 viewport. They keep the measure through `.wizard-prose` below.
    `none` RATHER THAN A WIDER MEASURE, because this is a workspace and not a page: the board, Project
    Control and the Explorer all fill the window, and any second measure here would be a number picked
    to clear the dock's 420px rather than to make a line readable. */
 .wizard-wide { max-width: none; }
+
+/* THE ONE THING `.wizard-wide` TOOK THAT NOTHING WANTED. Off the measure, the documents step draws its
+   heading and its hint at the width of the window: 1198px at 1280, measured in the browser harness,
+   which is about 200 characters on a line where five is the whole of the product's type scale and 68ch
+   is what every other page is held to. The cards and the conversation are what the width is FOR, so the
+   measure comes back on the prose alone rather than on the card.
+   THE CONTAINER IS THE HEADING AND THE HINT, and it is a `Stack` gapped at `--s-5` so the pair sits
+   exactly as it did when both were direct children of the card. A max-width is the one thing no atom
+   can carry — the same reason `.wizard-card` exists at all. */
+.wizard-prose { max-width: var(--measure); }

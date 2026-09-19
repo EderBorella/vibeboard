@@ -1521,6 +1521,10 @@ describe('the docs step', () => {
     return card;
   };
 
+  // SAYING "THIS ONE". It was a click anywhere on the card and is the card's FACE now — a real control,
+  // because the gesture had no tab stop, no focus ring and no Enter when it was a handler on the box.
+  const face = (plain: string): HTMLElement => within(cardFor(plain)).getByRole('button', { name: plain });
+
   // A message typed into the embedded conversation and sent, which is the loop: the person reads a
   // summary, dislikes something, and says so. The composer is the dock's own organism wearing this
   // screen's label — `compact` drops the header and the panel takes its placeholder from the embedder,
@@ -1657,6 +1661,31 @@ describe('the docs step', () => {
     expect(
       screen.getByText('Something went wrong while it was writing — you can ask it to try again.'),
     ).toBeTruthy();
+  });
+
+  // AND A FAILURE BELONGS TO THE TURN IT HAPPENED IN, which is the other end of the same rule. The
+  // scan window was opened once, by the offer, and never moved — so the report from a turn that fell
+  // over stayed on the screen under every turn after it, including the one the person asked for to
+  // fix it. "Something went wrong while it was writing" over a rewrite that has just succeeded is a
+  // screen accusing itself.
+  it('takes the failure down when a later turn goes through', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'error', text: 'it fell over' } });
+    });
+    await turn(false);
+
+    // The premise: the report really is on the screen before the second turn, or the assertion below
+    // is about a sentence that was never there.
+    expect(screen.getByText(/Something went wrong while it was writing/)).toBeTruthy();
+
+    await turn(true);
+    await turn(false);
+
+    expect(screen.queryByText(/Something went wrong while it was writing/)).toBeNull();
   });
 
   // A TURN THAT NEVER STARTED CANNOT HAVE ENDED. `running` is false before the first frame, so an
@@ -1987,6 +2016,23 @@ describe('the docs step', () => {
       expect(screen.queryAllByTestId('doc-card')).toHaveLength(0);
     });
 
+    // A NAME THIS PRODUCT DOES NOT KNOW GETS NO CARD, and the card it used to get was broken in both
+    // directions: the listing has no path for it, so `Read it all` sits on `Opening…` for ever, and
+    // saying "this one" about it blanks the selector above the chat, because that list is the six.
+    // It can only arrive by hand-editing `wizard.yaml` — the server refuses a résumé filed under any
+    // other name — so what is being refused here is a broken card, not a document.
+    it('renders no card for a name outside the six', async () => {
+      filed({ ...SUMMARIES, 'NOTES.md': 'Typed into the file by hand, under a name setup never writes.' });
+      await screen.findAllByTestId('doc-card');
+
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+      expect(screen.queryByText('Typed into the file by hand, under a name setup never writes.')).toBeNull();
+      expect(screen.queryByText('NOTES.md')).toBeNull();
+      // AND THE SELECTOR AGREES WITH THE CARDS, which is the half that makes this one fault rather
+      // than two: both read `DOC_NAMES`, so neither can offer a subject the other cannot show.
+      expect([...(screen.getByLabelText('Talking about') as HTMLSelectElement).options]).toHaveLength(7);
+    });
+
     it('offers no reading of a document that has not been written', async () => {
       filed({ 'README.md': SUMMARIES['README.md'] });
       await screen.findAllByTestId('doc-card');
@@ -2095,7 +2141,7 @@ describe('the docs step', () => {
       filed(SUMMARIES);
       await screen.findByRole('button', { name: ADVANCE });
 
-      fireEvent.click(cardFor('Quality gates'));
+      fireEvent.click(face('Quality gates'));
 
       expect((screen.getByLabelText('Talking about') as HTMLSelectElement).value).toBe('CODE-QUALITY.md');
       say('these commands are not the ones I run');
@@ -2104,6 +2150,43 @@ describe('the docs step', () => {
         text: 'these commands are not the ones I run',
         attach: 'CODE-QUALITY.md',
       });
+    });
+
+    // THE GESTURE IS A CONTROL, AND THIS IS THE HALF A CLICK TEST CANNOT SEE. It was `onClick` on the
+    // card's box: a mouse could say "this one" and a keyboard could not — no tab stop, no focus ring,
+    // nothing Enter would reach — and the offer to read the document sat INSIDE that click target.
+    //
+    // ASSERTED AS STRUCTURE RATHER THAN AS A KEYPRESS, because jsdom does not implement a button's
+    // activation behaviour: measured here, a keydown of Enter on a focused `<button>` fires no click
+    // at all, so a test that pressed it would prove the opposite of what it claimed. What makes Enter
+    // and Space work is the element being a real button, which is what this pins; the browser harness
+    // then walks the actual tab order and the focus ring on every one of them (check 8).
+    it('puts the “this one” gesture on a real button, with nothing nested inside it', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      const gesture = face('Quality gates');
+      expect(gesture.tagName).toBe('BUTTON');
+      expect(gesture.getAttribute('type')).toBe('button');
+      expect(gesture.hasAttribute('disabled')).toBe(false);
+      // NOTHING INTERACTIVE INSIDE IT, and `Read it all` is its sibling rather than its child — a
+      // control inside a control is a click whose meaning depends on where in it you landed.
+      expect(gesture.querySelector('button, a, input, select, textarea')).toBeNull();
+      expect(cardFor('Quality gates').hasAttribute('onclick')).toBe(false);
+
+      gesture.focus();
+      expect(document.activeElement).toBe(gesture);
+    });
+
+    // AND OPENING A DOCUMENT STILL SAYS IT TOO, which is what the whole-card click was really for:
+    // somebody who has just pressed Read it all is looking at that document by any definition.
+    it('takes “Read it all” as saying this one as well', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      fireEvent.click(within(cardFor('How it feels')).getByRole('button', { name: 'Read it all' }));
+
+      expect((screen.getByLabelText('Talking about') as HTMLSelectElement).value).toBe('UX.md');
     });
 
     it('offers the six by name and rides whichever is chosen, until it is changed', async () => {
@@ -2128,7 +2211,7 @@ describe('the docs step', () => {
     it('carries no document at all once the selector is put back', async () => {
       filed(SUMMARIES);
       await screen.findByRole('button', { name: ADVANCE });
-      fireEvent.click(cardFor('Quality gates'));
+      fireEvent.click(face('Quality gates'));
 
       fireEvent.change(screen.getByLabelText('Talking about'), { target: { value: '' } });
       say('is any of this going to change once I start?');
@@ -2152,6 +2235,26 @@ describe('the docs step', () => {
 
       await turn(false);
       expect(screen.getByRole('button', { name: ADVANCE }).hasAttribute('disabled')).toBe(false);
+    });
+
+    // THREE CLICKS, ONE ADVANCE. The button is `disabled` while an action is in flight and nothing was
+    // raising that flag: the press read the readiness and wrote the file with no `busy` in between, so
+    // an impatient double-click on a slow network asked twice and wrote the step twice. Written as
+    // three clicks in one tick because that is the shape of the fault — the second press lands before
+    // the answer to the first.
+    it('asks and writes once however many times it is pressed', async () => {
+      const asked = deferred<Readiness>();
+      api.getReadiness.mockReturnValue(asked.promise);
+      filed(SUMMARIES);
+      const advance = await screen.findByRole('button', { name: ADVANCE });
+
+      fireEvent.click(advance);
+      fireEvent.click(advance);
+      fireEvent.click(advance);
+      await asked.settle(readiness());
+
+      expect(api.getReadiness).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledTimes(1));
     });
 
     // THE PRESS ASKS THE MACHINE AGAIN, because the conversation has been writing documents since the

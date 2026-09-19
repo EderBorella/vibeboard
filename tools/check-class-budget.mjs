@@ -278,7 +278,14 @@ const PRIMITIVE_LAYER = [
 // overflowing it four ways. No atom in this tree can say a measure, which is what `.wizard-card` was
 // allowed for, and none can unsay one either. The reason in full is on the rule in pages/wizard/wizard.css.
 // Zero slack is restored at 221.
-const CLASS_CEILING = 221;
+// 221 -> 222 ON 2026-09-19, FOR `.wizard-prose`, and it is the bill for `.wizard-wide` rather than a
+// second helping of it. Taking the documents step off `--measure` took the HEADING AND THE HINT off it
+// too: the browser harness drew the pair 1198px wide at a 1280 viewport, about 200 characters to a line,
+// on the one screen in setup where the person is being asked to read carefully. The cards and the
+// conversation are what the width is for; the prose is not, and a measure is the thing no atom in this
+// tree can say — which is the ruling `.wizard-card` was allowed under, applied to the inverse case.
+// Zero slack is restored at 222.
+const CLASS_CEILING = 222;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

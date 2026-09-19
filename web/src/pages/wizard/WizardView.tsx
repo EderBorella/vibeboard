@@ -1122,13 +1122,26 @@ function DocumentCard({
     [open, path],
     null,
   );
+  const plain = DOC_NAMES[name] ?? name;
+  // SAYING "THIS ONE" IS A CONTROL, NOT A CLICK ON THE BOX. The whole card carried the handler, which
+  // is reachable by mouse and by nothing else: no tab stop, no focus ring, no Enter — and it put a
+  // click target around the button inside it. The FACE takes it instead, which is the part that names
+  // the document, and `Read it all` stays its sibling rather than its child.
+  //
+  // OPENING STILL SAYS IT TOO, which is what the old whole-card gesture was really for: somebody who
+  // has just pressed Read it all is looking at that document by any definition, and the conversation
+  // beside them should not need telling twice.
+  const attach = onAttach && (() => onAttach(name));
   return (
-    // THE WHOLE CARD IS THE "THIS ONE" GESTURE, opening it included: a person who has just pressed
-    // Read it all is looking at that document by any definition, so the click that opens it sets the
-    // subject too rather than being swallowed on its way past.
-    <Surface variant="inset" data-testid="doc-card" onClick={onAttach && (() => onAttach(name))}>
+    <Surface variant="inset" data-testid="doc-card">
       <Stack direction="column" gap={3}>
-        <Text ink="strong">{DOC_NAMES[name] ?? name}</Text>
+        {attach ? (
+          <Button align="start" onClick={attach} title={`Talk about ${plain}`}>
+            {plain}
+          </Button>
+        ) : (
+          <Text ink="strong">{plain}</Text>
+        )}
         {summary === undefined ? (
           // AN ABSENCE HAS TO BE ON THE SCREEN. Rendering only what was written turns a six-document
           // project with three summaries into a three-document project, and the person reviewing it
@@ -1144,7 +1157,14 @@ function DocumentCard({
               {summary}
             </Text>
             <Stack gap={4}>
-              <Button onClick={() => setOpen(!open)}>{open ? 'Hide it again' : 'Read it all'}</Button>
+              <Button
+                onClick={() => {
+                  attach?.();
+                  setOpen(!open);
+                }}
+              >
+                {open ? 'Hide it again' : 'Read it all'}
+              </Button>
             </Stack>
           </>
         )}
@@ -1167,9 +1187,15 @@ function DocumentCard({
 }
 
 // THE FULL SET, ALWAYS, IN THE ORDER THE DOCUMENTS ARE WRITTEN. A summary that has not been filed is
-// a card that says so rather than a card that is missing. A name the file carries that this product
-// does not know can only arrive by hand-editing `wizard.yaml` — it is shown last, under its filename,
-// for `Unwritten`'s reason: an unknown document is still a document.
+// a card that says so rather than a card that is missing.
+//
+// AND THE SET IS `DOC_NAMES`, WHICH IS NOT THE SAME AS "WHATEVER IS IN THE FILE". A name outside it can
+// only arrive by hand-editing `wizard.yaml` — the server refuses a résumé filed against any other name
+// — and the card it used to get was broken in both directions: the listing has no path for it, so
+// `Read it all` opens on `Opening…` for ever, and clicking it sets a subject the selector above the
+// chat has no option for, so the selector goes blank and the person cannot see what "it" now means.
+// A card that cannot be read and cannot be talked about is not a document; showing it said the
+// opposite.
 function DocumentCards({
   resumes,
   running,
@@ -1187,7 +1213,7 @@ function DocumentCards({
 }) {
   const { value: groups } = useFetched(listControlFiles, [], NO_GROUPS);
   const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
-  const names = [...Object.keys(DOC_NAMES), ...Object.keys(resumes).filter((name) => !(name in DOC_NAMES))];
+  const names = Object.keys(DOC_NAMES);
   // NOTHING AT ALL UNTIL THE WRITING HAS BEGUN — a turn running, or something already filed. Six
   // cards saying "no summary yet" under an offer to write them is a list of things that do not exist.
   // Asked here rather than at the call site: the step that renders this has a complexity budget, and
@@ -1488,29 +1514,35 @@ function DocsStep({
     [onContinue, saved],
   );
 
+  // THROUGH `run`, WHICH IS WHAT MAKES THE SECOND PRESS DO NOTHING. The advance is disabled on `busy`
+  // and nothing was setting it: the press read the readiness and wrote the file with no flag raised in
+  // between, so three clicks while the network was slow asked three times and wrote the step three
+  // times. The button's own `disabled` was answering a question nobody had asked it.
   const finish = useCallback(async (): Promise<void> => {
-    // ONE READ, THREE QUESTIONS, and it used to ask only the third. Writing CODE-QUALITY.md or
-    // TESTING.md as an agent blocks auto-pilot until a person has read it (decision 51), and the
-    // copilot has just been told to write both — but the same response also says whether the README
-    // and the five documents are THERE, and a turn that died four documents in walked the person to
-    // "that is setup done" over a project with none of them.
-    //
-    // A FAILED READ IS NOT EVIDENCE OF A MISSING DOCUMENT, so it hands over rather than accusing: the
-    // question this asks is answerable again on the next screen, and holding somebody here over a
-    // hiccup is the fault the machine check's own failure case names.
-    const state = await getReadiness().catch(() => undefined);
-    if (state) {
-      // THE README IS NOT A FOUNDATION DOCUMENT and is answered by its own field, so a turn that
-      // wrote all five and never touched it is a state `foundation.missing` cannot see. First,
-      // because it is written first and read first.
-      const missing = [...(state.readme.ok ? [] : ['README.md']), ...state.foundation.missing];
-      if (missing.length > 0) {
-        setUnwritten(missing);
-        return;
+    await run(async () => {
+      // ONE READ, THREE QUESTIONS, and it used to ask only the third. Writing CODE-QUALITY.md or
+      // TESTING.md as an agent blocks auto-pilot until a person has read it (decision 51), and the
+      // copilot has just been told to write both — but the same response also says whether the README
+      // and the five documents are THERE, and a turn that died four documents in walked the person to
+      // "that is setup done" over a project with none of them.
+      //
+      // A FAILED READ IS NOT EVIDENCE OF A MISSING DOCUMENT, so it hands over rather than accusing: the
+      // question this asks is answerable again on the next screen, and holding somebody here over a
+      // hiccup is the fault the machine check's own failure case names.
+      const state = await getReadiness().catch(() => undefined);
+      if (state) {
+        // THE README IS NOT A FOUNDATION DOCUMENT and is answered by its own field, so a turn that
+        // wrote all five and never touched it is a state `foundation.missing` cannot see. First,
+        // because it is written first and read first.
+        const missing = [...(state.readme.ok ? [] : ['README.md']), ...state.foundation.missing];
+        if (missing.length > 0) {
+          setUnwritten(missing);
+          return;
+        }
       }
-    }
-    await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
-  }, [leave]);
+      await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
+    });
+  }, [leave, run]);
 
   // THE SETTLE OPENS THE REVIEW AND DOES NOTHING ELSE. It used to call `finish` — read the readiness,
   // write the file, change the step — which is a machine deciding that six documents it has never
@@ -1519,6 +1551,14 @@ function DocsStep({
   useEffect(() => {
     if (running) {
       ran.current = true;
+      // A NEW TURN IS A NEW WINDOW, and without this the report never went away: `failed` scans from
+      // the mark `ask` set, so the error from a turn that fell over stayed inside the scan for every
+      // turn after it — ask for a rewrite from the composer, watch it succeed, and "something went
+      // wrong while it was writing" is still on the screen underneath it. Moved here rather than into
+      // the composer's path because this is the only place that knows a turn STARTED, whoever sent it.
+      // A turn refused before it began never raises `running`, so the offer it belongs to still sees
+      // its error.
+      mark.current = committed.current;
       return;
     }
     if (!ran.current) return;
@@ -1536,14 +1576,21 @@ function DocsStep({
 
   return (
     <>
-      <Text as="h2" size="title" ink="strong" family="display">
-        Writing it all down
-      </Text>
-      <Text role="hint">
-        {review
-          ? 'Read the short summaries. Anything you want said differently, say so in the chat — click the document first, so it knows which one you mean.'
-          : 'Your assistant writes the README and five short guiding documents from your answers. Where it has to guess, it says so in the document rather than guessing quietly.'}
-      </Text>
+      {/* THE PROSE KEEPS THE MEASURE THE STEP GAVE UP. `.wizard-wide` takes the card off `--measure`
+          because the review is a workspace — six cards beside a conversation — and the heading and the
+          hint went with it: at 1280 the pair was drawn 1198px wide, which is roughly 200 characters on
+          one line and unreadable by the rule the rest of the product is held to. The container is the
+          two of them and nothing else; the cards below are the part that wants the window. */}
+      <Stack direction="column" gap={5} className="wizard-prose">
+        <Text as="h2" size="title" ink="strong" family="display">
+          Writing it all down
+        </Text>
+        <Text role="hint">
+          {review
+            ? 'Read the short summaries. Anything you want said differently, say so in the chat — click the document first, so it knows which one you mean.'
+            : 'Your assistant writes the README and five short guiding documents from your answers. Where it has to guess, it says so in the document rather than guessing quietly.'}
+        </Text>
+      </Stack>
 
       {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
       {/* NOT ONCE THE REVIEW IS UP: the panel beside the cards carries this same indicator, with the

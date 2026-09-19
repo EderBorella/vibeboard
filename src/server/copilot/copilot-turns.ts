@@ -1,5 +1,6 @@
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { classifyCopilotError } from '../../core/copilot-errors.js';
+import { readWizardState } from '../../store/project/wizard.js';
 import { redactCredential } from '../../store/redaction.js';
 import type { Credential } from '../auth/credentials.js';
 import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
@@ -8,6 +9,7 @@ import { errorText } from '../errors.js';
 import type { AppCtx, WsClient } from '../route-context.js';
 import { assistCredentialSection } from '../runs/prompt/credential.js';
 import type { Backend, CopilotMode, EffortLevel } from './copilot.js';
+import { wizardFrame } from './wizard-frame.js';
 
 // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
 // and is the only persisted source; anything omitted here falls back to it. Precedence
@@ -116,7 +118,12 @@ export function createCopilotTurns(ctx: AppCtx): {
       // for ending it eagerly on every chat and project change rather than only on a send. The
       // exposure and its limits are stated in full in docs/security/containment.md.
       const credential = await turnCredential(root);
-      const modelText = credential ? withCredential(credential.token, text) : text;
+      // AND THE SAME SPLIT AGAIN, for the wizard's brief: it is about the person, so the person must
+      // not be reading it in their own transcript. Composed here rather than in the browser's message
+      // because a brief the client sends is a brief the client can edit. decision 77.
+      const frame = wizardFrame(await readWizardState(root));
+      const framed = frame ? `${frame}\n\n---\n\n${text}` : text;
+      const modelText = credential ? withCredential(credential.token, framed) : framed;
       const choice = resolveCopilotSelection(session.config?.copilot, {
         backend: opts.backend,
         model: opts.model,

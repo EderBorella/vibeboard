@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FOUNDATION_FILES } from '../src/core/layout.js';
+import { FOUNDATION_FILES, foundationRel } from '../src/core/layout.js';
 import { defaultConfig } from '../src/store/project/config.js';
 import type { Readiness, SandboxState } from '../web/src/lib/api.js';
 import type { ProjectConfig, ProjectSnapshot, WizardState } from '../web/src/lib/shared.js';
@@ -35,6 +35,12 @@ const api = vi.hoisted(() => ({
   acknowledgeGates: vi.fn().mockResolvedValue({ ok: true }),
   listControlFiles: vi.fn().mockResolvedValue([]),
   getControlFile: vi.fn().mockResolvedValue({ content: '' }),
+  // The README is not a control file — it lives at the project root — so the card that opens it goes
+  // through the explorer's door instead. The two reads are different endpoints and this is the fake
+  // for the second one.
+  readFsFile: vi
+    .fn()
+    .mockResolvedValue({ kind: 'text', path: 'README.md', name: 'README.md', size: 0, content: '' }),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -1491,7 +1497,9 @@ describe('the docs step', () => {
     await turn(true);
 
     expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
-    expect(screen.getByText('README.md')).toBeTruthy();
+    // IN WORDS, NOT AS A FILENAME, which is what this assertion said until the cards landed: the card
+    // face is the plain name and the filename waits on the view that opens the file (decision 78).
+    expect(screen.getByText('The introduction')).toBeTruthy();
 
     // The tool name comes off the transcript rather than out of the file, so it needs no read.
     await act(async () => {
@@ -1751,6 +1759,165 @@ describe('the docs step', () => {
       expect(await screen.findByText('That is setup done')).toBeTruthy();
       expect(ws.sent).toHaveLength(0);
       await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+    });
+  });
+
+  // THE SIX DOCUMENTS AS SOMETHING A PERSON CAN READ (W7, decision 78). A summary first, because a
+  // beginner asked to review six documents they did not write will read none of them; the document
+  // itself one press away, because the summary is the model's account of it and the file is the fact.
+  describe('the résumé cards', () => {
+    const SUMMARIES: Record<string, string> = {
+      'README.md': 'What the project is, in a paragraph.',
+      'STACK.md': 'TypeScript, Vite and vitest.',
+      'CODE-QUALITY.md': 'The commands your work has to pass.',
+      'TESTING.md': 'What a test is for here.',
+      'UX.md': 'Plain screens, and few choices at a time.',
+      'DESIGN.md': 'One type scale and four corners.',
+    };
+    // Every plain name the map holds. Hand-written on purpose: this is the one place the WORDS are
+    // the subject, and deriving them from the same map the screen reads would assert nothing.
+    const PLAIN = [
+      'The introduction',
+      'The stack',
+      'Quality gates',
+      'Testing',
+      'How it feels',
+      'How it looks',
+    ];
+
+    // THE PATH COMES FROM THE LISTING, exactly as the gates step opens its documents — where a
+    // foundation document lives is the server's fact and not a copy of the layout kept in the browser.
+    const listing = [
+      {
+        key: 'foundation',
+        label: 'Foundation',
+        creatable: false,
+        files: FOUNDATION_FILES.map((f) => ({
+          name: f.name,
+          path: foundationRel(f.name),
+          category: 'foundation',
+          managed: true,
+          deletable: false,
+          renameable: false,
+        })),
+      },
+    ];
+
+    const filed = (resumes: Record<string, string>) => {
+      api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs', resumes } });
+      api.listControlFiles.mockResolvedValue(listing);
+      return docs();
+    };
+
+    const cardFor = (plain: string): HTMLElement => {
+      const card = screen.getAllByTestId('doc-card').find((c) => (c.textContent ?? '').startsWith(plain));
+      if (!card) throw new Error(`no card reading "${plain}"`);
+      return card;
+    };
+
+    it('wears the plain name and the summary, one card per document', async () => {
+      filed(SUMMARIES);
+
+      for (const plain of PLAIN) expect(await screen.findByText(plain)).toBeTruthy();
+      for (const summary of Object.values(SUMMARIES)) expect(screen.getByText(summary)).toBeTruthy();
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+    });
+
+    // THE TRIPWIRE FOR THIS SURFACE, and the same shape as the plain-words sweep: a filename is the
+    // one thing a beginner cannot act on, and six of them down the side of the review screen is the
+    // wizard talking to itself. Swept rather than named one by one, so a seventh card is covered by
+    // this the day it is added.
+    it('puts no filename on any card face', async () => {
+      filed(SUMMARIES);
+      // Waited for BY HANDLE and not by one of the plain names: a sweep whose premise is the very
+      // thing it sweeps for cannot fail on the fault it names — put the filenames back on the faces
+      // and this would have died at the `findByText` above, with the assertion below never reached.
+      await screen.findAllByTestId('doc-card');
+
+      for (const card of screen.getAllByTestId('doc-card')) {
+        const face = card.textContent ?? '';
+        expect(face.length, 'a card rendered almost nothing').toBeGreaterThan(10);
+        expect(face, face).not.toContain('.md');
+      }
+    });
+
+    // A MISSING SUMMARY MUST BE VISIBLE, NOT ABSENT. Rendering only what was written turns a
+    // six-document project with three summaries into a three-document project, and the person
+    // reviewing it has no way to know what they were not shown.
+    it('keeps the set at six when only one document has been summarised', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+
+      expect(await screen.findByText('The introduction')).toBeTruthy();
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+      expect(screen.getAllByText('No summary yet — ask for one in the chat')).toHaveLength(5);
+    });
+
+    // The same absence while a turn is running is a different fact — it is being written right now —
+    // and saying "ask for one in the chat" under a turn that is writing it reads as a fault.
+    it('says a document is on its way while the turn is still running', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+      await screen.findByText('The introduction');
+
+      await turn(true);
+
+      expect(screen.getAllByText('Being written…')).toHaveLength(5);
+      expect(screen.queryByText('No summary yet — ask for one in the chat')).toBeNull();
+    });
+
+    it('opens the document itself, and the filename is on that view', async () => {
+      api.getControlFile.mockResolvedValue({ content: 'gates:\n  - npm test\n' });
+      filed(SUMMARIES);
+      await screen.findByText('Quality gates');
+
+      fireEvent.click(within(cardFor('Quality gates')).getByRole('button', { name: 'Read it all' }));
+
+      await waitFor(() => expect(api.getControlFile).toHaveBeenCalledWith(foundationRel('CODE-QUALITY.md')));
+      const shown = (await screen.findByLabelText('CODE-QUALITY.md')) as HTMLTextAreaElement;
+      expect(shown.value).toBe('gates:\n  - npm test\n');
+      // The name of the file, on the one view that is about the file. The summary above it still says
+      // "Quality gates", which is what the card is for.
+      expect(within(cardFor('Quality gates')).getByText('CODE-QUALITY.md')).toBeTruthy();
+    });
+
+    // THE README IS NOT A CONTROL FILE. It lives at the project root, so the listing does not carry it
+    // and Project Control's read cannot open it — the explorer's can, which is the door the file pane
+    // already reads every project file through.
+    it('reads the README through the explorer rather than the control door', async () => {
+      api.readFsFile.mockResolvedValue({
+        kind: 'text',
+        path: 'README.md',
+        name: 'README.md',
+        size: 24,
+        content: '# demo\n\nWhat it is.\n',
+      });
+      filed(SUMMARIES);
+      await screen.findByText('The introduction');
+
+      fireEvent.click(within(cardFor('The introduction')).getByRole('button', { name: 'Read it all' }));
+
+      await waitFor(() => expect(api.readFsFile).toHaveBeenCalledWith('README.md'));
+      const shown = (await screen.findByLabelText('README.md')) as HTMLTextAreaElement;
+      expect(shown.value).toBe('# demo\n\nWhat it is.\n');
+      expect(api.getControlFile).not.toHaveBeenCalled();
+    });
+
+    // Nothing to read on a card with nothing written: the offer would open an empty box, which reads
+    // as the product failing rather than as a document that does not exist yet.
+    // The opening screen is an OFFER to write, and six cards reading "no summary yet" underneath it
+    // is a list of things that do not exist — the absence only becomes news once the writing has
+    // begun.
+    it('shows no cards at all before anything has been written', async () => {
+      docs();
+
+      await screen.findByText('Let the assistant write the drafts?');
+      expect(screen.queryAllByTestId('doc-card')).toHaveLength(0);
+    });
+
+    it('offers no reading of a document that has not been written', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+      await screen.findByText('The introduction');
+
+      expect(screen.getAllByRole('button', { name: 'Read it all' })).toHaveLength(1);
     });
   });
 });
@@ -2115,5 +2282,45 @@ describe('the words on every step (W7)', () => {
     expect(await screen.findByTestId('verbatim-tool')).toBeTruthy();
     expect(await screen.findByTestId('verbatim-resume')).toBeTruthy();
     sweep('the documents being written', container);
+  });
+
+  // THE DOCUMENT ITSELF, OPENED, which is where the model's words are thicker than any summary: a
+  // CODE-QUALITY.md is a list of commands, and half of them name the things this list sweeps for. A
+  // fourth exemption by element, and the content below is the fixture that proves it — take
+  // `verbatim-document` off the block and this case goes red on the word "docker".
+  it('opens a document in the model’s own words, with plain words around it', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        resumes: { 'CODE-QUALITY.md': 'The commands your work has to pass.' },
+      },
+    });
+    api.listControlFiles.mockResolvedValue([
+      {
+        key: 'foundation',
+        label: 'Foundation',
+        creatable: false,
+        files: [
+          {
+            name: 'CODE-QUALITY.md',
+            path: foundationRel('CODE-QUALITY.md'),
+            category: 'foundation',
+            managed: true,
+            deletable: false,
+            renameable: false,
+          },
+        ],
+      },
+    ]);
+    api.getControlFile.mockResolvedValue({
+      content: 'gates:\n  - docker compose config\n  - yamllint .\n\nRun them in the sandbox.\n',
+    });
+    const { container } = view({ start: 'docs', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Read it all' }));
+    await screen.findByLabelText('CODE-QUALITY.md');
+
+    sweep('the document opened in full', container);
   });
 });

@@ -17,6 +17,7 @@ import {
   listControlFiles,
   patchConfig,
   putWizard,
+  readFsFile,
   runWizardSkill,
   type SandboxState,
   scaffoldProject,
@@ -1041,13 +1042,13 @@ function StackStep({
 // land in the person's own transcript on the way past. decision 77.
 const KICKOFF = "Please set up this project's documents from my answers.";
 
+// How often the summaries are re-read while a turn is writing them. See the effect that uses it.
+const RESUME_POLL_MS = 3_000;
+
 // THE SIX DOCUMENTS, IN WORDS (W7). A filename is the one thing a beginner cannot act on, and this
 // screen is where they first meet these — so the wizard names them the way somebody would say them
 // out loud, and the filename stays on the surfaces that open the file. The order is the order they
 // are written and the order they are listed in.
-// How often the summaries are re-read while a turn is writing them. See the effect that uses it.
-const RESUME_POLL_MS = 3_000;
-
 const DOC_NAMES: Record<string, string> = {
   'README.md': 'The introduction',
   'STACK.md': 'The stack',
@@ -1056,6 +1057,110 @@ const DOC_NAMES: Record<string, string> = {
   'UX.md': 'How it feels',
   'DESIGN.md': 'How it looks',
 };
+
+// WHERE A DOCUMENT'S TEXT COMES FROM, and it is two doors because the six documents live in two
+// places. The five foundation documents are control files, opened by the path the LISTING gives —
+// the server's fact, never a copy of the layout kept in the browser, exactly as the gates step opens
+// them. The README is at the project root and is not a control file at all, so it is read through
+// the explorer, which is the door every other project file is read through.
+async function documentText(name: string, path: string | undefined): Promise<string | null> {
+  if (name === 'README.md') {
+    const file = await readFsFile(name);
+    return file.kind === 'text' ? file.content : null;
+  }
+  return path ? (await getControlFile(path)).content : null;
+}
+
+// ONE DOCUMENT: WHAT IT IS, IN A SENTENCE, AND THE DOCUMENT ITSELF ONE PRESS AWAY (decision 78).
+// A person asked to review six documents they did not write will read none of them, so the summary
+// is the card and the file is the offer — and the filename appears only once the file is open, which
+// is the one view it is a fact about.
+function DocumentCard({
+  name,
+  summary,
+  path,
+  running,
+}: {
+  name: string;
+  summary?: string;
+  path?: string;
+  // Whether a turn is writing right now, which is what makes a missing summary a different fact.
+  running: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { value: text } = useFetched<string | null>(
+    async () => (open ? await documentText(name, path) : null),
+    [open, path],
+    null,
+  );
+  return (
+    <Surface variant="inset" data-testid="doc-card">
+      <Stack direction="column" gap={3}>
+        <Text ink="strong">{DOC_NAMES[name] ?? name}</Text>
+        {summary === undefined ? (
+          // AN ABSENCE HAS TO BE ON THE SCREEN. Rendering only what was written turns a six-document
+          // project with three summaries into a three-document project, and the person reviewing it
+          // cannot know what they were never shown.
+          <Text as="p" role="hint">
+            {running ? 'Being written…' : 'No summary yet — ask for one in the chat'}
+          </Text>
+        ) : (
+          <>
+            {/* The model's own words, rendered whole — exempt from the plain-words sweep by element,
+                as the stack proposal is. */}
+            <Text as="p" role="hint" testId="verbatim-resume">
+              {summary}
+            </Text>
+            <Stack gap={4}>
+              <Button onClick={() => setOpen(!open)}>{open ? 'Hide it again' : 'Read it all'}</Button>
+            </Stack>
+          </>
+        )}
+        {open && (
+          <Stack direction="column" gap={3}>
+            {/* THE FILENAME, HERE AND NOWHERE ELSE ON THE CARD: this is the view that is about the
+                file, and somebody who will later go looking for it needs to have met its name once. */}
+            <Text ink="strong">{name}</Text>
+            {/* The document is the model's text too, and thicker than any summary — a CODE-QUALITY.md
+                is a list of commands. Exempt by element for the summary's reason. Read-only and
+                monospaced, as the gates step shows a document: this screen must not invite editing. */}
+            <Stack direction="column" gap={3} testId="verbatim-document">
+              <Control as="textarea" mono readOnly rows={12} aria-label={name} value={text ?? 'Opening…'} />
+            </Stack>
+          </Stack>
+        )}
+      </Stack>
+    </Surface>
+  );
+}
+
+// THE FULL SET, ALWAYS, IN THE ORDER THE DOCUMENTS ARE WRITTEN. A summary that has not been filed is
+// a card that says so rather than a card that is missing. A name the file carries that this product
+// does not know can only arrive by hand-editing `wizard.yaml` — it is shown last, under its filename,
+// for `Unwritten`'s reason: an unknown document is still a document.
+function DocumentCards({ resumes, running }: { resumes: Record<string, string>; running: boolean }) {
+  const { value: groups } = useFetched(listControlFiles, [], NO_GROUPS);
+  const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
+  const names = [...Object.keys(DOC_NAMES), ...Object.keys(resumes).filter((name) => !(name in DOC_NAMES))];
+  // NOTHING AT ALL UNTIL THE WRITING HAS BEGUN — a turn running, or something already filed. Six
+  // cards saying "no summary yet" under an offer to write them is a list of things that do not exist.
+  // Asked here rather than at the call site: the step that renders this has a complexity budget, and
+  // "is there anything to show" is a question about the cards.
+  if (!running && names.every((name) => resumes[name] === undefined)) return null;
+  return (
+    <>
+      {names.map((name) => (
+        <DocumentCard
+          key={name}
+          name={name}
+          summary={resumes[name]}
+          path={files.find((file) => file.name === name)?.path}
+          running={running}
+        />
+      ))}
+    </>
+  );
+}
 
 // WHAT ACTUALLY HAPPENED, when it was not what the heading promised. Counted rather than listed in
 // the sentence and then named in words underneath: the count is the news, the names are what to do
@@ -1279,17 +1384,9 @@ function DocsStep({
           CLI'S — a tool name, not a sentence this screen wrote — so it is exempt from the plain-words
           sweep by element, exactly as the model's own proposal and summaries are. */}
       {tool && <Readout testId="verbatim-tool">{tool}</Readout>}
-      {/* THE SUMMARIES AS THEY LAND, which is the only part of this a beginner can read while it runs.
-          The words are the model's and are rendered whole, so they are exempt from the plain-words
-          sweep by element exactly as the stack proposal is. */}
-      {Object.entries(resumes).map(([name, summary]) => (
-        <Stack key={name} direction="column" gap={3}>
-          <Text ink="strong">{name}</Text>
-          <Text as="p" role="hint" testId="verbatim-resume">
-            {summary}
-          </Text>
-        </Stack>
-      ))}
+      {/* THE SUMMARIES AS THEY LAND, which is the only part of this a beginner can read while it
+          runs. Whether there is anything to show yet is the cards' own question — see below. */}
+      <DocumentCards resumes={resumes} running={running} />
 
       {failed && (
         <Notice as="p" tone="warn">

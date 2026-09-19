@@ -1,15 +1,14 @@
-import { FOUNDATION_FILES, foundationRel } from '../../core/layout.js';
+import { foundationRel, RESUMABLE_DOCUMENTS } from '../../core/layout.js';
 import type { WizardState } from '../../store/project/wizard.js';
 
 // THE SIX DOCUMENTS A NAME MAY POINT AT, and the reason this is a fixed set rather than a path check:
 // the name arrives from the browser, so a page that has been tampered with can put any string in it.
 // Anything else is DROPPED rather than framed, which is what stops this field smuggling a path into a
-// prompt. The same six `PUT /api/wizard/resumes/:name` accepts, built from the same constant so only
-// `README.md` — the one that is not a foundation document — could ever drift between them.
-const ATTACHABLE = new Set<string>([...FOUNDATION_FILES.map((f) => f.name), 'README.md']);
-
+// prompt. The set is `core/layout.ts`'s — the same one `PUT /api/wizard/resumes/:name` accepts — and one
+// home rather than two, because a second copy of a list this short is how the two doors come to disagree
+// about what a document is.
 function attachLine(attach: string | undefined): string | undefined {
-  if (!attach || !ATTACHABLE.has(attach)) return undefined;
+  if (!attach || !RESUMABLE_DOCUMENTS.has(attach)) return undefined;
   // The README is the one of the six at the project root; the rest are under the foundation folder.
   const path = attach === 'README.md' ? 'README.md' : foundationRel(attach);
   // A name and a path, never the content: the model has a Read tool, and the person may be about to

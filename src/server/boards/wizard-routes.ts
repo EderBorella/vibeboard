@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { FOUNDATION_FILES } from '../../core/layout.js';
+import { RESUMABLE_DOCUMENTS } from '../../core/layout.js';
 import {
   clearWizardState,
   isScaffoldMode,
@@ -128,17 +128,17 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
   });
 
   // The copilot's door, and the other half of what `suggested` is to a run: it writes the documents,
-  // so it files the plain-language summary the person reads before opening any of them. Built from
-  // FOUNDATION_FILES rather than listed, because a name here that no document answers to is a summary
-  // of nothing sitting in the list for the rest of setup. decision 77.
-  const RESUMABLE = new Set([...FOUNDATION_FILES.map((f) => f.name), 'README.md']);
+  // so it files the plain-language summary the person reads before opening any of them. The set is
+  // `core/layout.ts`'s rather than listed here, because a name this door accepts that no document
+  // answers to is a summary of nothing sitting in the list for the rest of setup — and the attachment
+  // seam refuses against the same constant, so neither door can drift from the other. decision 77.
   api.put('/wizard/resumes/:name', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { name } = req.params as { name: string };
-    if (!RESUMABLE.has(name)) {
-      return reply
-        .code(400)
-        .send({ error: `Not a document with a résumé. One of: ${[...RESUMABLE].join(', ')}.` });
+    if (!RESUMABLE_DOCUMENTS.has(name)) {
+      return reply.code(400).send({
+        error: `Not a document with a résumé. One of: ${[...RESUMABLE_DOCUMENTS].join(', ')}.`,
+      });
     }
     const { summary } = (req.body ?? {}) as { summary?: string };
     if (typeof summary !== 'string' || summary.trim() === '') {

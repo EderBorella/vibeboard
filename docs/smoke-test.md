@@ -512,13 +512,37 @@ worn compact, and that needs a real model.
 The wizard ends at a project ready to hand over; what happens next is the board's, and it is the part
 most likely to regress unnoticed because no wizard test can see it.
 
-- Press **Start**. On a project whose boards the import filled, auto-pilot works the cards.
-- On a project with an empty board and a README, it bootstraps: it derives the feature list and then
-  **stops for a person to confirm it**, with `review` as the stop reason and the feature list on screen.
+**The journey forks here, and the two halves are different tests.** Setup scaffolds with no sample cards
+(`samples: false`), so a project nobody imported into reaches Start with an empty board and one that was
+imported into reaches it carrying the person's own cards. Walk whichever fork this pass took, and walk
+the other one on the next pass.
+
+### The no-import fork: the board is empty, so auto-pilot derives
+
+- **Look at the boards before you press anything.** A wizard-made project has no cards at all: no
+  "Sample feature", no "Sample product card", no "Sample engineering card". A demo card here is the
+  regression this fork exists to catch — it is what made the stop below unreachable, and what a live
+  run measured was a real dispatch spent building "Sample engineering card".
+- Press **Start**. It bootstraps: one run derives the feature list from the README the documents step
+  wrote, and the loop **stops for a person to confirm it**, with `review` as the stop reason.
+- **Read the sentence, not the reason code.** It counts what it derived, names the smoke-harness feature
+  apart from that count, and ends on the action — *"Auto-pilot derived N features from this project’s
+  README, and added the smoke-harness feature beside them, then stopped so you can read them before
+  anything is built on top of them. … Check them, choose a feature to focus on if you want one, and
+  confirm on the auto-pilot bar."* A sentence saying only "a feature list", one folding the harness card
+  into the number, or one naming the button without saying where it is, is a regression in itself.
 - Confirm the list. That is the first moment a focus can be chosen at all, and the loop carries on from
   there.
-- The regression to watch for: a derived feature list that auto-pilot walks straight past, or a stop
-  whose sentence does not name what it derived.
+- The regression to watch for: a derived feature list auto-pilot walks straight past.
+
+### The import fork: the person brought their board, so nothing is derived
+
+- Press **Start** on the project C7's import filled. Auto-pilot works **their** cards.
+- **No bootstrap run, no derived list, no `review` stop, and that is correct** rather than a gate that
+  failed to fire: the feature list here is the person's own and they wrote it before setup ended. Being
+  asked to confirm a list they had just pasted in would be the fault.
+- Watch the first dispatch name one of their cards. A bootstrap run on this fork means the empty-board
+  gate has loosened and the loop is about to derive a second feature list over theirs.
 
 ---
 
@@ -529,6 +553,13 @@ most likely to regress unnoticed because no wizard test can see it.
 - Both host credential files byte-identical to the backup taken before the first start.
 - The shared mirrors under `~/.cache/vibeboard/creds/` match the host files.
 - `git status` in the throwaway project shows only what the run was asked to produce.
+
+**Note what setup cost, because the endpoint cannot see most of it.** `GET /api/accounting` sums RUN
+records: the wizard's two dispatches (`scan-project`, `suggest-stack`) land in it, and the documents
+step and the import are copilot TURNS, which land nowhere. One execution measured **$2.20 of a $4.61
+session invisible to it**. Read the session total off the backend's own usage report and write it beside
+the accounting figure, so the gap is on the record. Whether the product should count a copilot turn is a
+product question that is already open — do not treat it as a fault of this pass.
 
 **Then clean up, and ask before you do**: the card, the file the run created, anything scaffolded, and
 the backup copies. The run records are worth keeping — they are the evidence.

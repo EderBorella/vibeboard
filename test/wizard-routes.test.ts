@@ -181,6 +181,62 @@ describe('PUT /api/wizard/prefill', () => {
     expect((await get(project)).json()).toEqual({ state: null });
   });
 
+  // JUNK FROM A RUN DIES AT THE DOOR. Whatever arrives here is spread into a file the browser reads
+  // back and PUTs whole, so an invented key would ride in `suggested` for the rest of setup — and a
+  // `step` or a `mode` among them is a run steering the wizard through the one route it was given so
+  // that it could not. Filtered to the known field sets at both levels rather than validated, because
+  // a scan that guessed one extra field should still deliver the six that were right.
+  it('keeps only the keys a suggestion has, at both levels', async () => {
+    const project = await open();
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'brownfield', step: 'scan' },
+    });
+
+    const res = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      payload: {
+        answers: { what: 'a timeline', mood: 'confident' },
+        kind: 'web',
+        step: 'handoff',
+        mode: 'greenfield',
+        resumes: { 'README.md': 'not yours to write' },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    expect((await get(project)).json()).toEqual({
+      state: {
+        mode: 'brownfield',
+        step: 'scan',
+        suggested: { answers: { what: 'a timeline' }, kind: 'web' },
+      },
+    });
+  });
+
+  // A body that is not an object at all. `in` throws on a primitive, so this is the difference
+  // between nothing landing and a 500 with a stack trace in the run's report.
+  it('takes nothing from a body that is not an object, and does not fall over', async () => {
+    const project = await open();
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard',
+      payload: { mode: 'brownfield', step: 'scan', suggested: { kind: 'web' } },
+    });
+
+    const res = await project.app.inject({
+      method: 'PUT',
+      url: '/api/wizard/prefill',
+      headers: { 'content-type': 'application/json' },
+      payload: '"a stack, honestly"',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect((await get(project)).json().state.suggested).toEqual({ kind: 'web' });
+  });
+
   // THE SCOPE A PROJECT RUN IS ACTUALLY MINTED WITH, taken from the runner rather than assumed:
   // `#start` in runs/agent-runner.ts mints `work`, with no card when there is no card. Asserted
   // through a real credential at the real endpoint, because the table is only the default until

@@ -3,10 +3,10 @@ import { FOUNDATION_FILES } from '../../core/layout.js';
 import {
   clearWizardState,
   isScaffoldMode,
+  knownSuggestions,
   readWizardState,
   WIZARD_STEPS,
   type WizardState,
-  type WizardSuggestions,
   writeWizardState,
 } from '../../store/project/wizard.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
@@ -59,8 +59,7 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
     // A run can outlive the setup that dispatched it — the person may abandon the wizard while the
     // scan is still reading — and there is nothing to merge into once the file is gone.
     if (!current) return reply.code(409).send({ error: 'No setup is in progress.' });
-    const body = req.body as WizardSuggestions;
-    const suggested = { ...current.suggested, ...body };
+    const suggested = { ...current.suggested, ...knownSuggestions(req.body) };
     await writeWizardState(ctx.session.root, { ...current, suggested });
     return { ok: true };
   });

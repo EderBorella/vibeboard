@@ -412,6 +412,9 @@ export interface WizardState {
 // one the browser silently deletes rather than one it merely cannot show.
 export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'suggested', 'stack', 'resumes'] as const;
 export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
+// The block an agent fills, mirroring `WIZARD_SUGGESTION_KEYS`. The server filters a prefill body to
+// these keys, so a field this side knows and that list does not is one no run can ever deliver.
+export const WIZARD_SUGGESTION_KEYS = ['answers', 'kind', 'stack', 'packages'] as const;
 
 // `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
 type UnlistedWizardField = Exclude<keyof WizardState, (typeof WIZARD_STATE_KEYS)[number]>;
@@ -420,3 +423,11 @@ void _everyWizardFieldIsListed;
 type UnlistedAnswerField = Exclude<keyof WizardAnswers, (typeof WIZARD_ANSWER_KEYS)[number]>;
 const _everyAnswerFieldIsListed: UnlistedAnswerField extends never ? true : UnlistedAnswerField = true;
 void _everyAnswerFieldIsListed;
+type UnlistedWizardSuggestionField = Exclude<
+  keyof WizardSuggestions,
+  (typeof WIZARD_SUGGESTION_KEYS)[number]
+>;
+const _everyWizardSuggestionFieldIsListed: UnlistedWizardSuggestionField extends never
+  ? true
+  : UnlistedWizardSuggestionField = true;
+void _everyWizardSuggestionFieldIsListed;

@@ -52,6 +52,9 @@ export interface WizardState {
 // read by this one.
 export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'suggested', 'stack', 'resumes'] as const;
 export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
+// The nested block gets the same treatment, and it is the one an AGENT fills: `PUT /api/wizard/prefill`
+// filters its body to these keys, so this list is a boundary as well as a mirror.
+export const WIZARD_SUGGESTION_KEYS = ['answers', 'kind', 'stack', 'packages'] as const;
 
 // `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
 type UnlistedWizardField = Exclude<keyof WizardState, (typeof WIZARD_STATE_KEYS)[number]>;
@@ -60,6 +63,30 @@ void _everyWizardFieldIsListed;
 type UnlistedAnswerField = Exclude<keyof WizardAnswers, (typeof WIZARD_ANSWER_KEYS)[number]>;
 const _everyAnswerFieldIsListed: UnlistedAnswerField extends never ? true : UnlistedAnswerField = true;
 void _everyAnswerFieldIsListed;
+type UnlistedSuggestionField = Exclude<keyof WizardSuggestions, (typeof WIZARD_SUGGESTION_KEYS)[number]>;
+const _everySuggestionFieldIsListed: UnlistedSuggestionField extends never ? true : UnlistedSuggestionField =
+  true;
+void _everySuggestionFieldIsListed;
+
+// WHAT A RUN IS ALLOWED TO HAVE SAID. The prefill route spreads its body into a file the browser reads
+// back and PUTs whole, so an invented key would ride in `suggested` for the rest of setup — and a
+// `step` or a `mode` among them would be a run steering the wizard through the one route it has.
+// Filtered rather than refused: a scan that guessed one extra field should still deliver the six that
+// were right. decision 77.
+export function knownSuggestions(body: unknown): WizardSuggestions {
+  // `in` throws on a primitive, and a JSON body is whatever the sender serialised.
+  const source = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
+  const picked: Record<string, unknown> = {};
+  for (const key of WIZARD_SUGGESTION_KEYS) if (key in source) picked[key] = source[key];
+  const answers = picked.answers;
+  if (answers && typeof answers === 'object') {
+    const given = answers as Record<string, unknown>;
+    const kept: Record<string, unknown> = {};
+    for (const key of WIZARD_ANSWER_KEYS) if (key in given) kept[key] = given[key];
+    picked.answers = kept;
+  }
+  return picked as WizardSuggestions;
+}
 
 const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 

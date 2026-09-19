@@ -87,15 +87,37 @@ function adoptTarget(input: string): { relative: boolean; path: string; name: st
 // is no evidence the file is absent, so writing over it would lose the same thing.
 function useSaved(mode: ScaffoldMode): {
   read: boolean;
+  failed: boolean;
+  retry: () => void;
   saved: (step: WizardStep) => WizardState;
 } {
-  const { value } = useFetched<{ state: WizardState | null } | null>(getWizard, [], null);
+  const [tries, setTries] = useState(0);
+  const { value, failed } = useFetched<{ state: WizardState | null } | null>(getWizard, [tries], null);
   return {
     read: value !== null,
+    // The read REJECTING is the pending case's twin: the gate above rightly stays shut, but a gate
+    // that stays shut with nothing on screen and no way to ask again strands setup on one hiccup —
+    // the same hole the live check had, closed the same way.
+    failed,
+    retry: () => setTries((n) => n + 1),
     // The fallback is for the one case the file can be missing with the read landed: it was cleared in
     // another tab. Setup then starts recording again from this step rather than refusing to move.
     saved: (step) => ({ ...(value?.state ?? { mode, step }), step }),
   };
+}
+
+// One rendering for the read's failure, shared by the two steps that gate on it.
+function ReadFailed({ retry, busy }: { retry: () => void; busy: boolean }) {
+  return (
+    <>
+      <Notice as="p" tone="warn">
+        We could not read where you were up to. Nothing is lost.
+      </Notice>
+      <Button disabled={busy} onClick={retry}>
+        Ask again
+      </Button>
+    </>
+  );
 }
 
 export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Props) {
@@ -290,7 +312,7 @@ function BackendStep({
   bump: number;
   onContinue: () => void;
 }) {
-  const { read, saved } = useSaved(mode);
+  const { read, failed: readFailed, retry, saved } = useSaved(mode);
   // Re-asked on entry, after the assistant changes, and after a build lands: all three change the
   // answer, and none of them is observable any other way. `useSandbox` re-fetches on whatever it is
   // keyed to, which is this counter and nothing else on the screen.
@@ -356,6 +378,7 @@ function BackendStep({
         />
       )}
 
+      {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
       {sandbox === null && !failed && <Text role="hint">Checking…</Text>}
       {failed && (
         <>
@@ -469,7 +492,7 @@ function FormStep({
   snapshot: ProjectSnapshot | null;
   onContinue: () => void;
 }) {
-  const { read, saved } = useSaved(mode);
+  const { read, failed: readFailed, retry, saved } = useSaved(mode);
   const [what, setWhat] = useState('');
   const [who, setWho] = useState('');
   const [done, setDone] = useState('');
@@ -506,6 +529,8 @@ function FormStep({
         Nothing here is binding — it is what your assistant reads before it starts, so a rough answer beats a
         blank one.
       </Text>
+
+      {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
 
       <Field label="What are you making?" hint="A sentence or two, in your own words.">
         <Control as="textarea" rows={3} value={what} onChange={(e) => setWhat(e.target.value)} />

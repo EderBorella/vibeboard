@@ -570,6 +570,28 @@ describe('the backend step', () => {
     );
   });
 
+  // THE READ'S OWN FAILURE — the pending case's twin, surfaced by the fix round. A rejection is not
+  // evidence the file is absent, so the gate above stays shut; but a gate that stays shut with nothing
+  // on screen and no way to ask again strands setup on one hiccup, exactly as the live check once did.
+  it('says so and offers to ask again when reading where you were fails', async () => {
+    api.getWizard.mockRejectedValueOnce(new Error('boom'));
+    view({ start: 'backend', snapshot: opened });
+    expect(await screen.findByText(/could not read where you were/i)).toBeTruthy();
+    const go = screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask again' }));
+    await waitFor(() => expect(go.disabled).toBe(false));
+    expect(screen.queryByText(/could not read where you were/i)).toBeNull();
+  });
+
+  it('the form step carries the same way back up', async () => {
+    api.getWizard.mockRejectedValueOnce(new Error('boom'));
+    view({ start: 'form', snapshot: opened });
+    expect(await screen.findByText(/could not read where you were/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeTruthy();
+  });
+
   it('offers to build when a build is what would fix it', async () => {
     api.getSandbox.mockResolvedValue(refused('docker', NO_IMAGE, { buildable: true }));
     view({ start: 'backend', snapshot: opened });

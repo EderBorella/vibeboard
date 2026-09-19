@@ -307,7 +307,15 @@ describe('the identity step, with no project yet', () => {
     expect(screen.getByText('/data/projects/calculator')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Create the project' }));
 
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/data/projects/calculator', 'calculator', 'greenfield');
+    // `false` IS THE SAMPLE CARDS DECLINED, and it is the whole of the wizard's hand-off: the bootstrap
+    // derives a feature list only from an empty board, so three seeded "delete me" cards are what Start
+    // would spend its first real run on instead of reaching `decision 74`'s review stop.
+    expect(api.scaffoldProject).toHaveBeenCalledWith(
+      '/data/projects/calculator',
+      'calculator',
+      'greenfield',
+      false,
+    );
     // The file is written before the shell is told, so a project that opens with a wizard pending is
     // never a project whose wizard file has not landed yet.
     await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'backend' }));
@@ -337,7 +345,7 @@ describe('the identity step, bringing in a repository', () => {
 
     // The path is the folder AS TYPED with its trailing slash dropped — never rebuilt from the slug,
     // which for a folder whose name is not already one would name a directory that does not exist.
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'my-repo', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'my-repo', 'brownfield', false);
     await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'brownfield', step: 'backend' }));
   });
 
@@ -359,7 +367,7 @@ describe('the identity step, bringing in a repository', () => {
 
     expect(bring.disabled).toBe(false);
     fireEvent.click(bring);
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/日本語', 'meter-reader', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/日本語', 'meter-reader', 'brownfield', false);
   });
 
   it('shows the name it derived from the folder, and lets it be changed', () => {
@@ -373,7 +381,7 @@ describe('the identity step, bringing in a repository', () => {
     type(/^name/i, 'meters');
     fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
 
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'meters', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'meters', 'brownfield', false);
   });
 
   it('will not bring in a relative path either', () => {

@@ -29,12 +29,16 @@ export function openProject(path: string): Promise<{ snapshot: ProjectSnapshot }
 // file cannot import this one. Re-exported so every caller and the barrel keep their import path.
 export type { ScaffoldMode } from '../shared';
 
+// `samples` is the three demo cards, and it defaults to writing them because that is what greenfield
+// has always meant. Setup is the one caller that declines: an empty board is what makes auto-pilot
+// derive a feature list at all, so a seeded one sends the first real run at "Sample engineering card".
 export function scaffoldProject(
   path: string,
   name: string,
   mode: ScaffoldMode = 'greenfield',
+  samples = true,
 ): Promise<{ snapshot: ProjectSnapshot }> {
-  return post('/api/project/scaffold', { path, name, mode });
+  return post('/api/project/scaffold', { path, name, mode, samples });
 }
 
 // DELETING A PROJECT. `name` is the folder's last segment, typed by the user, and it is re-checked on

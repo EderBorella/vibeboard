@@ -289,7 +289,13 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
       // has taken the mode since adoption left the gate, and nothing has asked for it. It is what makes
       // the difference between adding the cockpit beside somebody's work and seeding it with three
       // sample cards.
-      await scaffoldProject(target.path, target.name, mode);
+      //
+      // AND NO SAMPLE CARDS IN EITHER MODE. Setup ends by handing over to Start, which derives a feature
+      // list only from an EMPTY board — so a greenfield journey that seeded three "delete me" cards spent
+      // its first real run building one of them and never reached the review stop. A person who came
+      // through here has just read their own documents or their own imported list; a demo card is noise
+      // beside that. Measured on a live journey, against "Sample engineering card".
+      await scaffoldProject(target.path, target.name, mode, false);
       // Written before the shell is told the project is open, so a project that opens with setup
       // pending is never one whose state file has not landed yet.
       await putWizard({ mode, step: 'backend' });

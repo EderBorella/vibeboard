@@ -232,7 +232,7 @@ async function ensureDiary(projectRoot: string, name: string, today: string): Pr
 
 export async function scaffoldProject(
   projectRoot: string,
-  opts: { name: string; mode: ScaffoldMode; today: string },
+  opts: { name: string; mode: ScaffoldMode; today: string; samples?: boolean },
 ): Promise<void> {
   const config = defaultConfig(opts.name);
   await ensureFolders(projectRoot, config);
@@ -253,7 +253,14 @@ export async function scaffoldProject(
   // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).
-  if (greenfield) await writeSampleCards(projectRoot, config, opts.today);
+  //
+  // AND A GREENFIELD CALLER MAY DECLINE THEM, which the wizard does. The bootstrap derives a feature
+  // list only from an EMPTY board, so a sample card is what auto-pilot spends its first real run on and
+  // `decision 74`'s review stop is never reached — measured on a live journey, against "Sample
+  // engineering card". The DEFAULT IS TRUE because greenfield outside the wizard — the visual harness,
+  // a direct API call — is the case the samples were written for: a board with nothing on it and nobody
+  // guiding the person through what a card is.
+  if (greenfield && (opts.samples ?? true)) await writeSampleCards(projectRoot, config, opts.today);
   await ensureDiary(projectRoot, opts.name, opts.today);
   // Order relative to `ensureRepo` does not matter — git reads `.gitignore` when it is asked about the
   // tree, not when the repository is created. Moving it after made no test fail, and the claim that it

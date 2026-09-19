@@ -271,7 +271,14 @@ const PRIMITIVE_LAYER = [
 // `Button` atom over every button in the picker's frame, which is what erased the doors' variants. The
 // name survives as a `className` on the recents list and styles nothing, so the union is one smaller and
 // the ceiling follows it down: slack is what stops this noticing the next class.
-const CLASS_CEILING = 220;
+// 220 -> 221 ON 2026-09-19, FOR `.wizard-wide`, under the same ruling `.wizard-card` was allowed by: a
+// legitimate class must not be blocked by this ratchet. It is one declaration, `max-width: none`, and it
+// exists because the browser harness MEASURED what the measure costs the documents step — 68ch minus the
+// dock's 420px panel is an 80px column of summaries, identical at 900, 1200 and 1440, with their own text
+// overflowing it four ways. No atom in this tree can say a measure, which is what `.wizard-card` was
+// allowed for, and none can unsay one either. The reason in full is on the rule in pages/wizard/wizard.css.
+// Zero slack is restored at 221.
+const CLASS_CEILING = 221;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

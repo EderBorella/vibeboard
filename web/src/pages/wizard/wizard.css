@@ -10,3 +10,19 @@
    The padding and the gap are the card's own because `Surface`'s `raised` variant deliberately has
    neither — a column pads its body, which is the same reason `.archive-drawer` and `.exec-column` do. */
 .wizard-card { width: 100%; max-width: var(--measure); padding: var(--s-7); gap: var(--s-5); }
+
+/* THE DOCUMENTS STEP IS THE ONE THAT IS NOT A COLUMN OF PROSE, and a measure is what it must not be
+   held to. Measured in the browser harness at 900, 1200 and 1440 before this rule existed: the review
+   is six summaries beside the conversation that wrote them, the conversation is the dock's own
+   organism at up to 420px, and 68ch minus that leaves the summaries an 80px column — identical at all
+   three widths, with the cards' own words overflowing it, which is four check-3 findings the ratchet
+   would otherwise have recorded as the state of this surface. Off the measure the cards side is
+   386px, 686px and 926px and check 3 finds nothing.
+   THE WHOLE STEP AND NOT THE REVIEW ALONE: the writing screen renders the same cards in the same box,
+   so a width that changed when the review opened would slide six documents sideways at the moment
+   somebody starts reading them — and the heading and hint above them are full-width on both screens
+   either way, so restricting it buys no prose back.
+   `none` RATHER THAN A WIDER MEASURE, because this is a workspace and not a page: the board, Project
+   Control and the Explorer all fill the window, and any second measure here would be a number picked
+   to clear the dock's 420px rather than to make a line readable. */
+.wizard-wide { max-width: none; }

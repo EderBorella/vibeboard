@@ -210,7 +210,9 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
 
   return (
     <Stack fill scroll justify="center" align="start" pad={[7, 6]}>
-      <Surface variant="raised" className="wizard-card">
+      {/* THE ONE STEP THAT IS WIDER THAN A LINE OF PROSE. Its review is cards beside the dock's own
+          panel, and the card's measure leaves the cards 80px — measured. See `.wizard-wide`. */}
+      <Surface variant="raised" className={step === 'docs' ? 'wizard-card wizard-wide' : 'wizard-card'}>
         {body}
         <Stack gap={4} wrap>
           {/* The way out of every step, quiet and always there. At the end it is the only thing left to

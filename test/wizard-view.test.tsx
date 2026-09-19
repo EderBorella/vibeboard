@@ -23,6 +23,15 @@ const api = vi.hoisted(() => ({
   // The wizard's own dispatch door. A card-less run is refused to this browser through `POST /api/runs`,
   // so setup's two runs have one of their own — see src/server/boards/wizard-routes.ts.
   runWizardSkill: vi.fn().mockResolvedValue({ run: { run: 'run-1', status: 'running' } }),
+  // THE DOCS STEP'S FOUR. The grant the copilot writes the documents under; the question the wizard
+  // asks the moment it stops — writing two of those documents as an agent is what raises it — and the
+  // listing and the read the gate step opens each document's text with. A clean project by default, so
+  // a test about the turn does not have to describe a block that is not there.
+  setAuthority: vi.fn().mockResolvedValue({ authorised: true }),
+  getReadiness: vi.fn().mockResolvedValue({ unreviewedGates: [] }),
+  acknowledgeGates: vi.fn().mockResolvedValue({ ok: true }),
+  listControlFiles: vi.fn().mockResolvedValue([]),
+  getControlFile: vi.fn().mockResolvedValue({ content: '' }),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -36,23 +45,33 @@ const ws = vi.hoisted(() => {
   // RunRecord would hide which three of its fields the step actually depends on.
   type Msg = {
     type: string;
-    state?: string;
+    // A string for a build frame and an object for the copilot's own state — the two frames this
+    // socket carries that are not a run record, and the fake passes each through untouched.
+    state?: string | { running: boolean };
     line?: string;
     record?: { run: string; status: string; outcome?: string };
+    event?: { kind: string; name?: string; text?: string };
   };
+  type Socket = { subscribe: (fn: (m: Msg) => void) => () => void; send: (payload: object) => void };
   const subscribers = new Map<number, Set<(m: Msg) => void>>();
-  const sockets = new Map<number, { subscribe: (fn: (m: Msg) => void) => () => void }>();
+  const sockets = new Map<number, Socket>();
   const asked: number[] = [];
+  // WHAT THE TAB SENT. The docs step's turn goes UP this socket rather than through a route, so a fake
+  // that only listened could not tell a turn sent from one merely prepared.
+  const sent: object[] = [];
   const useSharedWs = (bump: number) => {
     asked.push(bump);
     const existing = sockets.get(bump);
     if (existing) return existing;
     const set = new Set<(m: Msg) => void>();
     subscribers.set(bump, set);
-    const socket = {
+    const socket: Socket = {
       subscribe: (fn: (m: Msg) => void) => {
         set.add(fn);
         return () => set.delete(fn);
+      },
+      send: (payload: object) => {
+        sent.push(payload);
       },
     };
     sockets.set(bump, socket);
@@ -61,10 +80,12 @@ const ws = vi.hoisted(() => {
   return {
     useSharedWs,
     asked,
+    sent,
     reset: () => {
       sockets.clear();
       subscribers.clear();
       asked.length = 0;
+      sent.length = 0;
     },
     push: (msg: Msg, bump = 0) => {
       for (const fn of subscribers.get(bump) ?? []) fn(msg);
@@ -1298,6 +1319,221 @@ describe('the stack step', () => {
   });
 });
 
+// THE THIRD AGENT MOMENT, AND IT IS THE COPILOT RATHER THAN A RUN (W3). Writing a README and five
+// guiding documents out of three answers is a conversation, so the wizard drives the same copilot the
+// dock does — and the brief is composed on the SERVER, at the credential seam, which is why the only
+// thing sent from here is one plain sentence.
+describe('the docs step', () => {
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'greenfield', step: 'docs', answers: { what: 'a tool for reading meters' } },
+    });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    api.getReadiness.mockResolvedValue({ unreviewedGates: [] });
+  });
+
+  const docs = () => view({ start: 'docs', snapshot: opened });
+
+  // The copilot's own state frame, as the server broadcasts it: `onStart` raises it and the `finally`
+  // of the turn lowers it, so this is the only thing that says a turn has ended.
+  const turn = async (running: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running } });
+    });
+  };
+
+  it('asks before it writes anything, and sends nothing until the answer is yes', async () => {
+    docs();
+
+    expect(await screen.findByText('Let the assistant write the drafts?')).toBeTruthy();
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Let it write' }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    expect(ws.sent[0]).toMatchObject({
+      type: 'copilot:send',
+      // ONE SENTENCE, AND THE BRIEF IS NOT IN IT. `wizardFrame` composes the contract and the answers
+      // on the server, at the seam the credential uses — a brief the browser sends is one the browser
+      // can edit, and it would also land in the person's own transcript.
+      text: "Please set up this project's documents from my answers.",
+    });
+  });
+
+  // THE GRANT HAS TO LAND FIRST, and this is not a tidiness point: the credential is minted per turn
+  // from the authority the server holds at the moment the turn arrives. A turn that overtook the grant
+  // would run without one and could not write a single foundation document.
+  it('has the authority before the turn, not merely at the same time', async () => {
+    const grant = deferred<{ authorised: boolean }>();
+    api.setAuthority.mockReturnValue(grant.promise);
+    docs();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+
+    await waitFor(() => expect(api.setAuthority).toHaveBeenCalledWith(true));
+    expect(ws.sent).toHaveLength(0);
+
+    await grant.settle({ authorised: true });
+
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  it('sends nothing when the answer is no, and leaves the offer standing', async () => {
+    docs();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Write the drafts' })).toBeTruthy();
+  });
+
+  it('shows what it is working on, and each summary as it lands', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      },
+    });
+    // A TOOL CALL IS THE CUE TO LOOK. A résumé is stored BY a tool call, and every tool call is an
+    // item in the transcript — so the transcript growing is what asks the file for the summaries.
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name: 'Write' } });
+    });
+
+    expect(await screen.findByText('Write')).toBeTruthy();
+    expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
+    expect(screen.getByText('README.md')).toBeTruthy();
+  });
+
+  // A TURN THAT NEVER STARTED CANNOT HAVE ENDED. `running` is false before the first frame, so an
+  // ending read off that alone would walk the person off this screen the moment they authorised.
+  it('does not treat the state before the turn as the turn ending', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(false);
+
+    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(api.getReadiness).not.toHaveBeenCalled();
+  });
+
+  // WRITING THE TWO EXECUTED DOCUMENTS AS AN AGENT TRIPS THE BLOCK BY DESIGN (decision 51). The wizard
+  // surfaces the reading in its own voice rather than letting a refused Start do it later.
+  it('goes to the reading step when a gate document was rewritten', async () => {
+    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md'] });
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
+  });
+
+  it('goes straight to the end when none was', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+});
+
+// DECISION 51 IN THE WIZARD'S OWN VOICE. CODE-QUALITY.md carries the `gates:` commands and TESTING.md
+// the `smoke:` one, and the server runs both OUTSIDE the sandbox as the person — so an agent rewriting
+// either blocks auto-pilot until somebody has read it. Cleared by a press and by nothing else, which is
+// why the press has to be worth something: the documents are on this screen to be read.
+describe('the gates step', () => {
+  const foundation = [
+    {
+      key: 'foundation',
+      label: 'Foundation',
+      creatable: false,
+      files: [
+        {
+          name: 'CODE-QUALITY.md',
+          path: '.vibeboard/foundation/CODE-QUALITY.md',
+          category: 'foundation',
+          managed: true,
+          deletable: false,
+          renameable: false,
+        },
+        {
+          name: 'TESTING.md',
+          path: '.vibeboard/foundation/TESTING.md',
+          category: 'foundation',
+          managed: true,
+          deletable: false,
+          renameable: false,
+        },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
+    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] });
+    api.listControlFiles.mockResolvedValue(foundation);
+    api.getControlFile.mockResolvedValue({ content: 'gates:\n  - npm test\n' });
+    api.acknowledgeGates.mockResolvedValue({ ok: true });
+  });
+
+  const gates = () => view({ start: 'gates', snapshot: opened });
+
+  it('names each document and opens the text of it', async () => {
+    gates();
+
+    expect(await screen.findByText('CODE-QUALITY.md')).toBeTruthy();
+    expect(screen.getByText('TESTING.md')).toBeTruthy();
+    // THE PATH COMES FROM THE LISTING, not from a copy of the layout kept in the browser. The names
+    // the block carries are bare filenames, and where a foundation document lives is the server's
+    // fact — the same listing Project Control opens every file from.
+    await waitFor(() =>
+      expect(api.getControlFile).toHaveBeenCalledWith('.vibeboard/foundation/CODE-QUALITY.md'),
+    );
+    expect(api.getControlFile).toHaveBeenCalledWith('.vibeboard/foundation/TESTING.md');
+    const shown = (await screen.findAllByLabelText('CODE-QUALITY.md'))[0] as HTMLTextAreaElement;
+    expect(shown.value).toBe('gates:\n  - npm test\n');
+  });
+
+  it('clears the block and moves on once the server agrees it is clear', async () => {
+    api.getReadiness
+      .mockResolvedValueOnce({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] })
+      .mockResolvedValue({ unreviewedGates: [] });
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. A screen that moved on before the server agreed would
+  // put somebody past a block that is still there — and the next thing they press is Start.
+  it('does not move on while the block is still there', async () => {
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(screen.getByText('One thing to read before anything runs')).toBeTruthy();
+  });
+});
+
 // W7, OVER EVERY STEP AND NOT THE ONE THAT HAPPENS TO HAVE A FOLD. The tripwire lived inside the form
 // step's describe and swept four words on one screen; the three words that were actually on the wizard
 // — "container", "Repository", "copilot" — were all on the other three steps, so it passed over each of
@@ -1414,6 +1650,43 @@ describe('the words on every step (W7)', () => {
     const proposal = view({ start: 'stack', snapshot: opened });
     await screen.findByRole('button', { name: 'Use this stack' });
     sweep('the stack proposal', proposal.container);
+  });
+
+  it('asks to write the documents, and reads out the gate commands, in plain words', async () => {
+    // The docs step opens on the question, so the sweep reads the dialog as well as the screen under
+    // it — the question is the first thing anybody sees here.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs' } });
+    const writing = view({ start: 'docs', snapshot: opened });
+    await screen.findByText('Let the assistant write the drafts?');
+    sweep('writing the documents', writing.container);
+    cleanup();
+
+    // And the gate step, whose documents are full of the words this sweeps for — inside the fold,
+    // where they belong, so what is read here is the sentence asking somebody to open one.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
+    api.getReadiness.mockResolvedValue({ unreviewedGates: ['CODE-QUALITY.md'] });
+    api.listControlFiles.mockResolvedValue([
+      {
+        key: 'foundation',
+        label: 'Foundation',
+        creatable: false,
+        files: [
+          {
+            name: 'CODE-QUALITY.md',
+            path: '.vibeboard/foundation/CODE-QUALITY.md',
+            category: 'foundation',
+            managed: true,
+            deletable: false,
+            renameable: false,
+          },
+        ],
+      },
+    ]);
+    api.getControlFile.mockResolvedValue({ content: 'gates:\n  - docker compose config\n' });
+    const reading = view({ start: 'gates', snapshot: opened });
+    await screen.findByRole('button', { name: "I've read them — carry on" });
+
+    sweep('the gate commands', reading.container);
   });
 
   it('asks its questions and hands over in plain words', async () => {

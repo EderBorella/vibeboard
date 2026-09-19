@@ -7,14 +7,20 @@ import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import {
+  acknowledgeGates,
   buildAgentImage,
+  type ControlGroup,
   clearWizard,
+  getControlFile,
+  getReadiness,
   getWizard,
+  listControlFiles,
   patchConfig,
   putWizard,
   runWizardSkill,
   type SandboxState,
   scaffoldProject,
+  setAuthority,
 } from '../../lib/api';
 import {
   type AutopilotConfig,
@@ -29,6 +35,7 @@ import {
 } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { useBuildLog } from '../../lib/useBuildLog';
+import { useConfirm } from '../../lib/useConfirm';
 import { useFetched } from '../../lib/useFetched';
 import { useSandbox } from '../../lib/useSandbox';
 import type { WizardStart } from '../../lib/useWizard';
@@ -38,7 +45,11 @@ import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
 import { Tabs } from '../../molecules/Tabs';
 import { LifecyclePicker } from '../../organisms/autopilot/LifecyclePicker';
+import { useReadiness } from '../../organisms/autopilot/useReadiness';
 import { BackendPicker } from '../../organisms/copilot/BackendPicker';
+import { clampToCaps, resolveChoice } from '../../organisms/copilot/choice';
+import { ThinkingIndicator } from '../../organisms/copilot/ThinkingIndicator';
+import { useCopilot } from '../../organisms/copilot/useCopilot';
 
 // SETTING A PROJECT UP, AS A SCREEN AND NOT A MODAL. Its later steps hold agent runs that last minutes,
 // and a dialog you cannot leave a run inside is a dialog somebody closes. It is the shell's sixth
@@ -152,6 +163,7 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
   // it is handed, and an inline arrow would rebuild it on every render.
   const leaveForm = useCallback(() => setStep('stack'), []);
   const leaveStack = useCallback(() => setStep('docs'), []);
+  const leaveGates = useCallback(() => setStep('handoff'), []);
 
   let body: ReactNode;
   if (step === 'identity')
@@ -171,6 +183,8 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
     body = <FormStep mode={mode} snapshot={snapshot} notice={scanNotice} onContinue={leaveForm} />;
   else if (step === 'stack')
     body = <StackStep mode={mode} snapshot={snapshot} bump={bump} onContinue={leaveStack} />;
+  else if (step === 'docs') body = <DocsStep snapshot={snapshot} bump={bump} onContinue={setStep} />;
+  else if (step === 'gates') body = <GatesStep onContinue={leaveGates} />;
   else body = <HandoffStep />;
 
   return (
@@ -999,6 +1013,228 @@ function StackStep({
           </Stack>
         </>
       )}
+      {error && <Text role="error">{error}</Text>}
+    </>
+  );
+}
+
+// THE ONE SENTENCE THE BROWSER SENDS. Everything the model actually needs — the voice contract, the
+// answers, the agreed stack, where the résumés go — is composed on the SERVER at the credential seam
+// (`wizardFrame`), because a brief the browser sends is a brief the browser can edit, and it would
+// land in the person's own transcript on the way past. decision 77.
+const KICKOFF = "Please set up this project's documents from my answers.";
+
+// THE THIRD AGENT MOMENT, AND IT IS THE COPILOT AND NOT A RUN (W3). Writing a README and five guiding
+// documents out of three answers is a conversation — the person is in it, and the next phase puts them
+// side by side with it. What this step is, on its own, is the honest minimum: ask, authorise, send one
+// turn, and show that something is happening until it stops.
+//
+// THE CONVERSATION IS THE APP'S, not this screen's: `useCopilot` is keyed to the tab's socket
+// generation, so the turn sent here is the same conversation the dock shows, with the same transcript
+// on the server.
+function DocsStep({
+  snapshot,
+  bump,
+  onContinue,
+}: {
+  snapshot: ProjectSnapshot | null;
+  bump: number;
+  // WHICH step is next is this one's to say, because the answer is the readiness the turn just
+  // changed — the backend step's rule, for the same reason.
+  onContinue: (next: WizardStep) => void;
+}) {
+  const { confirm, dialog } = useConfirm();
+  const { items, running, send, cancel, sentAt, lastEventAt } = useCopilot(bump);
+  const [sent, setSent] = useState(false);
+  const [resumes, setResumes] = useState<Record<string, string>>({});
+  const started = useRef(false);
+  // A turn that never began cannot have ended: `running` is false before the first frame, and an
+  // ending read off that alone would walk the person off this screen the moment they authorised.
+  const ran = useRef(false);
+  const { busy, error, run } = useAction();
+
+  // Full-auto, clamped to what this assistant actually publishes — the model is writing files
+  // unattended, which is the whole of what this step is. Nothing else is sent with the turn: the
+  // config holds the assistant, the model and the effort, and the server falls back to them.
+  const { mode } = clampToCaps(resolveChoice(snapshot?.config.copilot, {}), 'bypassPermissions');
+
+  const ask = useCallback(async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Let the assistant write the drafts?',
+      body: 'It will write the README and five guiding documents for this project — through the product, for this conversation only. You review everything next.',
+      action: 'Let it write',
+    });
+    if (!ok) return;
+    await run(async () => {
+      // AWAITED, AND THE ORDER IS THE POINT. The credential is minted per turn from the authority the
+      // server holds when the turn arrives, so a turn that overtook the grant would run without one
+      // and could not write a single foundation document. `setCopilotAuthority` on the hook is
+      // fire-and-forget for a button that reflects a state; this is a sequence.
+      await setAuthority(true);
+      send(KICKOFF, { mode });
+      setSent(true);
+    });
+  }, [confirm, run, send, mode]);
+
+  useEffect(() => {
+    // Waits for the project's own settings: what the turn is sent WITH is read off the snapshot, and
+    // asking before it lands would send one assistant's mode to whichever one is configured.
+    if (!snapshot || started.current) return;
+    started.current = true;
+    void ask();
+  }, [snapshot, ask]);
+
+  useEffect(() => {
+    // A RÉSUMÉ IS STORED BY A TOOL CALL, and every tool call is an item in this transcript — so the
+    // transcript growing is the cue to read the file. A clock would ask most often while nothing is
+    // happening, and never at the moment something did.
+    if (items.length === 0) return;
+    void getWizard()
+      .then(({ state }) => setResumes(state?.resumes ?? {}))
+      .catch(() => {});
+  }, [items.length]);
+
+  const finish = useCallback(async (): Promise<void> => {
+    // Writing CODE-QUALITY.md or TESTING.md as an agent blocks auto-pilot until a person has read it
+    // (decision 51), and the copilot has just been told to write both. Asked here rather than assumed,
+    // because it depends on what the turn actually did.
+    const unread = await getReadiness()
+      .then((r) => r.unreviewedGates)
+      .catch(() => []);
+    onContinue(unread.length > 0 ? 'gates' : 'handoff');
+  }, [onContinue]);
+
+  useEffect(() => {
+    if (running) {
+      ran.current = true;
+      return;
+    }
+    if (!ran.current) return;
+    ran.current = false;
+    void finish();
+  }, [running, finish]);
+
+  // A turn refused before it started — no credential, no assistant — arrives as an error and nothing
+  // else: the server's own `copilot:state` never goes up, so nothing here would ever settle. The offer
+  // comes back rather than leaving somebody on a screen with no control that does anything.
+  const failed = sent && items.some((item) => item.kind === 'error');
+  // The latest tool the model reached for, which is the one thing in a long turn that says WHAT it is
+  // doing rather than that it is doing something.
+  const tool = items.filter((item) => item.kind === 'tool').at(-1)?.toolName;
+
+  return (
+    <>
+      <Text as="h2" size="title" ink="strong" family="display">
+        Writing it all down
+      </Text>
+      <Text role="hint">
+        Your assistant writes the README and five short guiding documents from your answers. Where it has to
+        guess, it says so in the document rather than guessing quietly.
+      </Text>
+
+      {running && <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />}
+      {/* ONE LINE, THE LATEST, as the build log shows itself on the machine check: what a person needs
+          from a turn this long is evidence it is still moving, not the transcript. */}
+      {tool && <Readout>{tool}</Readout>}
+      {/* THE SUMMARIES AS THEY LAND, which is the only part of this a beginner can read while it runs.
+          The words are the model's and are rendered whole, so they are exempt from the plain-words
+          sweep by element exactly as the stack proposal is. */}
+      {Object.entries(resumes).map(([name, summary]) => (
+        <Stack key={name} direction="column" gap={3}>
+          <Text ink="strong">{name}</Text>
+          <Text as="p" role="hint" testId="verbatim-resume">
+            {summary}
+          </Text>
+        </Stack>
+      ))}
+
+      {failed && (
+        <Notice as="p" tone="warn">
+          Something went wrong while it was writing — you can ask it to try again.
+        </Notice>
+      )}
+      {!running && (!sent || failed) && (
+        <Stack gap={4}>
+          <Button variant="primary" disabled={busy !== null} onClick={() => void ask()}>
+            Write the drafts
+          </Button>
+        </Stack>
+      )}
+      {error && <Text role="error">{error}</Text>}
+      {dialog}
+    </>
+  );
+}
+
+// The listing before it lands. A module constant for `useFetched`'s reason: a fresh literal is a new
+// blank on every render.
+const NO_GROUPS: ControlGroup[] = [];
+
+// One gate document, opened where it was changed. The listing is what turns a document's NAME into its
+// path — the block carries bare filenames, and where a foundation document lives is the server's fact
+// rather than a copy of the layout kept in the browser.
+function GateDocument({ name, path }: { name: string; path?: string }) {
+  const { value } = useFetched<string | null>(
+    async () => (path ? (await getControlFile(path)).content : null),
+    [path],
+    null,
+  );
+  if (value === null) return <Text role="hint">Opening…</Text>;
+  // Read-only and monospaced: it is a file, and the one thing this screen must not invite is editing
+  // the commands somebody is here to check.
+  return <Control as="textarea" mono readOnly rows={12} aria-label={name} value={value} />;
+}
+
+// DECISION 51 IN THE WIZARD'S OWN VOICE. CODE-QUALITY.md carries the `gates:` commands and TESTING.md
+// the `smoke:` one, and the server runs both OUTSIDE the sandbox as the person — so an agent rewriting
+// either blocks auto-pilot until somebody has read it. The block is cleared by a person saying they
+// have, and by nothing else; this is that moment, put where the change happened rather than left to a
+// refused Start days later.
+function GatesStep({ onContinue }: { onContinue: () => void }) {
+  // Asked again after the acknowledgement, and that second answer is what moves the screen on.
+  const [asked, setAsked] = useState(0);
+  const { readiness } = useReadiness(asked);
+  const { value: groups } = useFetched(listControlFiles, [], NO_GROUPS);
+  const { busy, error, run } = useAction();
+  const names = readiness?.unreviewedGates ?? [];
+  const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
+
+  // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. Acknowledging is the server's to accept, and a screen
+  // that moved on before it answered would put somebody past a block that is still there — and the
+  // next thing they press is Start.
+  useEffect(() => {
+    if (asked > 0 && names.length === 0) onContinue();
+  }, [asked, names.length, onContinue]);
+
+  const acknowledge = (): void => {
+    void run(async () => {
+      await acknowledgeGates();
+      setAsked((n) => n + 1);
+    });
+  };
+
+  return (
+    <>
+      <Text as="h2" size="title" ink="strong" family="display">
+        One thing to read before anything runs
+      </Text>
+      <Text role="hint">
+        These files hold the commands your project will be judged by — and they run on your machine, as you.
+        Read them once.
+      </Text>
+      {names.map((name) => (
+        <details key={name}>
+          <summary>{name}</summary>
+          <Stack direction="column" gap={4} pad={[4, 0, 0]}>
+            <GateDocument name={name} path={files.find((file) => file.name === name)?.path} />
+          </Stack>
+        </details>
+      ))}
+      <Stack gap={4}>
+        <Button variant="primary" disabled={busy !== null} onClick={acknowledge}>
+          I've read them — carry on
+        </Button>
+      </Stack>
       {error && <Text role="error">{error}</Text>}
     </>
   );

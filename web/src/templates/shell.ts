@@ -58,6 +58,17 @@ export function chooseContent(state: ShellState): ShellContent {
   return 'work';
 }
 
+// WHAT THE BLANK PANE SAYS, which is two different facts and not one. "No project open." is an answer;
+// "Connecting…" is the absence of one, and saying the first while the socket is still opening tells
+// somebody their project is gone when it is merely not here yet.
+//
+// Here rather than as a ternary in the shell's JSX for this file's own reason: nothing in the repository
+// mounts `App`, so a rule written there is a rule nothing can test. It also keeps the shell under the
+// cognitive-complexity ceiling it sits exactly on.
+export function emptyMessage(conn: ConnState): string {
+  return conn === 'open' ? 'No project open.' : 'Connecting…';
+}
+
 // EVERY LIGHT PROP THE TOP BAR TAKES, DERIVED IN ONE PLACE — and it exists because the hop it replaces
 // could not be tested and was silently broken by a planted defect.
 //

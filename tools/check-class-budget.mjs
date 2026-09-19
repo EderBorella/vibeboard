@@ -258,7 +258,15 @@ const PRIMITIVE_LAYER = [
 // The departure is `.msg-running`, the copilot's `…working` line, deleted with the element it styled
 // when `ThinkingIndicator` replaced it. Net −1, and the ceiling is the count with ZERO SLACK: a
 // ratchet sitting above the tree is one that would not notice the next class.
-const CLASS_CEILING = 220;
+// 220 -> 221 ON 2026-09-18, FOR `.wizard-card`, under the ruling recorded above: a legitimate class must
+// not be blocked by this ratchet. The setup wizard is a new surface (`pages/wizard/`) and it spends ONE
+// name. Its frame declares nothing — `Stack fill scroll justify="center" align="start" pad={[7, 6]}` is
+// the four declarations `.gate` writes by hand — and the one thing no atom in this tree can say is a
+// MEASURE, so `max-width: var(--measure)` on the card is the whole of it. It could have worn `.gate-card`,
+// which is the same box, and that is exactly what it must not do: the browser harness proves the board by
+// counting the picker's frame at zero, and a screen that renders with a project OPEN while wearing the
+// picker's names would make that proof answer for two screens. Zero slack is restored at 221.
+const CLASS_CEILING = 221;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

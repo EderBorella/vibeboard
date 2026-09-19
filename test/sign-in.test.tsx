@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SignIn } from '../web/src/pages/signin/SignIn.js';
-import { chooseContent, rebindOnSignIn } from '../web/src/templates/shell.js';
+import { chooseContent, emptyMessage, rebindOnSignIn } from '../web/src/templates/shell.js';
 
 afterEach(cleanup);
 
@@ -92,6 +92,16 @@ describe('when it stopped', () => {
     );
     expect(screen.getByText('That was refused.')).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+// TWO DIFFERENT FACTS, AND ONLY ONE OF THEM IS AN ANSWER. Telling somebody their project is gone while
+// the socket is still opening is a lie for the length of a round trip.
+describe('what the blank pane says', () => {
+  it('says the project is gone only once the socket can answer for it', () => {
+    expect(emptyMessage('open')).toBe('No project open.');
+    expect(emptyMessage('connecting')).toBe('Connecting…');
+    expect(emptyMessage('closed')).toBe('Connecting…');
   });
 });
 

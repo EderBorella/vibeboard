@@ -78,6 +78,35 @@ export async function writeBaseline(theme: string, baseline: Baseline): Promise<
 
 export const recording = process.env.VB_VISUAL_RECORD === '1';
 
+// THE BOARD-PROOF PROJECT, OPEN — made true rather than inherited, before anything renders.
+//
+// One server holds ONE open project for the whole run, and the `wizard-stack` surface reaches its
+// step by SWITCHING to the second project visual/run.mjs scaffolds: that is the only way into a
+// wizard step, which has no URL and no door of its own. Without this, every test after that surface
+// would land on the half-set-up project, which renders its unfinished setup INSTEAD of the board —
+// `[data-testid="ap-bar"]` never appears and the failure is a 30-second timeout in the fixture, not a
+// sentence about what went wrong. Reopening the project that is already open is not a switch and is
+// refused by nothing (`samePath` in src/server/boards/project-routes.ts), so it is a no-op for every
+// test that did not move.
+//
+// Exported because the recording pass needs it too and cannot get it from the fixture: it walks every
+// surface inside ONE test, reloading between them rather than rebuilding the page.
+export async function openFixtureProject(page: Page, baseURL: string): Promise<void> {
+  const project = process.env.VB_VISUAL_PROJECT;
+  if (!project) throw new Error('VB_VISUAL_PROJECT is not set — run the harness with `npm run visual`');
+  // WITH AN `Origin`, because the server refuses a cookie-authenticated mutation that arrives without
+  // one — `sameOrigin` in src/server/auth/auth.ts, the second of the three CSRF defences. A page's own
+  // `fetch` sends the header and Playwright's request context does not, so stating it here is what
+  // makes this the request the product makes rather than a different one that is rightly refused.
+  const reopened = await page.request.post('/api/project/open', {
+    headers: { origin: baseURL },
+    data: { path: project },
+  });
+  if (!reopened.ok()) {
+    throw new Error(`the fixture project would not open: ${reopened.status()} ${await reopened.text()}`);
+  }
+}
+
 // Sign the browser in, and PROVE the page is the board.
 //
 // This is the failure mode that would make every number in this harness a lie: the server has no
@@ -105,6 +134,7 @@ async function openBoard(page: Page, theme: Theme, baseURL: string): Promise<voi
     { name: 'vb', value: token, url: baseURL },
     { name: 'vb.in', value: '1', url: baseURL },
   ]);
+  await openFixtureProject(page, baseURL);
   // Before the app's first paint, or `useTheme` writes the default and the theme under test is
   // whatever the previous test left behind.
   await page.addInitScript((t) => {

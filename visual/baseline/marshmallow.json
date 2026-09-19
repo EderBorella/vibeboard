@@ -158,14 +158,14 @@
         "16px"
       ],
       "examined": {
-        "elements": 236,
-        "textElements": 84,
+        "elements": 240,
+        "textElements": 86,
         "overflow": 42,
         "clipping": 29,
-        "contrast": 84,
+        "contrast": 86,
         "tokens": 51,
         "rows": 10,
-        "focus": 62
+        "focus": 64
       },
       "findings": {
         "type": 0,
@@ -264,6 +264,48 @@
         "focus": 0
       }
     },
+    "wizard-stack": {
+      "fontSizes": [
+        "12px",
+        "13px",
+        "15px",
+        "18px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "16px",
+        "28px",
+        "32px"
+      ],
+      "markerHeights": [
+        "16px"
+      ],
+      "examined": {
+        "elements": 50,
+        "textElements": 21,
+        "overflow": 15,
+        "clipping": 6,
+        "contrast": 21,
+        "tokens": 51,
+        "rows": 3,
+        "focus": 15
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
+        "focus": 0
+      }
+    },
     "card": {
       "fontSizes": [
         "11px",
@@ -290,14 +332,14 @@
         "16px"
       ],
       "examined": {
-        "elements": 65,
-        "textElements": 35,
-        "overflow": 30,
+        "elements": 67,
+        "textElements": 37,
+        "overflow": 32,
         "clipping": 5,
-        "contrast": 35,
+        "contrast": 37,
         "tokens": 51,
         "rows": 5,
-        "focus": 18
+        "focus": 20
       },
       "findings": {
         "type": 0,

@@ -280,6 +280,42 @@ mkdirSync(project, { recursive: true });
 await scaffoldProject(project, { name: 'Harness', mode: 'greenfield', today: '2026-01-01' });
 await furnish(project);
 
+// A SECOND PROJECT, HALF SET UP, AND IT HAS TO BE A SECOND ONE. The wizard's later steps have no URL
+// and no door — they are reached by opening a project whose `wizard.yaml` is still on disk, which
+// resumes setup at the step the file names — so the only way to render one is a project that is
+// mid-setup. Putting that file on the board-proof project instead would replace the board with the
+// wizard for every other check in the harness: `openBoard` proves the board partly by no setup screen
+// covering it.
+//
+// THERE ARE NO AGENTS HERE. `VIBEBOARD_DOCKER_BIN` is `/bin/false`, so the stack step's own run can
+// never answer — and that step dispatches one unless the file already carries a proposal. With
+// `suggested.stack` present it renders the proposal screen and touches the network for nothing; without
+// it, the screen is a spinner over `Choosing a stack that fits…` and stays there. The key is the whole
+// fixture.
+//
+// Written through the product's own writer for the reason `scaffoldProject` is imported rather than
+// reimplemented: a second copy of the serialiser drifts, and then the harness measures a file shape the
+// product cannot produce. No `resumes` for the same reason — the copilot writes those at the docs step,
+// which is after this one, so a stack-step file carrying them is a state that never exists.
+const { writeWizardState } = await import(pathToFileURL(join(REPO, 'dist/store/project/wizard.js')));
+const midSetup = join(projects, 'setup');
+mkdirSync(midSetup, { recursive: true });
+await scaffoldProject(midSetup, { name: 'Setup in progress', mode: 'greenfield', today: '2026-01-01' });
+await writeWizardState(midSetup, {
+  mode: 'greenfield',
+  step: 'stack',
+  answers: {
+    what: 'A place to keep track of what the allotment needs each week.',
+    who: 'The four of us who share the plot, mostly on our phones.',
+    done: "Everyone can see this week's jobs without having to ask anybody.",
+  },
+  suggested: {
+    stack:
+      'A small web app written in TypeScript, with React for the screens and Vite to build them. Vitest for the tests. Nothing that needs a server of its own to begin with.',
+    packages: ['git', 'ripgrep'],
+  },
+});
+
 const stateFile = join(root, 'state.json');
 writeFileSync(stateFile, `${JSON.stringify({ lastProject: project }, null, 2)}\n`, 'utf8');
 

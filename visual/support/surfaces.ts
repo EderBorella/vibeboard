@@ -167,6 +167,44 @@ export const SURFACES: Surface[] = [
     floor: { elements: 40, text: 15, contrast: 15, focus: 3 },
   },
   {
+    name: 'wizard-stack',
+    what: "the setup wizard's stack step — the proposal, the box to overrule it and what the sandbox installs",
+    root: null,
+    open: async (page) => {
+      // A DIFFERENT PROJECT, AND THAT IS THE ONLY WAY IN. These steps have no door of their own: the
+      // wizard resumes at the step its file names when a project with an unfinished setup is opened
+      // (`useWizard`), so the path is the picker and the second project visual/run.mjs scaffolds — the
+      // board-proof one must never carry that file, or every other check would measure this screen.
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      // By NAME, not by position: the picker sorts on it, and a row keyed on the temp root's path
+      // would name a directory that is different on every run.
+      await page.locator('.gate li').filter({ hasText: 'Setup in progress' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+      // THE ENGINEER'S FOLD, OPENED, because a closed `<details>` renders none of its contents: the
+      // packages field the run prefilled is the only control on this screen that is neither prose nor a
+      // button, and every check would walk straight past it.
+      await page.locator('.wizard-card details summary').click();
+    },
+    prove: async (page) => {
+      // THE PROPOSAL ITSELF, and it is the assertion that makes this surface distinguishable from the
+      // step failing to load its state. `Use this stack` renders on the answered screen whether or not
+      // anything was proposed — disabled, over an empty screen — so proving the button alone would pass
+      // on a run that proposed nothing, which is exactly what this harness gets: it has no agents.
+      await expect(page.locator('[data-testid="verbatim-stack"]')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Use this stack' })).toBeEnabled();
+      // Open, and with its field in it: `toBeVisible` on a control inside a closed fold is false, so
+      // this is also what says the click in `open` still lands.
+      await expect(page.locator('.wizard-card details input.vb-ctl')).toBeVisible();
+      await gone(page, '.gate');
+      await gone(page, 'main.boards');
+    },
+    // 50 elements are measured here. The floor is set close because the failure it has to catch is a
+    // near miss: the waiting screen this step shows while a run is choosing is the same card with a
+    // spinner and four fewer controls in it, and a loose floor would record it as a surface.
+    floor: { elements: 40, text: 15, contrast: 15, focus: 10 },
+  },
+  {
     name: 'card',
     what: 'an open card in the dock — its tab strip, the card view, its runs and the skill rail',
     root: '[data-testid="dock-body"]',

@@ -205,7 +205,7 @@ describe('the identity step, bringing in a repository', () => {
   it('asks for one path and says what that path is', () => {
     view({ mode: 'brownfield' });
 
-    expect(screen.getByText('Repository (full path)')).toBeTruthy();
+    expect(screen.getByText('Folder (full path)')).toBeTruthy();
     expect(screen.getByText('The folder that holds the project you want to bring in.')).toBeTruthy();
     // Where a new project goes is not asked: the folder already exists and is the answer. Its NAME is
     // asked, prefilled from the path — see the two cases below.
@@ -214,7 +214,7 @@ describe('the identity step, bringing in a repository', () => {
 
   it('sends brownfield, and names the project after the folder it was given', async () => {
     view({ mode: 'brownfield' });
-    type(/repository/i, '/work/My Repo/');
+    type(/^folder/i, '/work/My Repo/');
 
     fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
 
@@ -230,7 +230,7 @@ describe('the identity step, bringing in a repository', () => {
   // path to complain about, simply refused to do anything when pressed.
   it('asks for a name when the folder cannot give one, rather than refusing in silence', () => {
     view({ mode: 'brownfield' });
-    type(/repository/i, '/work/日本語');
+    type(/^folder/i, '/work/日本語');
 
     const bring = screen.getByRole('button', { name: 'Bring it in' }) as HTMLButtonElement;
     expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('');
@@ -249,7 +249,7 @@ describe('the identity step, bringing in a repository', () => {
     // It was derived and never shown, so the one place a person could learn what their project would be
     // called was the top bar after it had been created.
     view({ mode: 'brownfield' });
-    type(/repository/i, '/work/My Repo/');
+    type(/^folder/i, '/work/My Repo/');
 
     expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('my-repo');
 
@@ -261,7 +261,7 @@ describe('the identity step, bringing in a repository', () => {
 
   it('will not bring in a relative path either', () => {
     view({ mode: 'brownfield' });
-    type(/repository/i, 'work/my-repo');
+    type(/^folder/i, 'work/my-repo');
 
     expect((screen.getByRole('button', { name: 'Bring it in' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/absolute path/i)).toBeTruthy();
@@ -781,18 +781,105 @@ describe('the form step', () => {
     );
   });
 
-  it('says nothing outside the fold that only an engineer would recognise', async () => {
-    // A cheap W7 tripwire on the one surface in the product written for somebody who has never seen it.
-    // The fold is exempt by name — it is labelled "For engineers" and is where those words belong.
+  it('keeps everything an engineer wants behind one fold', async () => {
+    // W8. The words INSIDE the fold are where the jargon belongs, and the sweep below exempts it by
+    // element for that reason — so this is what proves the fold is really there to be exempted.
     const { container } = form();
     await screen.findByRole('button', { name: 'Continue' });
 
     expect(container.querySelector('details')).not.toBeNull();
+    expect(screen.getByText('For engineers')).toBeTruthy();
+  });
+});
+
+// W7, OVER EVERY STEP AND NOT THE ONE THAT HAPPENS TO HAVE A FOLD. The tripwire lived inside the form
+// step's describe and swept four words on one screen; the three words that were actually on the wizard
+// — "container", "Repository", "copilot" — were all on the other three steps, so it passed over each of
+// them. It is a sweep of the SURFACE now.
+//
+// TWO EXEMPTIONS, BOTH BY ELEMENT AND NEITHER BY WORD:
+//
+//   - `<details>`, which is labelled "For engineers" and is the place those words belong.
+//   - the probe's own sentence, which is the server's and is rendered verbatim on purpose — it is the
+//     only thing on the screen that names the command or the setting that clears the fault, and the
+//     gate that will refuse the first run computes it. Rewording it here would send somebody to fix
+//     something that is not broken. It carries a test handle so this can skip it by element; the
+//     fixtures below put jargon INSIDE it, so removing the handle turns this red rather than green.
+//
+// The list is every word the product's own code uses constantly, which is exactly why they leak.
+describe('the words on every step (W7)', () => {
+  const JARGON = [
+    'config',
+    'yaml',
+    'backend',
+    'docker',
+    'container',
+    'repository',
+    'copilot',
+    'scaffold',
+    'sandbox',
+  ];
+
+  const sweep = (what: string, container: HTMLElement): void => {
     const plain = container.cloneNode(true) as HTMLElement;
     for (const fold of plain.querySelectorAll('details')) fold.remove();
-    expect(plain.textContent).not.toBe('');
-    for (const jargon of ['config', 'yaml', 'backend', 'docker']) {
-      expect(plain.textContent?.toLowerCase()).not.toContain(jargon);
+    for (const quoted of plain.querySelectorAll('[data-testid="verbatim-reason"]')) quoted.remove();
+    const text = (plain.textContent ?? '').toLowerCase();
+    // A step that rendered nothing would pass every assertion below it.
+    expect(text.length, `${what} rendered almost nothing`).toBeGreaterThan(60);
+    for (const word of JARGON) expect(text, `${what}: "${word}"`).not.toContain(word);
+  };
+
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
+  });
+
+  it('asks for a project in plain words, through either door', () => {
+    sweep('starting a new project', view().container);
+    cleanup();
+    sweep('bringing a folder in', view({ mode: 'brownfield' }).container);
+  });
+
+  it('says the machine is ready in plain words', async () => {
+    const { container } = view({ start: 'backend', snapshot: opened });
+    await screen.findByText('Connected and ready.');
+
+    sweep('the machine is ready', container);
+  });
+
+  it('says what is wrong in plain words, whatever the probe refused', async () => {
+    // The probe's four refusal kinds, each with a reason FULL of the words this sweeps for — because
+    // the reason is the server's and is exempt, and a fixture that did not carry them would leave the
+    // exemption untested. The heading beside it is ours, and is what is being read here.
+    const reasons: [NonNullable<SandboxState['refusalKind']>, string][] = [
+      ['credential', 'the Claude Code sign-in on this machine has expired'],
+      ['docker', 'the agent image vibeboard-agent:latest is not built yet — run a docker build'],
+      ['backend', 'the OpenCode server this project is attached to is not answering'],
+      ['attached', 'this project is attached to a sandbox VibeBoard did not start'],
+    ];
+    for (const [refusalKind, reason] of reasons) {
+      api.getSandbox.mockResolvedValue({
+        ok: false,
+        backend: 'managed',
+        reason,
+        refusalKind,
+        agentRefusal: `Agents are disabled: ${reason}.`,
+      });
+      const { container } = view({ start: 'backend', snapshot: opened });
+      await screen.findByText(reason);
+
+      sweep(`the ${refusalKind} refusal`, container);
+      cleanup();
     }
+  });
+
+  it('asks its questions and hands over in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+    const form = view({ start: 'form', snapshot: opened });
+    await screen.findByRole('button', { name: 'Continue' });
+    sweep('the questions', form.container);
+    cleanup();
+
+    sweep('the hand-off', view({ start: 'handoff', snapshot: opened }).container);
   });
 });

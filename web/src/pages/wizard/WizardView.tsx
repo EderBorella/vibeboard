@@ -199,8 +199,8 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
       </Text>
       <Text role="hint">
         {greenfield
-          ? 'Creates the folder, the board, and the container its agents will run in. The container is built the first time and reused after that.'
-          : 'Adds the board and the container beside what is already there. Your files stay where they are.'}
+          ? 'Creates the folder, the board, and the private workspace your assistant will work inside. That workspace is prepared the first time and reused after that.'
+          : 'Adds the board and your assistant’s own workspace beside what is already there. Your files stay where they are.'}
       </Text>
 
       {greenfield ? (
@@ -212,8 +212,12 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
           />
         </Field>
       ) : (
-        <Field label="Repository (full path)" hint="The folder that holds the project you want to bring in.">
-          <Control value={repo} placeholder="/path/to/repository" onChange={(e) => setRepo(e.target.value)} />
+        <Field label="Folder (full path)" hint="The folder that holds the project you want to bring in.">
+          <Control
+            value={repo}
+            placeholder="/path/to/your-project"
+            onChange={(e) => setRepo(e.target.value)}
+          />
         </Field>
       )}
       {/* ASKED IN BOTH MODES, and bringing a folder in is the half that was missing: its name was
@@ -262,7 +266,7 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
 // person has just read is worse than no remedy at all.
 const REFUSAL_TITLE: Record<NonNullable<SandboxState['refusalKind']>, string> = {
   credential: 'Almost — one thing to do outside VibeBoard',
-  docker: 'Almost — the container it runs in is not ready',
+  docker: 'Almost — the workspace it runs in is not ready',
   backend: 'Almost — the assistant is not answering',
   attached: 'Almost — one thing to change in Settings',
 };
@@ -339,8 +343,8 @@ function BackendStep({
         Is the assistant ready?
       </Text>
       <Text role="hint">
-        Your project's work is done by an assistant running in a container on this machine. This is a live
-        check that one can actually start.
+        Your project's work is done by an assistant that runs on this machine, in a workspace of its own. This
+        is a live check that one can actually start.
       </Text>
 
       {copilot && (
@@ -377,8 +381,11 @@ function BackendStep({
               are computed by the same gate that will refuse the first run — so a wizard that reworded
               them could send somebody to fix what is not broken. `reason` is the fault's own sentence;
               an attached server is refused by the gate alone and has none, so that one falls back to
-              the gate's. */}
-          <Notice as="p" tone="warn">
+              the gate's.
+              THE HANDLE IS WHY IT CAN NAME A COMMAND. Every other word on this screen is swept for the
+              nine engineer's words a beginner should never meet (W7); this line is exempt BY ELEMENT,
+              because these words are not this screen's to choose. */}
+          <Notice as="p" tone="warn" testId="verbatim-reason">
             {sandbox.reason ?? sandbox.agentRefusal}
           </Notice>
         </>
@@ -591,7 +598,7 @@ function HandoffStep() {
         That is setup done
       </Text>
       <Text role="hint">
-        The next part needs the copilot, and it isn't built yet — everything you chose is saved.
+        The next part needs the assistant, and it isn't built yet — everything you chose is saved.
       </Text>
     </>
   );

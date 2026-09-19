@@ -89,6 +89,11 @@ export function ProjectGate({ onOpened, onNewProject, onMapProject }: Props) {
           <Button variant="primary" onClick={onNewProject}>
             New project
           </Button>
+          {/* `repository` SURVIVES ON THE DOOR AND NOWHERE BEHIND IT. The wizard sweeps that word out
+              of every step it renders, because a beginner meeting it there has no way to act on it —
+              but here the word IS the job: it is what somebody who has one is scanning this card for,
+              and somebody who does not know it is not who this door is for. A door self-selects its
+              audience; the screen behind it has already been chosen by one. */}
           <Button onClick={onMapProject}>Map an existing repository</Button>
         </Stack>
 

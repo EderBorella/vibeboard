@@ -60,6 +60,11 @@ export async function afterProjectRun(
     // out of the README and are what this stop asks a person to check, while the harness card is canned
     // (ruling 66) and came from us. A count folding it in sends somebody looking in their README for a
     // feature that was never in it.
+    //
+    // AND IT IS EVERY FEATURE ON THE BOARD, not the ones this run made — the same number only because the
+    // bootstrap is dispatched on a board holding NO cards at all (`decideTick`'s `cards.length === 0`,
+    // decision 74). That gate is what makes the count honest; loosen it and this says "derived N features"
+    // about a list the person mostly wrote themselves, and asks them to confirm their own backlog.
     derived = features.length;
     await stampSetup(deps, features);
     harness = await createHarnessFeature(deps);

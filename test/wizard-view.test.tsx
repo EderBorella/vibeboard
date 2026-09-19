@@ -1722,6 +1722,45 @@ describe('the gates step', () => {
     expect(shown.value).toBe('gates:\n  - npm test\n');
   });
 
+  // THE PRESS IS A CLAIM ABOUT WHAT IS ON THE SCREEN — "I've read them" — and it is the only way the
+  // block is ever cleared. It was live from the first paint: `unreviewedGates` reads `?? []` before
+  // the answer lands, so for one round trip the screen named no documents, showed no documents, and
+  // offered a button asserting both had been read. The next thing that button leads to is Start.
+  it('will not take the word of somebody with nothing in front of them', async () => {
+    const asked = deferred<Readiness>();
+    api.getReadiness.mockReturnValue(asked.promise);
+    gates();
+
+    const carry = (await screen.findByRole('button', {
+      name: "I've read them — carry on",
+    })) as HTMLButtonElement;
+    expect(carry.disabled).toBe(true);
+
+    await asked.settle(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }));
+
+    await waitFor(() => expect(carry.disabled).toBe(false));
+  });
+
+  // The other half of "in front of them": the readiness names a document and the LISTING is what
+  // turns that name into a path to open it with. Without the path the fold holds "Opening…" for
+  // ever, so the name is on the screen and the document is not.
+  it('waits for the documents it named to be openable', async () => {
+    api.listControlFiles.mockResolvedValue([
+      { key: 'foundation', label: 'Foundation', creatable: false, files: [foundation[0].files[0]] },
+    ]);
+    gates();
+
+    const carry = (await screen.findByRole('button', {
+      name: "I've read them — carry on",
+    })) as HTMLButtonElement;
+    // CODE-QUALITY.md is in the listing and TESTING.md is not, so one of the two documents this
+    // screen is naming cannot be opened at all.
+    expect(await screen.findByText('TESTING.md')).toBeTruthy();
+    await waitFor(() => expect(api.getControlFile).toHaveBeenCalled());
+    expect(carry.disabled).toBe(true);
+    expect(api.acknowledgeGates).not.toHaveBeenCalled();
+  });
+
   it('clears the block and moves on once the server agrees it is clear', async () => {
     api.getReadiness
       .mockResolvedValueOnce(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }))

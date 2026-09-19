@@ -1326,6 +1326,15 @@ function GatesStep({ mode, onContinue }: { mode: ScaffoldMode; onContinue: () =>
   const { busy, error, run } = useAction();
   const names = readiness?.unreviewedGates ?? [];
   const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
+  // The listing is what turns a document's NAME into the path it is opened from; without one the
+  // fold holds "Opening…" for ever, so the name is on the screen and the document is not.
+  const pathFor = (name: string): string | undefined => files.find((file) => file.name === name)?.path;
+  // WHETHER THERE IS ANYTHING TO HAVE READ. The press is a claim about what is on this screen and it
+  // is the only thing that ever clears the block, so it waits for both reads: `?? []` above made the
+  // button live for the round trip in which the screen named no documents and showed none. An
+  // ANSWERED readiness naming nothing leaves it live deliberately — there is nothing to wait for, and
+  // a resume onto a step whose block has since been cleared must still have a way forward.
+  const openable = readiness !== null && names.every((name) => pathFor(name) !== undefined);
   // Once, whatever the effect below is re-run by. `leave` is rebuilt on every render — `saved` is —
   // so without this the write would repeat for as long as the parent took to unmount this step.
   const moved = useRef(false);
@@ -1371,12 +1380,12 @@ function GatesStep({ mode, onContinue }: { mode: ScaffoldMode; onContinue: () =>
         <details key={name}>
           <summary>{name}</summary>
           <Stack direction="column" gap={4} pad={[4, 0, 0]}>
-            <GateDocument name={name} path={files.find((file) => file.name === name)?.path} />
+            <GateDocument name={name} path={pathFor(name)} />
           </Stack>
         </details>
       ))}
       <Stack gap={4}>
-        <Button variant="primary" disabled={busy !== null} onClick={acknowledge}>
+        <Button variant="primary" disabled={busy !== null || !openable} onClick={acknowledge}>
           I've read them — carry on
         </Button>
       </Stack>

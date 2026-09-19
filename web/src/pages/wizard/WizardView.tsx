@@ -52,6 +52,7 @@ import { BackendPicker } from '../../organisms/copilot/BackendPicker';
 import { CopilotPanel } from '../../organisms/copilot/CopilotPanel';
 import { clampToCaps, resolveChoice } from '../../organisms/copilot/choice';
 import { ThinkingIndicator } from '../../organisms/copilot/ThinkingIndicator';
+import { List } from '../../organisms/shared/List';
 
 // EVERYTHING THE EMBEDDED CONVERSATION NEEDS, TAKEN OFF THE ORGANISM rather than restated here. The
 // documents step renders the DOCK'S panel — the same component, on the same `useCopilot` instance —
@@ -188,7 +189,14 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
   const leaveForm = useCallback(() => setStep('stack'), []);
   const leaveStack = useCallback(() => setStep('docs'), []);
   const leaveGates = useCallback(() => setStep('import'), []);
-  const leaveImport = useCallback(() => setStep('ready'), []);
+  // WHAT THE IMPORT SAID IT DID, carried to the screen that reports it — the scan notice's pattern and
+  // its reason: the count is the model's own closing sentence, and the step that heard it is unmounted
+  // by the time the closing screen renders. Absent when no turn ran, which is the common journey.
+  const [imported, setImported] = useState<string>();
+  const leaveImport = useCallback((made?: string) => {
+    setImported(made);
+    setStep('ready');
+  }, []);
 
   let body: ReactNode;
   if (step === 'identity')
@@ -211,7 +219,7 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
   else if (step === 'docs')
     body = <DocsStep mode={mode} snapshot={snapshot} copilot={copilot} onContinue={setStep} />;
   else if (step === 'gates') body = <GatesStep mode={mode} onContinue={leaveGates} />;
-  else if (step === 'ready') body = <ReadyStep />;
+  else if (step === 'ready') body = <ReadyStep mode={mode} snapshot={snapshot} imported={imported} />;
   // `handoff` LANDS HERE. It was where setup ended before the journey had an import and a closing
   // screen; it is retired from the flow, still on the disk of anything set up under that build, and
   // what it was standing in front of is this step. decision 79.
@@ -228,7 +236,7 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
               press, so it stops being a skip and ENDS setup rather than leaving it. */}
           {step === 'ready' ? (
             <Button variant="primary" disabled={busy !== null} onClick={endSetup}>
-              Take me to the board
+              Open the board
             </Button>
           ) : (
             <Button onClick={onExit}>Not now — take me to the board</Button>
@@ -1770,7 +1778,10 @@ function ImportStep({
   mode: ScaffoldMode;
   snapshot: ProjectSnapshot | null;
   copilot: Conversation;
-  onContinue: () => void;
+  // WITH WHAT THE ASSISTANT SAID IT DID, where a turn ran. The closing screen reports it and this is
+  // the only place it exists: the sentence is pulled out of a transcript this step has a mark in, and
+  // the mark goes with the step. Absent through the no-door, which reported nothing because nothing ran.
+  onContinue: (made?: string) => void;
 }) {
   const { saved } = useSaved(mode);
   const { confirm, dialog } = useConfirm();
@@ -1819,13 +1830,16 @@ function ImportStep({
   // THE FILE MOVES WITH THE SCREEN, from a fresh read — the docs step's `leave` exactly and for its
   // reason: `putWizard` replaces the file whole, and `wizardFrame` keys on the step, so a file left
   // at `import` would prefix every later conversation on this project with the import brief.
-  const leave = useCallback(async (): Promise<void> => {
-    const latest = await getWizard()
-      .then((r) => r.state ?? undefined)
-      .catch(() => undefined);
-    await putWizard({ ...(latest ?? saved('ready')), step: 'ready' }).catch(() => {});
-    onContinue();
-  }, [onContinue, saved]);
+  const leave = useCallback(
+    async (made?: string): Promise<void> => {
+      const latest = await getWizard()
+        .then((r) => r.state ?? undefined)
+        .catch(() => undefined);
+      await putWizard({ ...(latest ?? saved('ready')), step: 'ready' }).catch(() => {});
+      onContinue(made);
+    },
+    [onContinue, saved],
+  );
 
   const bring = useCallback(async (): Promise<void> => {
     // ASKED ONLY WHERE IT IS NOT ALREADY THERE. The documents step granted this a screen ago, and a
@@ -1930,7 +1944,7 @@ function ImportStep({
           is finishing over a half-made board. */}
       {settled && (
         <Stack gap={4}>
-          <Button variant="primary" disabled={running || busy !== null} onClick={() => void leave()}>
+          <Button variant="primary" disabled={running || busy !== null} onClick={() => void leave(made)}>
             Done — finish up
           </Button>
         </Stack>
@@ -1941,15 +1955,84 @@ function ImportStep({
   );
 }
 
-function ReadyStep() {
+// THE END OF SETUP, AND IT IS A REPORT RATHER THAN A CELEBRATION (W1, decision 79). Every sentence is
+// composed from what the wizard ALREADY HOLDS — the file it has been writing since the scaffold and
+// the project's own settings — plus one read of the readiness. Nothing here asks the server what was
+// just set up: a summary that re-derives its own facts is a second opinion about them, and two answers
+// to one question is the state this screen exists to end.
+//
+// ANYTHING UNKNOWN IS LEFT OUT RATHER THAN GUESSED, heading included. A setup resumed at this step
+// knows less than one walked end to end, and a line written to fill the gap would be the only thing
+// here a person has no way to check.
+//
+// AND IT NEVER BLOCKS ON READINESS. The wizard ends at a project ready to hand over; whether auto-pilot
+// could start this second is the board's question, and decision 74's gate is what meets them after
+// Start. An honest gap with the way out still open is the whole of W1.
+function ReadyStep({
+  mode,
+  snapshot,
+  // What the import reported, in the assistant's own words, handed over by the step that watched it.
+  imported,
+}: {
+  mode: ScaffoldMode;
+  snapshot: ProjectSnapshot | null;
+  imported?: string;
+}) {
+  const { saved } = useSaved(mode);
+  // ONCE, ON MOUNT — a constant trigger, because there is nothing on this screen that could change the
+  // answer. Null is "not answered yet" and a read that REJECTED leaves it null too, which is why
+  // neither branch below renders on it: reassurance before the answer lands is a lie for the length of
+  // a round trip, and a gap inferred from a rejection is the same lie the other way up.
+  const { readiness } = useReadiness(0);
+  const state = saved('ready');
+  const kind = snapshot?.config.box?.kind;
+  // ALL SIX OR NOTHING, because the sentence below COUNTS them. The documents step can hand over with
+  // fewer — a readiness read that failed lets it past — and "Six documents written" over five is the
+  // one claim on this screen nobody reading it can check.
+  const documents = Object.keys(DOC_NAMES).every((name) => state.resumes?.[name] !== undefined);
+
   return (
     <>
       <Text as="h2" size="title" ink="strong" family="display">
         That is setup done
       </Text>
-      <Text role="hint">
-        The next part needs the assistant, and it isn't built yet — everything you chose is saved.
-      </Text>
+      <Text role="hint">Everything you chose is saved. Here is what the project has now.</Text>
+
+      {kind && <Text as="p">Set up as: {KIND_LABELS[kind]}</Text>}
+      {/* THE SENTENCE THEY AGREED TO, WHOLE, and it is the model's words or their own rather than this
+          screen's — so it is exempt from the plain-words sweep by element, exactly as it is on the step
+          that proposed it. A summary that reworded the stack would be re-deciding it on the way out. */}
+      {state.stack && (
+        <Text as="p">
+          Built with: <Text testId="verbatim-stack">{state.stack}</Text>
+        </Text>
+      )}
+      {documents && <Text as="p">Six documents written — read them any time in Project Control</Text>}
+      {/* WHAT THE IMPORT SAID IT MADE, exempt for the same reason: the frame asked the model to state
+          the counts plainly, and nothing in the browser knows how many cards were created. */}
+      {imported && (
+        <Text as="p" testId="verbatim-imported">
+          {imported}
+        </Text>
+      )}
+
+      {readiness?.ok && <Text as="p">Everything auto-pilot needs is here.</Text>}
+      {readiness && !readiness.ok && (
+        <>
+          {/* THE SERVER'S OWN SENTENCES, LISTED AND NOT REWRITTEN. Each names the file or the block
+              that clears it, and a wizard that reworded them would send somebody to fix what is not
+              broken — the probe refusal's argument on the backend step, and the same exemption by
+              element. No class: `ul.vb-list` already cancels the marker and the gap is the atom's. */}
+          <List as="ul" gap={2} testId="verbatim-blockers">
+            {readiness.blockers.map((blocker) => (
+              <li key={blocker}>
+                <Text>{blocker}</Text>
+              </li>
+            ))}
+          </List>
+          <Text as="p">You can fix these from the board — nothing is lost.</Text>
+        </>
+      )}
     </>
   );
 }

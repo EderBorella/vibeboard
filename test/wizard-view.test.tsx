@@ -412,7 +412,7 @@ describe('the two ways out', () => {
   it('finishing deletes the file BEFORE it leaves, exactly as abandoning does', async () => {
     view({ start: 'ready', snapshot: opened });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open the board' }));
 
     await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
     expect(api.clearWizard).toHaveBeenCalledTimes(1);
@@ -425,7 +425,7 @@ describe('the two ways out', () => {
     view({ start: 'ready', snapshot: opened });
 
     expect(screen.queryByRole('button', { name: 'Stop offering this' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Take me to the board' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open the board' })).toBeTruthy();
   });
 
   it('does not offer to stop before there is anything to stop', () => {
@@ -575,7 +575,7 @@ describe('the offer to finish setup', () => {
     // Wired the way the shell wires it: the wizard's only report of leaving is `onExit`, and the shell's
     // handler is `setup.leave()`.
     view({ start: 'ready', snapshot: opened, onExit: () => result.current.leave() });
-    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open the board' }));
 
     await waitFor(() => expect(result.current.pending).toBe(false));
     act(() => result.current.resume());
@@ -2613,6 +2613,156 @@ describe('the import step', () => {
   });
 });
 
+// THE END OF SETUP, WHICH IS A REPORT AND NOT A CELEBRATION (W1, decision 79). It says what is now in
+// place in plain sentences, says honestly whether auto-pilot could start, and does not hold anybody
+// here over the answer: the wizard ends at "project ready to hand over", and a gap that is left is the
+// board's to show.
+//
+// EVERY SENTENCE COMES FROM WHAT THE WIZARD ALREADY HOLDS — the file and the snapshot — plus one read
+// of the readiness. Nothing here asks the server what it set up, because a summary that re-derives its
+// own facts is a second opinion about them.
+describe('the ready screen', () => {
+  const FINISH = 'Open the board';
+  const DOCUMENTS = 'Six documents written — read them any time in Project Control';
+  const ALL_SIX = Object.fromEntries(
+    ['README.md', 'STACK.md', 'CODE-QUALITY.md', 'TESTING.md', 'UX.md', 'DESIGN.md'].map((name) => [
+      name,
+      `What ${name} says, in a sentence.`,
+    ]),
+  );
+
+  const finished = (state: Partial<WizardState> = {}) => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'ready', ...state } });
+    return view({ start: 'ready', snapshot: opened });
+  };
+
+  it('says what was set up, one plain sentence at a time', async () => {
+    const stack = 'A small web app in TypeScript, with React for the screens and Vitest for the tests.';
+    finished({ stack, resumes: ALL_SIX });
+
+    expect(await screen.findByText(DOCUMENTS)).toBeTruthy();
+    // The kind is the config's — the form wrote it there — and the plain name is the one the form
+    // offered, not the slug the image is built from.
+    expect(screen.getByText('Set up as: Web App')).toBeTruthy();
+    // The sentence is the model's or the person's own, whole: it is what the box will be built
+    // against, and a wizard that reworded it here would be re-deciding it on the way out.
+    expect(screen.getByTestId('verbatim-stack').textContent).toBe(stack);
+    expect(screen.getByRole('button', { name: FINISH })).toBeTruthy();
+  });
+
+  // ANYTHING UNKNOWN IS OMITTED RATHER THAN GUESSED, and a heading over nothing is the failure this
+  // pins: a setup that skipped the stack and the documents has nothing to say about either, and
+  // "Six documents written" over a project with none is the one sentence this screen must never say.
+  it('omits what it cannot say, and still ends setup', async () => {
+    finished();
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByText(DOCUMENTS)).toBeNull();
+    expect(screen.queryByTestId('verbatim-stack')).toBeNull();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
+  });
+
+  // A PART-WRITTEN SET IS NOT SIX. The sentence counts, so it is said when the count is what it says
+  // — the documents step can end with fewer, and a line that rounded five up to six would be the
+  // screen lying about the one thing a person cannot check from here.
+  it('does not call five documents six', async () => {
+    const five = Object.fromEntries(Object.entries(ALL_SIX).filter(([name]) => name !== 'DESIGN.md'));
+    finished({ resumes: five });
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByText(DOCUMENTS)).toBeNull();
+  });
+
+  // READINESS, HONESTLY, AND IT NEVER STANDS IN THE WAY (W1). Setup ends at a project ready to hand
+  // over; whether auto-pilot could start this second is the board's question, and holding somebody
+  // inside the wizard over it would make the last screen a second gate on top of decision 74's.
+  it('lists what is still missing without blocking the way out', async () => {
+    api.getReadiness.mockResolvedValue(
+      readiness({
+        ok: false,
+        blockers: ['foundation/UX.md has not been written yet.', 'There is no card on any board.'],
+      }),
+    );
+    finished();
+
+    expect(await screen.findByText('foundation/UX.md has not been written yet.')).toBeTruthy();
+    expect(screen.getByText('There is no card on any board.')).toBeTruthy();
+    expect(screen.getByText('You can fix these from the board — nothing is lost.')).toBeTruthy();
+    expect(screen.queryByText('Everything auto-pilot needs is here.')).toBeNull();
+
+    const finish = screen.getByRole('button', { name: FINISH }) as HTMLButtonElement;
+    expect(finish.disabled).toBe(false);
+    fireEvent.click(finish);
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
+  });
+
+  it('says so when there is nothing missing', async () => {
+    finished();
+
+    expect(await screen.findByText('Everything auto-pilot needs is here.')).toBeTruthy();
+    expect(screen.queryByText('You can fix these from the board — nothing is lost.')).toBeNull();
+  });
+
+  // A READ THAT FAILED IS NOT AN ANSWER. Reassurance over a question that could not be asked is the
+  // lie `useReadiness` exists to prevent, and a blocker list invented from a rejection is the other
+  // one — so a failed read says neither, and the board asks again.
+  it('promises nothing when the readiness could not be read', async () => {
+    api.getReadiness.mockRejectedValue(new Error('no'));
+    finished({ stack: 'TypeScript and React.' });
+
+    expect(await screen.findByTestId('verbatim-stack')).toBeTruthy();
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    await act(async () => {});
+    expect(screen.queryByText('Everything auto-pilot needs is here.')).toBeNull();
+    expect(screen.queryByText('You can fix these from the board — nothing is lost.')).toBeNull();
+    expect((screen.getByRole('button', { name: FINISH }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // WHAT THE IMPORT DID, CARRIED FORWARD BY THE SCREEN THAT SAW IT. The count is the model's own
+  // closing sentence and lives in the step that ran the turn; the ready screen is mounted after that
+  // step is gone, so it is handed over on the way — the scan step's notice exactly.
+  it('repeats what the import reported, in the assistant’s own words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    type(/paste your list/i, 'Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const made = 'I made 6 cards on features and 2 on engineering.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: made } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Done — finish up' }));
+
+    expect(await screen.findByTestId('verbatim-imported')).toBeTruthy();
+    expect(screen.getByTestId('verbatim-imported').textContent).toBe(made);
+  });
+
+  // AND THE OTHER HALF, without which the case above only proves a sentence can appear: the no-door
+  // is the common journey (W1), and a screen reporting an import over a person who never ran one
+  // would be the summary inventing the one fact on it that cost money.
+  it('says nothing about an import that never ran', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    view({ start: 'import', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'No — finish up' }));
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
+  });
+});
+
 // W7, OVER EVERY STEP AND NOT THE ONE THAT HAPPENS TO HAVE A FOLD. The tripwire lived inside the form
 // step's describe and swept four words on one screen; the three words that were actually on the wizard
 // — "container", "Repository", "copilot" — were all on the other three steps, so it passed over each of
@@ -2927,6 +3077,66 @@ describe('the words on every step (W7)', () => {
     expect(screen.getByTestId('verbatim-made').textContent).toBe(reply);
     expect((screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase()).toContain('docker');
     sweep('the import once it has run', container);
+  });
+
+  // THE LAST SCREEN, WHERE THREE VOICES MEET AND ONLY ONE OF THEM IS THIS WIZARD'S. What it says about
+  // the kind, the documents and the way out is its own copy and is swept. The agreed stack and the
+  // import's count are the MODEL'S — shown because they were agreed and reported, not written here —
+  // and the blockers are the SERVER'S, which name the file or the block that clears them and would
+  // send somebody to fix the wrong thing if this screen reworded them. All three exempt elements carry
+  // a fixture full of the words this sweeps for, so taking any one handle off turns this red.
+  it('ends setup in plain words, around three sets of words that are not its own', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    api.getReadiness.mockResolvedValue(
+      readiness({
+        ok: false,
+        // Verbatim from `coverageProblems` in src/core/autopilot-cover.ts, which is where this
+        // sentence is composed: a blocker invented here would be plain in exactly the way the real
+        // ones are not.
+        blockers: ['This project has no autopilot block in config.yaml, so there is no lifecycle to run.'],
+      }),
+    );
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const made = 'I made 4 cards. The docker container and the yaml config went to engineering.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: made } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+
+    // The file as the closing screen reads it, with the stack the person agreed to in the model's
+    // own sentence — the step writes and re-reads, so the answer has to be in place before the press.
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'ready',
+        stack: 'A Node repository, its config in yaml, run in a Docker container',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done — finish up' }));
+    await screen.findByRole('button', { name: 'Open the board' });
+
+    // The premises, all three: the exempt elements really do carry the words, or their handles prove
+    // nothing at all.
+    expect(await screen.findByTestId('verbatim-stack')).toBeTruthy();
+    expect((screen.getByTestId('verbatim-stack').textContent ?? '').toLowerCase()).toContain('docker');
+    expect(screen.getByTestId('verbatim-imported').textContent).toBe(made);
+    expect((screen.getByTestId('verbatim-blockers').textContent ?? '').toLowerCase()).toContain('yaml');
+    sweep('the end of setup', container);
   });
 
   // THE DOCUMENT ITSELF, OPENED, which is where the model's words are thicker than any summary: a

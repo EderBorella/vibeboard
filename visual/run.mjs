@@ -279,6 +279,15 @@ function seedChat(projectRoot, chat) {
   writeFileSync(join(chatDir, `${chat.id}.json`), `${JSON.stringify(chat, null, 2)}\n`, 'utf8');
 }
 
+// THE FIXTURE PROJECT NAMES ARE MEASURED, NOT DECORATIVE, AND 17 CHARACTERS IS THE CEILING. Every
+// check opens its surface through the picker, and the name it clicks is also the name the top bar then
+// renders. At the harness's 1280 viewport that row holds 17 and wraps at 18: measured by renaming
+// "Setup in progress" — which is exactly 17 — to an eighteenth character and watching check 7 go from
+// 0 findings to 1, `header.vb-stack — 5 children span 68.0px, tallest is 28.0px`, on the surface that
+// opens that project. A longer name here therefore does not fail as a wrong name; it fails as a
+// wrapped TOP BAR reported against a wizard step that has nothing to do with it, which is a morning
+// spent looking in the wrong place. The wrap is a real product finding and not this file's to fix —
+// a top bar that cannot hold a project name needs a decision, not a shorter fixture.
 const projects = join(root, 'projects');
 const project = join(projects, 'harness');
 mkdirSync(project, { recursive: true });
@@ -443,6 +452,23 @@ await writeWizardState(review, {
     'DESIGN.md':
       'How it should look: one accent colour, generous spacing, the system font. I could not work out whether you want a dark mode, and the document says so.',
   },
+});
+
+// AND THE BLOCK THAT WRITING THEM RAISES, because a fixture has to be a state the product can reach.
+// This project's CODE-QUALITY.md carries the `gates:` list and its TESTING.md the `smoke:` command, and
+// both were written above as the assistant writes them — which trips `unreviewedGates` by design
+// (decision 51): the server flags an executed document rewritten by anything but you, and auto-pilot
+// will not run until somebody says they have read it. The file left that list empty, so the review's
+// advance would have walked to the hand-off past a block production always raises here.
+//
+// Through the product's own writer, for the reason `scaffoldProject` is imported rather than
+// reimplemented. Nothing on the review screen reads this — the press is what asks — which is exactly
+// why it was wrong and stayed wrong: an unreachable state that renders identically.
+const { writeAutopilotState } = await import(pathToFileURL(join(REPO, 'dist/store/autopilot-store.js')));
+await writeAutopilotState(review, {
+  state: 'idle',
+  iteration: 0,
+  unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'],
 });
 
 // THE CONVERSATION THAT WROTE THEM, because the review is the summaries BESIDE it: the panel is the

@@ -122,10 +122,18 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
         req.log.warn({ err, path }, 'the project was created but its agent box was not');
       }
     }
-    const snapshot = await ctx.session.open(path, ctx.runner.activeIds);
-    await ctx.autopilot.load();
-    await rememberProject(path);
-    return { snapshot };
+    // THE SAME SHAPE AND THE SAME SENTENCE AS `open` ABOVE, because it is the same failure: a folder
+    // on disk that will not read as a project. It was left bare while the only caller was a form on a
+    // screen with a board behind it; the wizard's identity step has no project behind it, so an
+    // unhandled throw here is a 500 on the one screen where that reads as the app having crashed.
+    try {
+      const snapshot = await ctx.session.open(path, ctx.runner.activeIds);
+      await ctx.autopilot.load();
+      await rememberProject(path);
+      return { snapshot };
+    } catch {
+      return reply.code(400).send({ error: 'Not a VibeBoard project' });
+    }
   });
 
   // WHY A DELETE IS REFUSED, kept apart from the doing of it so that neither is long enough to hide a

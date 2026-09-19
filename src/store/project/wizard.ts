@@ -28,8 +28,11 @@ export interface WizardState {
 
 const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 
-// Null for absent AND for unreadable: a corrupt scratch file must never stop a project opening. The
-// person loses their wizard progress, which is recoverable; a crash on open is not.
+// Null for absent AND for unreadable, and the CALLER is the reason: `GET /api/wizard` is the only one,
+// so a stray brace in this scratch file has to come back as "no setup in progress" and never as a 500.
+// Nothing here is in the path of opening a project. What a corrupt file costs is a place in setup,
+// which the next step writes back; what a 500 would cost is a browser that cannot tell an absent file
+// from an unreachable one — and both of the wizard's Continue buttons are gated on that difference.
 export async function readWizardState(root: string): Promise<WizardState | null> {
   try {
     const parsed = parse(await readFile(wizardPath(root), 'utf8')) as WizardState;

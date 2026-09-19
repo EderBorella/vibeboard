@@ -429,9 +429,12 @@ const KIND_LABELS: Record<BoxKind, string> = {
   research: 'Research',
 };
 
-// A cleared number box gives `Number('') === NaN`, which `JSON.stringify` puts on the wire as `null` and
-// the endpoint refuses with a sentence about a key the person never touched. Clamped at source, exactly
-// as AutopilotPanel clamps it: a box that cannot express an invalid value needs no refusal.
+// A cleared number box reads as `''`, and `Number('')` is 0 — below every minimum here, so what turns it
+// into the minimum is the clamp and not the guard. The guard is for the one thing `Number` returns that
+// is neither a number nor a refusal: an exponent big enough to overflow gives `Infinity`, which
+// `JSON.stringify` puts on the wire as `null` and the endpoint refuses with a sentence about a key the
+// person never touched. Clamped at source, exactly as AutopilotPanel clamps it: a box that cannot
+// express an invalid value needs no refusal.
 const atLeast = (text: string, min: number): number => {
   const n = Number(text);
   return Number.isFinite(n) ? Math.max(min, n) : min;

@@ -94,10 +94,12 @@ export function AutopilotPanel({
   // below, because a hook after a conditional return is a different bug.
   const [caps, setCaps] = useState<Partial<AutopilotConfig>>({});
   const accounting = useAccounting(config);
-  // Clamped here, not merely validated on the server. An emptied number box gives `Number('') === NaN`,
-  // which `JSON.stringify` puts on the wire as `null`, and `min={0}` on the input does not stop a typed
-  // `-5` — so the user cleared a box and got a 400 about column routing. A box that cannot express an
-  // invalid value needs no refusal.
+  // Clamped here, not merely validated on the server: the user cleared a box and got a 400 about column
+  // routing. `Number('')` is 0 and not NaN — the claim written here for a year — so what the empty box
+  // really sent was a zero under a minimum of one, and `min={0}` on the input does not stop a typed
+  // `-5` either. The `isFinite` half is for the value that is neither: an exponent big enough to
+  // overflow gives `Infinity`, which `JSON.stringify` puts on the wire as `null`. A box that cannot
+  // express an invalid value needs no refusal.
   const edit = (key: keyof AutopilotConfig, value: number, min: number, max?: number): void => {
     const clamped = Number.isFinite(value) ? Math.max(min, value) : min;
     const next = { ...caps, [key]: max === undefined ? clamped : Math.min(max, clamped) };

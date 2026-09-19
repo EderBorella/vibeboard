@@ -4,10 +4,12 @@ import { parse, stringify } from 'yaml';
 import { WIZARD_FILE } from '../../core/layout.js';
 import type { ScaffoldMode } from './scaffold.js';
 
-// Extended by later phases; the union is the contract the web mirrors by hand. A LIST and not a bare
-// union, because a type has no runtime value for test/mirror.test.ts to compare the two sides against
-// — the `BOX_KINDS` precedent.
-export const WIZARD_STEPS = ['backend', 'form', 'handoff'] as const;
+// The union is the contract the web mirrors by hand. A LIST and not a bare union, because a type has
+// no runtime value for test/mirror.test.ts to compare the two sides against — the `BOX_KINDS`
+// precedent. The order is the order they are walked, and the three agent moments sit where they act:
+// `scan` reads the repository before the form it prefills, `stack` proposes once the form has been
+// answered, and `gates` holds the person at the commands the copilot just wrote. decision 77.
+export const WIZARD_STEPS = ['backend', 'scan', 'form', 'stack', 'docs', 'gates', 'handoff'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardAnswers {
@@ -16,10 +18,26 @@ export interface WizardAnswers {
   done?: string;
 }
 
+// Free strings rather than the narrower types config uses for the same two facts: this arrives from a
+// repository scan over HTTP, and a `kind` the product does not know must be showable to the person who
+// will overrule it rather than refused at the door — nothing here reaches config without their word.
+export interface WizardSuggestions {
+  answers?: WizardAnswers;
+  kind?: string;
+  stack?: string;
+  packages?: string[];
+}
+
 export interface WizardState {
   mode: ScaffoldMode;
   step: WizardStep;
   answers?: WizardAnswers;
+  // What an agent proposed, kept apart from what the person said: the form prefills FROM here into
+  // empty fields only, so a suggestion can never silently overwrite an answer. decision 77.
+  suggested?: WizardSuggestions;
+  // The stack as AGREED — after the person approved or overruled the suggestion (W9's whole point:
+  // the box's needs are known upfront, from this).
+  stack?: string;
   // Plain-language summaries of the foundation documents, written by the copilot during the loop and
   // dying with this file — stored here rather than beside the documents so they cannot outlive the
   // wizard and drift from what they summarise. decision 76.
@@ -32,7 +50,7 @@ export interface WizardState {
 // the file, so a key the browser's type does not carry is deleted on the next Continue with nothing
 // anywhere reporting it. `resumes` is exactly that shape — written by a later phase of the wizard,
 // read by this one.
-export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'resumes'] as const;
+export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'suggested', 'stack', 'resumes'] as const;
 export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
 
 // `never` when every field is listed; otherwise these lines fail to compile and name the one missed.

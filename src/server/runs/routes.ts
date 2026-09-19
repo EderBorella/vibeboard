@@ -2,9 +2,6 @@ import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
-import type { AutopilotState } from '../../core/autopilot-state.js';
-import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
-import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { findCard } from '../../core/find.js';
 import { phase } from '../../core/phases.js';
 import { asVerification, isInFlight, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
@@ -23,12 +20,15 @@ import {
   writeRun,
 } from '../../store/run-store.js';
 import type { Scope } from '../auth/credentials.js';
-import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
-import { agentRefusal } from '../boxes/sandbox.js';
 import { errorText } from '../errors.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { DispatchInput } from './agent-runner.js';
-import { type DispatchBody, dispatchFrame, resolveProjectDispatch } from './dispatch.js';
+import {
+  agentDispatchRefusal,
+  type DispatchBody,
+  dispatchFrame,
+  resolveProjectDispatch,
+} from './dispatch.js';
 
 // Dispatching and reading runs.
 //
@@ -41,43 +41,6 @@ import { type DispatchBody, dispatchFrame, resolveProjectDispatch } from './disp
 // checked before the store is touched. The store refuses it too — this is the half that gives the
 // caller a 400 and a sentence instead of a 500.
 const NOT_A_RUN_ID = 'That is not a run id.';
-
-// Why this dispatch cannot happen right now, or nothing. Separated from the handler because it is a
-// rule rather than plumbing, and because every sentence has to offer a way forward: a refusal about a
-// state the user cannot see and cannot act on is worse than the state itself.
-//
-// The SCOPE matters, and it is the whole of C2's change here. `running` means auto-pilot owns this
-// project's runner, so a by-hand dispatch is refused (S6: the runner, the concurrency cap and the queue
-// are shared, so a manual run would queue ahead of the loop's next one and make `autoPilotConcurrency: 1`
-// aspirational). The service dispatching while `running` is not a competing caller — it IS the loop, and
-// refusing it would refuse the only state in which it ever works.
-//
-// `halted` stays absolute. Nothing dispatches, the service included: halted is the state a person has to
-// leave deliberately, and a loop that could still dispatch inside it would make the emergency stop a
-// suggestion.
-// Exported so the rule can be tested directly, for the same reason `allows` is: planting showed the
-// halted branch here was held by NOTHING through the app, because agent-runner.ts refuses a halted
-// project again on the far side of every await and produces the same sentence. That second guard is
-// deliberate defence in depth — but a branch whose removal changes no test is a branch that does not
-// work, whatever else happens to catch it.
-export function dispatchLock(state: AutopilotState, scope: Scope | undefined): string | undefined {
-  // First, and for everyone. Halted is the state a person has to leave deliberately (decision 12); a loop
-  // that could still dispatch inside it would make the emergency stop a suggestion.
-  if (state.state === 'halted') return HALTED_DISPATCH;
-  // The service's authority is CO-TERMINOUS WITH `running`, stated as what is allowed rather than as what
-  // is refused. Written the other way round — "not a by-hand caller while running" — it admitted the loop
-  // while `idle` and while `stopped`, and `stopped` is what a soft stop produces: the runtime writes it
-  // and kills nothing, so the soft stop was enforced by the loop's own cooperation and by no layer at
-  // all. A stale token was then a dispatching one for the life of the server.
-  if (scope === 'service') {
-    if (state.state === 'running') return undefined;
-    return `Auto-pilot is ${state.state}, so its loop has no authority to dispatch. Start it from the auto-pilot panel.`;
-  }
-  if (state.state === 'running') {
-    return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
-  }
-  return undefined;
-}
 
 // The two booleans, coerced. A `service` caller is the loop, but a body is still JSON: `=== true` is the only
 // reading that cannot turn a string, a number or a missing key into a pass.
@@ -203,46 +166,22 @@ async function resolveDispatch(
   };
 }
 
-// The refusal when an agent has rewritten a gate document and nobody has read it. Named rather than
-// inlined so the dispatch handler stays under its complexity budget — flattening beats a suppression —
-// and so the sentence, which is the only thing a person sees, can be tested without dispatching.
-export function unreviewedGatesRefusal(names: string[] | undefined): string | undefined {
-  if (!names || names.length === 0) return undefined;
-  // The wording lives in core/autopilot-state.ts, beside the flag it describes. It was written twice
-  // before, and only one copy told you how to clear it.
-  return unreviewedGatesSentence(names);
-}
-
 // Everything that refuses a dispatch before anything is resolved or written, in the order it is asked. Its own
 // function rather than four guards in the handler — flattening beats a suppression, and the handler is then
-// dispatch-and-report while the refusals, each of which is a rule with a history, sit together.
+// dispatch-and-report while the refusals, each of which is a rule with a history, sit together. The three the
+// wizard's door asks too live in dispatch.ts; what is left here is the two about the BODY, which only this
+// route has one of.
 async function dispatchRefusal(
   ctx: AppCtx,
   body: DispatchBody,
   scope: Scope | undefined,
 ): Promise<{ code: number; error: string } | undefined> {
-  // A run that cannot be confined is a run that does not start. 412 rather than 403 — the request is fine, the
-  // machine is not in a state to serve it.
-  const refusal = agentRefusal(await ctx.sandbox(), attachedOpencodeUrl());
-  if (refusal) return { code: 412, error: refusal };
-  // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
-  // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
-  // shared, so a manual dispatch would queue ahead of the loop's next one and make
-  // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
-  const state = await ctx.autopilot.current();
-  const locked = dispatchLock(state, scope);
-  if (locked) return { code: 409, error: locked };
-  // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
-  // is ALREADY running dispatches without passing through start, and the verifier re-reads
-  // foundation/CODE-QUALITY.md fresh for every card (exec/verify.ts) — so an authorised copilot
-  // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
-  // server's user. "The write is allowed; the execution waits" was false in exactly that window,
-  // which is the window an agent is most able to reach.
+  // THE THREE EVERY DOOR ASKS — the sandbox, the project's state, the gates nobody has read — from the
+  // one home both doors read them from. See `agentDispatchRefusal` in dispatch.ts for each one's reason.
+  const shared = await agentDispatchRefusal(ctx, scope);
+  if (shared) return shared;
+  // WHAT IS THIS ROUTE'S ALONE follows, and both of these are about the BODY rather than the machine.
   //
-  // Refusing the dispatch stops the loop with a reason rather than killing it, so the work already in
-  // flight finishes and the person is told what to look at.
-  const unreviewed = unreviewedGatesRefusal(state.unreviewedGates);
-  if (unreviewed) return { code: 412, error: unreviewed };
   // A PROJECT run is the loop's alone. It is the only run confined to no card — decision 5's scope spiral is
   // exactly what a card gives you — and the only caller with a reason to start one is the loop deriving an
   // empty board. Anyone at the browser is dispatching FROM a card and has one to name.

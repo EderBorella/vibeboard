@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { AutopilotState } from '../../core/autopilot-state.js';
+import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { isBoxKind } from '../../core/box-kinds.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
+import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { foundationRel } from '../../core/layout.js';
 import { BOARDS, type ProjectConfig } from '../../core/types.js';
 import { boardColumnSlugs } from '../../store/cards/board.js';
@@ -9,7 +12,11 @@ import { readResources } from '../../store/project/control-files.js';
 import { foundationStatus, readGates } from '../../store/project/foundation.js';
 import { readSkills } from '../../store/project/skill-catalogue.js';
 import type { Backend } from '../agent-turn.js';
+import type { Scope } from '../auth/credentials.js';
 import { BASE_IMAGE, imageForKind } from '../boxes/containers.js';
+import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
+import { agentRefusal } from '../boxes/sandbox.js';
+import type { AppCtx } from '../route-context.js';
 import type { DispatchInput } from './agent-runner.js';
 import type { BoardColumns } from './prompt/index.js';
 
@@ -138,6 +145,96 @@ export async function dispatchFrame(
 // ITS SECOND CALLER IS THE WIZARD'S DOOR, which starts two project runs of its own (`POST /api/wizard/run`) and
 // cannot come through `POST /api/runs` — `dispatchRefusal` there refuses a card-less run to everyone but the
 // loop, the browser included, and that guard is not being loosened. decision 77.
+// Why this dispatch cannot happen right now, or nothing. Separated from the handler because it is a
+// rule rather than plumbing, and because every sentence has to offer a way forward: a refusal about a
+// state the user cannot see and cannot act on is worse than the state itself.
+//
+// IT LIVES HERE RATHER THAN IN `routes.ts` BECAUSE TWO DOORS ASK IT NOW — `POST /api/runs` and the
+// wizard's own `POST /api/wizard/run`, which starts setup's two card-less runs. A route may not import
+// a route (test/entry-column.test.ts holds that at zero), so the alternative was a second copy of the
+// rule, and a second copy is how one door refuses a running project while the other quietly dispatches
+// into it. That is not hypothetical here: the wizard's door shipped with no gate at all.
+//
+// The SCOPE matters, and it is the whole of C2's change here. `running` means auto-pilot owns this
+// project's runner, so a by-hand dispatch is refused (S6: the runner, the concurrency cap and the queue
+// are shared, so a manual run would queue ahead of the loop's next one and make `autoPilotConcurrency: 1`
+// aspirational). The service dispatching while `running` is not a competing caller — it IS the loop, and
+// refusing it would refuse the only state in which it ever works.
+//
+// `halted` stays absolute. Nothing dispatches, the service included: halted is the state a person has to
+// leave deliberately, and a loop that could still dispatch inside it would make the emergency stop a
+// suggestion.
+// Exported so the rule can be tested directly, for the same reason `allows` is: planting showed the
+// halted branch here was held by NOTHING through the app, because agent-runner.ts refuses a halted
+// project again on the far side of every await and produces the same sentence. That second guard is
+// deliberate defence in depth — but a branch whose removal changes no test is a branch that does not
+// work, whatever else happens to catch it.
+export function dispatchLock(state: AutopilotState, scope: Scope | undefined): string | undefined {
+  // First, and for everyone. Halted is the state a person has to leave deliberately (decision 12); a loop
+  // that could still dispatch inside it would make the emergency stop a suggestion.
+  if (state.state === 'halted') return HALTED_DISPATCH;
+  // The service's authority is CO-TERMINOUS WITH `running`, stated as what is allowed rather than as what
+  // is refused. Written the other way round — "not a by-hand caller while running" — it admitted the loop
+  // while `idle` and while `stopped`, and `stopped` is what a soft stop produces: the runtime writes it
+  // and kills nothing, so the soft stop was enforced by the loop's own cooperation and by no layer at
+  // all. A stale token was then a dispatching one for the life of the server.
+  if (scope === 'service') {
+    if (state.state === 'running') return undefined;
+    return `Auto-pilot is ${state.state}, so its loop has no authority to dispatch. Start it from the auto-pilot panel.`;
+  }
+  if (state.state === 'running') {
+    return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
+  }
+  return undefined;
+}
+
+// The refusal when an agent has rewritten a gate document and nobody has read it. Named rather than
+// inlined so each dispatch handler stays under its complexity budget — flattening beats a suppression —
+// and so the sentence, which is the only thing a person sees, can be tested without dispatching. Beside
+// `dispatchLock` for the reason given there: both doors ask it.
+export function unreviewedGatesRefusal(names: string[] | undefined): string | undefined {
+  if (!names || names.length === 0) return undefined;
+  // The wording lives in core/autopilot-state.ts, beside the flag it describes. It was written twice
+  // before, and only one copy told you how to clear it.
+  return unreviewedGatesSentence(names);
+}
+
+// EVERYTHING THAT REFUSES AN AGENT BEFORE ANYTHING IS RESOLVED OR WRITTEN, in the order it is asked,
+// for every door that starts one. `POST /api/runs` adds two rules of its own about the BODY on top of
+// this; the wizard's door adds none. Three guards rather than one would also be three guards each door
+// has to remember, and the door that forgot is why this function exists: `POST /api/wizard/run` shipped
+// with no gate at all, so with the sandbox refusing it ran setup's agent on the host.
+//
+// `Pick` rather than the whole context, so the two facts it consults are the two it can consult.
+export async function agentDispatchRefusal(
+  ctx: Pick<AppCtx, 'sandbox' | 'autopilot'>,
+  scope: Scope | undefined,
+): Promise<{ code: number; error: string } | undefined> {
+  // A run that cannot be confined is a run that does not start. 412 rather than 403 — the request is fine, the
+  // machine is not in a state to serve it.
+  const refusal = agentRefusal(await ctx.sandbox(), attachedOpencodeUrl());
+  if (refusal) return { code: 412, error: refusal };
+  // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
+  // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
+  // shared, so a manual dispatch would queue ahead of the loop's next one and make
+  // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
+  const state = await ctx.autopilot.current();
+  const locked = dispatchLock(state, scope);
+  if (locked) return { code: 409, error: locked };
+  // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
+  // is ALREADY running dispatches without passing through start, and the verifier re-reads
+  // foundation/CODE-QUALITY.md fresh for every card (exec/verify.ts) — so an authorised copilot
+  // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
+  // server's user. "The write is allowed; the execution waits" was false in exactly that window,
+  // which is the window an agent is most able to reach.
+  //
+  // Refusing the dispatch stops the loop with a reason rather than killing it, so the work already in
+  // flight finishes and the person is told what to look at.
+  const unreviewed = unreviewedGatesRefusal(state.unreviewedGates);
+  if (unreviewed) return { code: 412, error: unreviewed };
+  return undefined;
+}
+
 export async function resolveProjectDispatch(
   root: string,
   config: ProjectConfig,

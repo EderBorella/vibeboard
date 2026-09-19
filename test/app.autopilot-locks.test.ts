@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import type { Scope } from '../src/server/auth/credentials.js';
-import { dispatchLock } from '../src/server/runs/routes.js';
+import { dispatchLock } from '../src/server/runs/dispatch.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { readRun } from '../src/store/run-store.js';
 import { openTestProject, shimArgsLog, tempDir, wsClient } from './helpers.js';

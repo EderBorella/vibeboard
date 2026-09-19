@@ -1,12 +1,14 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { FOUNDATION_FILES, skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { allows } from '../src/server/auth/auth.js';
 import type { Credential } from '../src/server/auth/credentials.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { WIZARD_STEPS, type WizardState } from '../src/store/project/wizard.js';
-import { readProjectRun } from '../src/store/run-store.js';
+import { listProjectRuns, readProjectRun } from '../src/store/run-store.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
 // The setup wizard's scratch state. GET/PUT/DELETE /api/wizard are the browser's, admin-only, and
@@ -405,8 +407,8 @@ describe('POST /api/wizard/run', () => {
   // The same shim runs/routes' own dispatch tests use: a real spawn, a real report, no model.
   const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
 
-  const openWithAgent = async (): Promise<TestProject> =>
-    openTestProject({ name: 'W', mode: 'brownfield', runBin: SHIM });
+  const openWithAgent = async (over: Partial<Parameters<typeof openTestProject>[0]> = {}) =>
+    openTestProject({ name: 'W', mode: 'brownfield', runBin: SHIM, ...over });
 
   const begin = (project: TestProject) =>
     project.app.inject({
@@ -524,5 +526,61 @@ describe('POST /api/wizard/run', () => {
       const res = await start(project, { skill: 'scan-project' }, agent.token);
       expect(res.statusCode, scope).toBe(403);
     }
+  });
+
+  // THE DOOR IS A DOOR FOR AGENTS, so it carries the gate every other one does. It did not: with the
+  // sandbox refusing — docker down, or the sign-in expired — this route dispatched anyway, and
+  // `wrapCommand` returns the bare `bin`/`args` for a status that is not ok, so setup's first run
+  // executed on the HOST with nothing confining it. Reproduced both ways by a reviewer.
+  //
+  // Three refusals, in `dispatchRefusal`'s own order and from its own functions: the machine cannot
+  // confine an agent, auto-pilot owns the runner, a gate document nobody has read.
+  describe('the gate in front of it', () => {
+    it('refuses to start anything when the sandbox cannot confine it, and starts no run', async () => {
+      const project = await openWithAgent({
+        sandbox: { ok: false, reason: 'Docker is not available — no daemon', kind: 'docker' },
+      });
+      await begin(project);
+
+      const res = await start(project, { skill: 'scan-project' });
+
+      // 412 rather than 403: the request is fine, the machine is not in a state to serve it.
+      expect(res.statusCode).toBe(412);
+      expect(res.json().error).toContain('Agents are disabled');
+      // The assertion that matters is that NOTHING RAN, not that the sentence was polite: an
+      // unconfined agent is what the refusal exists to prevent, and a 412 with a run record beside
+      // it would be the bug wearing the right status code.
+      expect(await listProjectRuns(project.root)).toEqual([]);
+    });
+
+    it('refuses while auto-pilot owns the runner, in the dispatch lock’s own words', async () => {
+      const project = await openWithAgent();
+      await begin(project);
+      await writeAutopilotState(project.root, { ...IDLE_STATE, state: 'running' });
+
+      const res = await start(project, { skill: 'scan-project' });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toContain('owns the runner');
+      expect(await listProjectRuns(project.root)).toEqual([]);
+    });
+
+    // Writing CODE-QUALITY.md or TESTING.md as an agent blocks dispatch until a person has read it
+    // (decision 51), and setup's own copilot step is one of the things that writes them. A door that
+    // skipped this would start the stack run over commands nobody had looked at.
+    it('refuses while a gate document nobody has read was rewritten', async () => {
+      const project = await openWithAgent();
+      await begin(project);
+      await writeAutopilotState(project.root, {
+        ...IDLE_STATE,
+        unreviewedGates: ['CODE-QUALITY.md'],
+      });
+
+      const res = await start(project, { skill: 'scan-project' });
+
+      expect(res.statusCode).toBe(412);
+      expect(res.json().error).toContain('CODE-QUALITY.md');
+      expect(await listProjectRuns(project.root)).toEqual([]);
+    });
   });
 });

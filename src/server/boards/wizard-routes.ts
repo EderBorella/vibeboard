@@ -9,9 +9,39 @@ import {
   type WizardState,
   writeWizardState,
 } from '../../store/project/wizard.js';
+import type { Scope } from '../auth/credentials.js';
 import { errorText } from '../errors.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
-import { resolveProjectDispatch } from '../runs/dispatch.js';
+import { agentDispatchRefusal, resolveProjectDispatch } from '../runs/dispatch.js';
+
+const WIZARD_SKILLS = ['scan-project', 'suggest-stack'];
+
+// Why setup cannot start this run right now, or nothing. Its own function for `dispatchRefusal`'s
+// reason: the handler is then dispatch-and-report, while the rules — a machine that cannot confine an
+// agent, a door that starts two named skills and nothing else, a setup that is not running — sit
+// together and can be read as one thing.
+//
+// `root` rather than the session, because `ensureOpen` is a type predicate over the SESSION and its
+// narrowing does not survive a function boundary.
+async function wizardRunRefusal(
+  ctx: AppCtx,
+  root: string,
+  skill: string | undefined,
+  scope: Scope | undefined,
+): Promise<{ code: number; error: string } | undefined> {
+  // THE SAME GATE EVERY OTHER AGENT PASSES, and it is first because nothing may be resolved or written
+  // in front of it. A narrower door is still a door, and this one shipped without the gate: with the
+  // sandbox refusing, `wrapCommand` hands the caller back the bare command, so setup's first run
+  // executed on the HOST with nothing confining it. The shared function rather than three guards of
+  // its own — a door that has to remember them is a door that can forget, and this is the one that did.
+  const refused = await agentDispatchRefusal(ctx, scope);
+  if (refused) return refused;
+  if (skill === undefined || !WIZARD_SKILLS.includes(skill)) {
+    return { code: 400, error: `Setup only starts ${WIZARD_SKILLS.join(' or ')}.` };
+  }
+  if (!(await readWizardState(root))) return { code: 409, error: 'No setup is in progress.' };
+  return undefined;
+}
 
 // The wizard's scratch state. The four routes below are ADMIN ONLY, by being absent from the scope
 // table in auth.ts — that is the default and it is right here: this file steers what the person is
@@ -56,16 +86,11 @@ export async function registerWizardRoutes(api: FastifyInstance, ctx: AppCtx): P
   // would grant every admin caller every card-less run for ever, so the wizard gets a narrower door
   // than the one it was refused: exactly these two skills, only while a setup is in progress, and
   // nothing else about the dispatch is the caller's to choose. decision 77.
-  const WIZARD_SKILLS = ['scan-project', 'suggest-stack'];
   api.post('/wizard/run', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { skill, prompt } = (req.body ?? {}) as { skill?: string; prompt?: string };
-    if (skill === undefined || !WIZARD_SKILLS.includes(skill)) {
-      return reply.code(400).send({ error: `Setup only starts ${WIZARD_SKILLS.join(' or ')}.` });
-    }
-    if (!(await readWizardState(ctx.session.root))) {
-      return reply.code(409).send({ error: 'No setup is in progress.' });
-    }
+    const refused = await wizardRunRefusal(ctx, ctx.session.root, skill, req.credential?.scope);
+    if (refused) return reply.code(refused.code).send({ error: refused.error });
     // `seedSkills` only writes into an ABSENT skills folder, so a project part-way through setup when
     // this version arrived will not have either of these — and the browser has to be able to tell
     // that from every other refusal, because the answer to it is to skip the run and ask the person.

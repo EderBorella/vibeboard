@@ -79,14 +79,14 @@ export type BackendCheck = () => Promise<{ live: true } | { live: false; reason:
 // running server left `GET /api/sandbox` answering `ok: true` for the life of the process. Demonstrated
 // rather than reasoned about — tag an alias, start a server on it, `docker rmi` the tag, ask again.
 //
-// That is not merely a stale label. The same value is what `agentRefusal` consults at the three gates
-// (a dispatch, a chat turn, auto-pilot starting), so a stale `ok` lets a run through to fail at
-// container creation as a raw Docker error — the exact confusion this module's opening comment says the
-// probe exists to prevent. And a stale `false` is what would make a "build the image" button appear to
+// That is not merely a stale label. The same value is what `agentRefusal` consults at the four gates
+// (a dispatch, setup's own dispatch door, a chat turn, auto-pilot starting), so a stale `ok` lets a run
+// through to fail at container creation as a raw Docker error — the exact confusion this module's
+// opening comment says the probe exists to prevent. And a stale `false` is what would make a "build the image" button appear to
 // do nothing.
 //
 // TTL rather than a probe per call: the two `docker` calls cost 30-40ms measured, which is affordable
-// per request but not per call when three gates and a route ask within one interaction. One second is
+// per request but not per call when four gates and a route ask within one interaction. One second is
 // far shorter than the interval between a human action and its consequence, and far longer than a burst.
 export const SANDBOX_TTL_MS = 1_000;
 
@@ -111,7 +111,7 @@ export function liveSandbox(
   const now = opts.now ?? Date.now;
   let cached: { at: number; status: SandboxStatus } | undefined;
   // The in-flight probe is shared, so a burst of callers makes ONE pair of docker calls rather than one
-  // each. Without this the three gates in a single dispatch would each spawn their own.
+  // each. Without this the gates in a single dispatch would each spawn their own.
   let inFlight: Promise<SandboxStatus> | undefined;
   return async () => {
     if (cached && now() - cached.at < ttl) return cached.status;

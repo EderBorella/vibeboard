@@ -12,7 +12,7 @@ import { allows, endpointsFor } from '../src/server/auth/auth.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { CopilotAuthority } from '../src/server/copilot/copilot-authority.js';
-import { unreviewedGatesRefusal } from '../src/server/runs/routes.js';
+import { unreviewedGatesRefusal } from '../src/server/runs/dispatch.js';
 import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
 import { redactCredential } from '../src/store/redaction.js';
 import { fixedSandbox, TEST_SANDBOX, tempDir } from './helpers.js';

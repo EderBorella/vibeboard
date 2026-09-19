@@ -47,7 +47,8 @@ const wizardPath = (root: string): string => join(root, WIZARD_FILE);
 
 // WHAT A MODE IS, SAID ONCE. Both ends of this file's life hand it an `unknown` dressed as a
 // `WizardState` — `parse` below, and `req.body` a layer up — and every step after the first branches
-// on the answer. Two copies of the pair would be the drift the mirror test exists to refuse.
+// on the answer. A second copy of the pair, in the route, is a second place to change when the type
+// gains a third member.
 export const isScaffoldMode = (value: unknown): value is ScaffoldMode =>
   value === 'greenfield' || value === 'brownfield';
 

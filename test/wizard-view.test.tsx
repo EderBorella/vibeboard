@@ -1477,6 +1477,70 @@ describe('the docs step', () => {
     expect(await screen.findByText('That is setup done')).toBeTruthy();
   });
 
+  // "DONE" HAS TO MEAN SOMETHING WAS WRITTEN. The step read the readiness and looked at one field of
+  // it — the gate block — so a turn that wrote nothing at all, or that died four documents in, walked
+  // the person to "That is setup done" over a project with no README and no foundation. The same
+  // response already says which documents are there; it was simply not asked.
+  describe('when the turn did not write everything', () => {
+    const half = readiness({
+      foundation: { present: ['STACK.md'], missing: ['CODE-QUALITY.md', 'UX.md'], ok: false },
+    });
+
+    const wrote = async (): Promise<void> => {
+      docs();
+      fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+      await waitFor(() => expect(ws.sent).toHaveLength(1));
+      await turn(true);
+      await turn(false);
+    };
+
+    it('says so plainly and stays, rather than reporting setup done', async () => {
+      api.getReadiness.mockResolvedValue(half);
+
+      await wrote();
+
+      expect(
+        await screen.findByText('It didn’t finish — 2 of the documents are still unwritten.'),
+      ).toBeTruthy();
+      // NAMED, AND IN WORDS. A filename is the one thing a beginner cannot act on, and these are the
+      // same six names the review screen wears.
+      expect(screen.getByText('Quality gates, How it feels')).toBeTruthy();
+      expect(screen.queryByText('That is setup done')).toBeNull();
+      expect(screen.queryByText('One thing to read before anything runs')).toBeNull();
+      // AND THE FILE STAYS WHERE IT IS. Moving the step on over half-written documents is the same
+      // lie written to disk, where the next open would believe it.
+      expect(api.putWizard).not.toHaveBeenCalled();
+    });
+
+    // The README is not a foundation document and is read from its own field, so a turn that wrote
+    // all five and never touched the README is a real state — and the one `foundation.missing` alone
+    // cannot see.
+    it('counts a missing README among them', async () => {
+      api.getReadiness.mockResolvedValue(readiness({ readme: { ok: false, reason: 'no README' } }));
+
+      await wrote();
+
+      expect(
+        await screen.findByText('It didn’t finish — one of the documents is still unwritten.'),
+      ).toBeTruthy();
+      expect(screen.getByText('The introduction')).toBeTruthy();
+    });
+
+    it('offers the writing again, and takes it', async () => {
+      api.getReadiness.mockResolvedValue(half);
+      await wrote();
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+
+      await waitFor(() => expect(ws.sent).toHaveLength(2));
+      // The honest state goes with the offer being taken: a second turn is running, and a report
+      // about the first one under it reads as a verdict on this one.
+      expect(screen.queryByText(/still unwritten/)).toBeNull();
+    });
+  });
+
   // THE FILE HAS TO MOVE WITH THE SCREEN, and this step wrote nothing at all: the file sat at `docs`
   // after every exit but the last, so `wizardFrame` prefixed EVERY later conversation on the project
   // with a brief about writing foundation documents — and resuming re-offered the question that

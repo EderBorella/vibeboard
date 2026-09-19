@@ -1025,6 +1025,41 @@ function StackStep({
 // land in the person's own transcript on the way past. decision 77.
 const KICKOFF = "Please set up this project's documents from my answers.";
 
+// THE SIX DOCUMENTS, IN WORDS (W7). A filename is the one thing a beginner cannot act on, and this
+// screen is where they first meet these — so the wizard names them the way somebody would say them
+// out loud, and the filename stays on the surfaces that open the file. The order is the order they
+// are written and the order they are listed in.
+const DOC_NAMES: Record<string, string> = {
+  'README.md': 'The introduction',
+  'STACK.md': 'The stack',
+  'CODE-QUALITY.md': 'Quality gates',
+  'TESTING.md': 'Testing',
+  'UX.md': 'How it feels',
+  'DESIGN.md': 'How it looks',
+};
+
+// WHAT ACTUALLY HAPPENED, when it was not what the heading promised. Counted rather than listed in
+// the sentence and then named in words underneath: the count is the news, the names are what to do
+// about it. Its own component for `GateDocument`'s reason — the step it renders inside has a
+// complexity budget, and this is a self-contained reading of one fact.
+function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; onRetry: () => void }) {
+  return (
+    <>
+      <Notice as="p" tone="warn">
+        {names.length === 1
+          ? 'It didn’t finish — one of the documents is still unwritten.'
+          : `It didn’t finish — ${names.length} of the documents are still unwritten.`}
+      </Notice>
+      <Text as="p">{names.map((name) => DOC_NAMES[name] ?? name).join(', ')}</Text>
+      <Stack gap={4}>
+        <Button variant="primary" disabled={busy} onClick={onRetry}>
+          Try again
+        </Button>
+      </Stack>
+    </>
+  );
+}
+
 // THE THIRD AGENT MOMENT, AND IT IS THE COPILOT AND NOT A RUN (W3). Writing a README and five guiding
 // documents out of three answers is a conversation — the person is in it, and the next phase puts them
 // side by side with it. What this step is, on its own, is the honest minimum: ask, authorise, send one
@@ -1056,6 +1091,10 @@ function DocsStep({
   // mounted", which falls back to the file's own — a setup resumed here shows what was written last
   // time rather than an empty list under a heading about writing.
   const [polled, setPolled] = useState<Record<string, string>>();
+  // The documents the turn did not produce, or `undefined` for "the question has not been asked or
+  // was answered yes". Never `[]`: an empty list and an unasked question are the same screen, and
+  // keeping them one value means nothing can render the honest ending over nothing.
+  const [unwritten, setUnwritten] = useState<string[]>();
   const started = useRef(false);
   // A turn that never began cannot have ended: `running` is false before the first frame, and an
   // ending read off that alone would walk the person off this screen the moment they authorised.
@@ -1087,6 +1126,7 @@ function DocsStep({
       // and could not write a single foundation document. `setCopilotAuthority` on the hook is
       // fire-and-forget for a button that reflects a state; this is a sequence.
       await setAuthority(true);
+      setUnwritten(undefined);
       send(KICKOFF, { mode: turnMode });
       setSent(true);
     });
@@ -1133,13 +1173,27 @@ function DocsStep({
   );
 
   const finish = useCallback(async (): Promise<void> => {
-    // Writing CODE-QUALITY.md or TESTING.md as an agent blocks auto-pilot until a person has read it
-    // (decision 51), and the copilot has just been told to write both. Asked here rather than assumed,
-    // because it depends on what the turn actually did.
-    const unread = await getReadiness()
-      .then((r) => r.unreviewedGates)
-      .catch(() => []);
-    await leave(unread.length > 0 ? 'gates' : 'handoff');
+    // ONE READ, THREE QUESTIONS, and it used to ask only the third. Writing CODE-QUALITY.md or
+    // TESTING.md as an agent blocks auto-pilot until a person has read it (decision 51), and the
+    // copilot has just been told to write both — but the same response also says whether the README
+    // and the five documents are THERE, and a turn that died four documents in walked the person to
+    // "that is setup done" over a project with none of them.
+    //
+    // A FAILED READ IS NOT EVIDENCE OF A MISSING DOCUMENT, so it hands over rather than accusing: the
+    // question this asks is answerable again on the next screen, and holding somebody here over a
+    // hiccup is the fault the machine check's own failure case names.
+    const state = await getReadiness().catch(() => undefined);
+    if (state) {
+      // THE README IS NOT A FOUNDATION DOCUMENT and is answered by its own field, so a turn that
+      // wrote all five and never touched it is a state `foundation.missing` cannot see. First,
+      // because it is written first and read first.
+      const missing = [...(state.readme.ok ? [] : ['README.md']), ...state.foundation.missing];
+      if (missing.length > 0) {
+        setUnwritten(missing);
+        return;
+      }
+    }
+    await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
   }, [leave]);
 
   useEffect(() => {
@@ -1197,6 +1251,7 @@ function DocsStep({
           Something went wrong while it was writing — you can ask it to try again.
         </Notice>
       )}
+      {unwritten && <Unwritten names={unwritten} busy={busy !== null} onRetry={() => void ask()} />}
       {holding && (
         <Stack gap={4}>
           {/* The offer, put back deliberately rather than raised on arrival: the person asking for
@@ -1209,7 +1264,9 @@ function DocsStep({
           </Button>
         </Stack>
       )}
-      {!holding && !running && (!sent || failed) && (
+      {/* `unwritten` carries its own offer, and two primary buttons saying the same thing on one
+          screen is a choice between them. */}
+      {!holding && !unwritten && !running && (!sent || failed) && (
         <Stack gap={4}>
           <Button variant="primary" disabled={busy !== null} onClick={() => void ask()}>
             Write the drafts

@@ -154,6 +154,8 @@ const readiness = (over: Partial<Readiness> = {}): Readiness => ({
 // THE DOCK'S PROPS, exactly the set `WorkArea` hands `CopilotPanel`: the docs step embeds the same
 // organism, so it takes the same ones. Inert handlers — what this file is about is the conversation,
 // and the selects above it are the dock's own subject.
+// NO `onClose`, because the shell stopped passing one: the review renders the panel `compact`, which
+// has no header and therefore no ✕ to hide it with (W11).
 const panel = {
   backend: 'claude-code',
   mode: 'bypassPermissions',
@@ -165,7 +167,6 @@ const panel = {
   onEffort: () => {},
   onBackend: () => {},
   onReset: () => {},
-  onClose: () => {},
 };
 
 // WHAT THE SHELL DOES, AND WHY IT IS A COMPONENT RATHER THAN A LITERAL. The conversation is a HOOK:
@@ -1521,12 +1522,12 @@ describe('the docs step', () => {
   };
 
   // A message typed into the embedded conversation and sent, which is the loop: the person reads a
-  // summary, dislikes something, and says so. The composer is the dock's own — the panel on this
-  // screen is the same organism.
+  // summary, dislikes something, and says so. The composer is the dock's own organism wearing this
+  // screen's label — `compact` drops the header and the panel takes its placeholder from the embedder,
+  // because "Message the copilot" is a sentence the plain-words sweep refuses (W11, W7).
+  const COMPOSER = 'Say what you’d change';
   const say = (text: string): void => {
-    fireEvent.change(screen.getByPlaceholderText('Message the copilot (Enter to send)'), {
-      target: { value: text },
-    });
+    fireEvent.change(screen.getByPlaceholderText(COMPOSER), { target: { value: text } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
   };
 
@@ -2014,7 +2015,7 @@ describe('the docs step', () => {
       // is the news — and a review with no cards on it reads as a screen that failed to load.
       expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
       // The conversation is on the screen rather than in the dock behind it.
-      expect(screen.getByPlaceholderText('Message the copilot (Enter to send)')).toBeTruthy();
+      expect(screen.getByPlaceholderText(COMPOSER)).toBeTruthy();
       // ONE CONVERSATION AND NOT TWO, said by the only thing that can tell them apart: the kick-off
       // this STEP sent is in the transcript the PANEL renders, which it can only be if the panel is
       // the same `useCopilot` instance the step drives. A second instance would be a second copy of
@@ -2030,6 +2031,42 @@ describe('the docs step', () => {
       expect(api.getReadiness).not.toHaveBeenCalled();
       expect(screen.queryByText('That is setup done')).toBeNull();
       expect(screen.queryByText('One thing to read before anything runs')).toBeNull();
+    });
+
+    // THE PANEL WITHOUT THE DOCK AROUND IT (ruling W11). Each of these is a control the dock carries
+    // and this screen must not: the assistant and the model were chosen two steps ago, the authority
+    // was granted by the question that started the writing, the spend belongs to the dock's own
+    // footer, and the ✕ would hide the conversation on a screen whose whole subject is it. Asserted
+    // here as well as in test/copilot-compact.test.tsx, and the two are different claims: that one is
+    // about the organism's option, this one is about the screen choosing it.
+    it('embeds the conversation with none of the dock’s own controls', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      expect(screen.getByPlaceholderText(COMPOSER)).toBeTruthy();
+      expect(screen.queryByText('Copilot')).toBeNull();
+      expect(screen.queryByLabelText('Backend')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Authorise' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Compact' })).toBeNull();
+      expect(screen.queryByTitle('Hide (session keeps running)')).toBeNull();
+    });
+
+    // ONE FILLED BUTTON AMONG THE WIZARD'S OWN, AND IT IS THE WAY ON. Two primaries on one screen is a
+    // choice between them, and the choice this screen offers is not "continue or try again" — it is
+    // "read this, then continue". SCOPED OUTSIDE `.copilot`: the composer's Send is the panel's own
+    // action, it is disabled until something is typed, and it belongs to the other column.
+    it('offers one filled button, and keeps it that way when the report arrives', async () => {
+      api.getReadiness.mockResolvedValue(
+        readiness({ foundation: { present: ['STACK.md'], missing: ['UX.md'], ok: false } }),
+      );
+      const { container } = filed(SUMMARIES);
+      const filled = () =>
+        [...container.querySelectorAll('.vb-btn-primary')].filter((b) => !b.closest('.copilot'));
+
+      fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+
+      expect(filled().map((b) => b.textContent)).toEqual([ADVANCE]);
     });
 
     // ONE CONVERSATION, NOT TWO. The panel on this screen and the dock's are the same `useCopilot`
@@ -2294,6 +2331,17 @@ describe('the gates step', () => {
 //     it. Both carry a `verbatim-` test handle and this skips them by element; the fixtures below put
 //     jargon INSIDE each, so removing a handle turns this red rather than green.
 //
+// AND `verbatim-conversation` IS NOW THE TRANSCRIPT AND NOT THE PANEL AROUND IT (W11). The review used
+// to skip the whole embedded copilot, which put its composer, its selects and its readout inside an
+// exemption written for the model's own words. The panel renders `compact` there — no header, no
+// pickers, no readout — so what is left beside the transcript is the composer, and that is the wizard's
+// to label.
+//
+// A PLACEHOLDER IS COPY AND `textContent` CANNOT SEE IT, which is how "Message the copilot" sat on the
+// review screen through every run of this sweep. A composer has no label but its placeholder, so the
+// attribute is read here as text: the identity step's three are paths and neither fold nor exemption
+// hides them.
+//
 // The list is every word the product's own code uses constantly, which is exactly why they leak.
 describe('the words on every step (W7)', () => {
   const JARGON = [
@@ -2312,7 +2360,8 @@ describe('the words on every step (W7)', () => {
     const plain = container.cloneNode(true) as HTMLElement;
     for (const fold of plain.querySelectorAll('details')) fold.remove();
     for (const quoted of plain.querySelectorAll('[data-testid^="verbatim"]')) quoted.remove();
-    const text = (plain.textContent ?? '').toLowerCase();
+    const labels = [...plain.querySelectorAll('[placeholder]')].map((el) => el.getAttribute('placeholder'));
+    const text = [plain.textContent ?? '', ...labels].join(' ').toLowerCase();
     // A step that rendered nothing would pass every assertion below it.
     expect(text.length, `${what} rendered almost nothing`).toBeGreaterThan(60);
     for (const word of JARGON) expect(text, `${what}: "${word}"`).not.toContain(word);
@@ -2499,11 +2548,11 @@ describe('the words on every step (W7)', () => {
 
   // THE REVIEW LAYOUT, which is the screen this step really is: the summaries down one side and the
   // conversation down the other. Everything the WIZARD says here is new copy — the selector above the
-  // chat, the button that ends the loop, the sentence under it — and all of it is swept. The
-  // conversation itself is not the wizard talking: it is the dock's own organism, embedded, and its
-  // vocabulary is the product's engineer-facing one. It is exempt BY ELEMENT like the model's own
-  // prose, and the assertion below is the fixture that proves the exemption is load-bearing rather
-  // than decorative — take the handle off and this case goes red on the word it is named for.
+  // chat, the composer's own label, the button that ends the loop, the sentence under it — and all of
+  // it is swept. What is exempt is the TRANSCRIPT, because those words are the model's, and the
+  // fixture below is what proves the exemption is load-bearing rather than decorative: the reply is
+  // full of the words this sweeps for, so taking the handle off `verbatim-conversation` turns this red
+  // on every one of them.
   it('reads the documents beside the conversation in plain words', async () => {
     api.getWizard.mockResolvedValue({
       state: {
@@ -2515,9 +2564,28 @@ describe('the words on every step (W7)', () => {
     const { container } = view({ start: 'docs', snapshot: opened });
     await screen.findByRole('button', { name: 'It reads right — continue' });
 
-    expect((screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase()).toContain(
-      'copilot',
-    );
+    // THE MODEL'S OWN REPLY, hydrated the way the conversation really arrives: from disk, on connect.
+    // Without it the exemption wraps an empty list and this case proves nothing at all — which is what
+    // it did, silently, the day the handle moved off the panel.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [
+          { kind: 'user', text: "Please set up this project's documents from my answers." },
+          {
+            kind: 'assistant',
+            text: 'All six are written. The stack document names the Docker container the repository builds, and the config is yaml.',
+          },
+        ],
+        stats: { costUsd: 0, turns: 1, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+
+    const quoted = (screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase();
+    for (const word of ['docker', 'container', 'repository', 'config', 'yaml']) {
+      expect(quoted, `the exempt transcript must carry "${word}" or it proves nothing`).toContain(word);
+    }
     sweep('the review layout', container);
   });
 

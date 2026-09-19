@@ -61,7 +61,11 @@ import { ThinkingIndicator } from '../../organisms/copilot/ThinkingIndicator';
 // EXCEPT THE CONTEXT WINDOW, which is a fact about the PROJECT rather than about the conversation:
 // this screen already has the snapshot and already reads the copilot block off it, and `WorkArea`
 // resolves the same figure the same way for the dock.
-type Conversation = Omit<ComponentProps<typeof CopilotPanel>, 'contextBudget'>;
+//
+// AND EXCEPT THE TWO THAT ARE THIS SCREEN'S TO DECIDE. `compact` and the composer's placeholder are
+// how the review WEARS the organism, not part of the conversation the shell hands down — and `onClose`
+// is gone from the shell's side altogether, because the compact panel renders no ✕ to hide it with.
+type Conversation = Omit<ComponentProps<typeof CopilotPanel>, 'contextBudget' | 'compact' | 'placeholder'>;
 // What `send` takes, read off the same place for the same reason: the review layout wraps it to add
 // the attached document's name, and a second spelling of the turn options would drift from it.
 type Turn = Parameters<Conversation['copilot']['send']>;
@@ -1209,7 +1213,22 @@ function DocumentCards({
 // the sentence and then named in words underneath: the count is the news, the names are what to do
 // about it. Its own component for `GateDocument`'s reason — the step it renders inside has a
 // complexity budget, and this is a self-contained reading of one fact.
-function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; onRetry: () => void }) {
+function Unwritten({
+  names,
+  busy,
+  // WHETHER THE REVIEW IS ON SCREEN, which decides whether this offer may be the filled button. It is
+  // the only way anybody reaches this report now — the press that asks the machine is the review's —
+  // so in practice it always is, and "Try again" as a second primary beside "It reads right — continue"
+  // is two filled buttons offering opposite answers to one question. One primary per screen, and on
+  // this screen it is the way ON.
+  review,
+  onRetry,
+}: {
+  names: string[];
+  busy: boolean;
+  review: boolean;
+  onRetry: () => void;
+}) {
   return (
     <>
       <Notice as="p" tone="warn">
@@ -1219,7 +1238,7 @@ function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; o
       </Notice>
       <Text as="p">{names.map((name) => DOC_NAMES[name] ?? name).join(', ')}</Text>
       <Stack gap={4}>
-        <Button variant="primary" disabled={busy} onClick={onRetry}>
+        <Button variant={review ? 'default' : 'primary'} disabled={busy} onClick={onRetry}>
           Try again
         </Button>
       </Stack>
@@ -1286,6 +1305,11 @@ function ReviewLayout({
         </Stack>
         <Text role="hint">You can come back and change any of this later, in Project Control.</Text>
       </Stack>
+      {/* THE CONVERSATION SIDE, AND `.copilot`'s `flex: 0 1 400px` IS A HEIGHT IN HERE. The dock declares
+          that basis for a ROW — it is the width the panel takes beside the board — and this column
+          reads the same declaration on the other axis, so the panel stands 400px tall here rather than
+          400px wide. Nothing about the dock meant to grant that; it is worth knowing before anybody
+          reaches for a height on this screen, because the number is already being spent. */}
       <Stack direction="column" gap={4}>
         {/* SAID OUT LOUD ABOVE THE CHAT, because "this document" needs a visible subject. A card
             click sets this, and this is what rides the next message — one state, two ways to set it,
@@ -1300,14 +1324,22 @@ function ReviewLayout({
             ))}
           </Control>
         </Field>
-        {/* EXEMPT FROM THE PLAIN-WORDS SWEEP BY ELEMENT, as the model's own prose is, and for a
-            related reason: none of this is copy the wizard wrote. It is the dock's organism, embedded
-            whole and on the same conversation, and its vocabulary is the product's engineer-facing
-            one. Everything around it — the selector above, the button and the sentence beside it —
-            stays inside the sweep, which is what the element boundary buys. */}
-        <Stack direction="column" testId="verbatim-conversation">
-          <CopilotPanel {...talking} contextBudget={contextBudget ?? DEFAULT_CONTEXT_BUDGET} />
-        </Stack>
+        {/* THE DOCK'S ORGANISM WITHOUT THE DOCK (ruling W11). `compact` leaves the transcript, the
+            composer, the thinking indicator and the Cancel under it — and takes away the header, the
+            chat history, the assistant and model pickers, the authority grant, the spend readout and
+            the ✕. Every one of those is either a question setup answered on an earlier screen or a way
+            out of a screen that has one: the way on is the button under the cards.
+            WHICH NARROWS THE PLAIN-WORDS EXEMPTION TO THE TRANSCRIPT (W7). The whole panel used to be
+            skipped by element, so the composer's own label — "Message the copilot" — was inside the
+            exemption and unswept. With the chrome gone the only words here that are not the wizard's
+            are the model's, the handle sits on the transcript list itself, and the placeholder below
+            is this screen's to write. */}
+        <CopilotPanel
+          {...talking}
+          contextBudget={contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+          compact
+          placeholder="Say what you’d change"
+        />
       </Stack>
     </Stack>
   );
@@ -1547,10 +1579,14 @@ function DocsStep({
           Something went wrong while it was writing — you can ask it to try again.
         </Notice>
       )}
-      {unwritten && <Unwritten names={unwritten} busy={busy !== null} onRetry={() => void ask()} />}
-      {/* `unwritten` carries its own offer, and two primary buttons saying the same thing on one
-          screen is a choice between them. */}
-      {!review && !unwritten && !running && (!sent || failed) && (
+      {unwritten && (
+        <Unwritten names={unwritten} busy={busy !== null} review={review} onRetry={() => void ask()} />
+      )}
+      {/* `!unwritten` USED TO BE IN THIS CONDITION AND COULD NEVER FIRE. Only `finish` sets `unwritten`,
+          only the review's button calls `finish`, and the review never closes once open — so `!review`
+          had already answered for it at every reachable state. A term that cannot change an outcome
+          reads as a case somebody tested. */}
+      {!review && !running && (!sent || failed) && (
         <Stack gap={4}>
           <Button variant="primary" disabled={busy !== null} onClick={() => void ask()}>
             Write the drafts

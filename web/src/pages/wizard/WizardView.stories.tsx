@@ -26,7 +26,14 @@ const pending: { state: WizardState | null } = { state: null };
 // but the prop is required, and a written-out stub says what the shell passes where a cast would hide
 // it. Typed off the component so a field added to the dock shows up here as an error rather than as a
 // story that renders half a panel.
-const quiet = { current: null };
+//
+// TWO CLOCKS AND THEREFORE TWO OBJECTS. They were one `quiet` shared by both, which is a fake keyed
+// differently from the real thing: `useCopilot` holds two separate refs precisely because the
+// difference between them is the whole of the thinking indicator's logic — time since dispatch against
+// time since the last event. One object cannot express a turn that started four minutes ago and said
+// something a second ago, so a story built on it could never show the state that matters.
+const sentAt = { current: null };
+const lastEventAt = { current: null };
 const conversation: ComponentProps<typeof WizardView>['copilot'] = {
   copilot: {
     items: [],
@@ -44,8 +51,8 @@ const conversation: ComponentProps<typeof WizardView>['copilot'] = {
     openChat: () => {},
     deleteChat: () => {},
     cancel: () => {},
-    sentAt: quiet,
-    lastEventAt: quiet,
+    sentAt,
+    lastEventAt,
     sawText: { current: false },
   },
   backend: 'claude-code',
@@ -58,7 +65,6 @@ const conversation: ComponentProps<typeof WizardView>['copilot'] = {
   onEffort: () => {},
   onBackend: () => {},
   onReset: () => {},
-  onClose: () => {},
 };
 
 const meta = {

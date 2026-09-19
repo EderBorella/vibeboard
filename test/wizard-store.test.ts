@@ -4,6 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { ScaffoldMode } from '../src/store/project/scaffold.js';
 import {
   clearWizardState,
+  knownSuggestions,
   readWizardState,
   WIZARD_STATE_KEYS,
   WIZARD_STEPS,
@@ -90,5 +91,63 @@ describe('the wizard state file', () => {
     expect(read?.suggested).toBeUndefined();
     expect(read?.stack).toBeUndefined();
     await clearWizardState(root);
+  });
+});
+
+// WHAT A RUN IS ALLOWED TO HAVE SAID, and it is a question about VALUES as well as keys. The filter
+// checked the key and spread whatever was under it, so a model answering the packages question in
+// prose put a STRING where the browser reads a list — `csv('git, ripgrep')` calls `.join` on it and
+// throws during render, with no error boundary above the wizard. The screen goes blank and stays
+// blank, because the state is on disk and the next read produces the same throw: setup is dead until
+// somebody deletes a file they do not know about. Reproduced by a reviewer.
+//
+// Dropped rather than coerced, for the reason the keys are filtered rather than refused: a scan that
+// got one field wrong should still deliver the ones it got right, and a suggestion that is not there
+// is a field the person fills in themselves.
+describe('knownSuggestions', () => {
+  it('keeps a whole, well-typed suggestion', () => {
+    const body = {
+      answers: { what: 'a timeline of releases', who: 'the team' },
+      kind: 'web',
+      stack: 'TypeScript and Vite',
+      packages: ['git', 'ripgrep'],
+    };
+
+    expect(knownSuggestions(body)).toEqual(body);
+  });
+
+  // THE REVIEWER'S OWN CASE. A list answered as prose is the likeliest thing a model does here, and
+  // it is the one that killed the screen.
+  it('drops a packages list answered as a sentence', () => {
+    expect(knownSuggestions({ packages: 'git, ripgrep', kind: 'web' })).toEqual({ kind: 'web' });
+  });
+
+  it('drops the members of a list that are not names, and keeps the rest', () => {
+    expect(knownSuggestions({ packages: ['git', 7, null, 'ripgrep'] })).toEqual({
+      packages: ['git', 'ripgrep'],
+    });
+  });
+
+  it('drops a kind or a stack that is not a sentence', () => {
+    expect(knownSuggestions({ kind: { name: 'web' }, stack: ['TypeScript'] })).toEqual({});
+    expect(knownSuggestions({ kind: 42, stack: null })).toEqual({});
+  });
+
+  it('drops an answer that is not a sentence, and keeps its siblings', () => {
+    expect(knownSuggestions({ answers: { what: 'a timeline', who: { name: 'the team' }, done: 3 } })).toEqual(
+      { answers: { what: 'a timeline' } },
+    );
+  });
+
+  // The keys it always filtered, still filtered: a `step` or a `mode` among them is a run steering
+  // the wizard through the one route it has.
+  it('still keeps only the keys a suggestion has', () => {
+    expect(knownSuggestions({ kind: 'web', step: 'handoff', mode: 'greenfield' })).toEqual({ kind: 'web' });
+  });
+
+  it('takes nothing at all from a body that is not an object', () => {
+    for (const body of ['a stack, honestly', 42, null, undefined, ['web']]) {
+      expect(knownSuggestions(body), JSON.stringify(body) ?? 'undefined').toEqual({});
+    }
   });
 });

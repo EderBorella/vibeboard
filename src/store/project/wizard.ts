@@ -52,8 +52,10 @@ export interface WizardState {
 // read by this one.
 export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'suggested', 'stack', 'resumes'] as const;
 export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
-// The nested block gets the same treatment, and it is the one an AGENT fills: `PUT /api/wizard/prefill`
-// filters its body to these keys, so this list is a boundary as well as a mirror.
+// The nested block gets the same treatment, and it is the one an AGENT fills. A MIRROR AND NOT THE
+// BOUNDARY, which is the correction: the prefill route filtered its body to these keys and spread
+// whatever was under them, and a key list cannot say what a value may be. `SUGGESTION_READERS` below
+// is the boundary now, and its own mapped type is what keeps it complete.
 export const WIZARD_SUGGESTION_KEYS = ['answers', 'kind', 'stack', 'packages'] as const;
 
 // `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
@@ -73,17 +75,55 @@ void _everySuggestionFieldIsListed;
 // `step` or a `mode` among them would be a run steering the wizard through the one route it has.
 // Filtered rather than refused: a scan that guessed one extra field should still deliver the six that
 // were right. decision 77.
+//
+// AND THE VALUE AS WELL AS THE KEY, which it did not check. A model answering "what should the box
+// install" in prose puts a STRING under `packages`, where the browser reads a list — `csv()` calls
+// `.join` on it and throws while rendering, with no error boundary above the wizard. The screen goes
+// blank and STAYS blank, because the bad value is on disk and every reload reproduces it: setup is
+// dead until somebody finds and deletes a file they were never told about. Reproduced in review.
+//
+// A sentence rather than a type: these fields are shown to the person who will overrule them, so a
+// `kind` the product has never heard of is a perfectly good suggestion and only a `kind` that is not
+// WORDS is not.
+const words = (value: unknown): value is string => typeof value === 'string';
+
+// One member at a time, so a list with one bad name still delivers the good ones — the same reading
+// the key filter takes. A value that is not a list at all has nothing to salvage and goes whole.
+function nameList(value: unknown): string[] | undefined {
+  return Array.isArray(value) ? value.filter(words) : undefined;
+}
+
+function knownAnswers(value: unknown): WizardAnswers | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const given = value as Record<string, unknown>;
+  const kept: WizardAnswers = {};
+  for (const key of WIZARD_ANSWER_KEYS) {
+    const answer = given[key];
+    if (words(answer)) kept[key] = answer;
+  }
+  return kept;
+}
+
+// EVERY SUGGESTION FIELD, WITH THE READING THAT MAKES IT SAFE. A map rather than a loop over
+// `WIZARD_SUGGESTION_KEYS`, because a list of keys cannot say what a value may BE — and the value is
+// the half that was missing. `Required` makes a new field on `WizardSuggestions` fail to compile
+// until it has a reader here, which is the guarantee `_everySuggestionFieldIsListed` gives the list.
+const SUGGESTION_READERS: {
+  [K in keyof Required<WizardSuggestions>]: (value: unknown) => WizardSuggestions[K] | undefined;
+} = {
+  answers: knownAnswers,
+  kind: (value) => (words(value) ? value : undefined),
+  stack: (value) => (words(value) ? value : undefined),
+  packages: nameList,
+};
+
 export function knownSuggestions(body: unknown): WizardSuggestions {
-  // `in` throws on a primitive, and a JSON body is whatever the sender serialised.
+  // Indexing throws on a primitive, and a JSON body is whatever the sender serialised.
   const source = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
   const picked: Record<string, unknown> = {};
-  for (const key of WIZARD_SUGGESTION_KEYS) if (key in source) picked[key] = source[key];
-  const answers = picked.answers;
-  if (answers && typeof answers === 'object') {
-    const given = answers as Record<string, unknown>;
-    const kept: Record<string, unknown> = {};
-    for (const key of WIZARD_ANSWER_KEYS) if (key in given) kept[key] = given[key];
-    picked.answers = kept;
+  for (const [key, reader] of Object.entries(SUGGESTION_READERS)) {
+    const value = reader(source[key]);
+    if (value !== undefined) picked[key] = value;
   }
   return picked as WizardSuggestions;
 }

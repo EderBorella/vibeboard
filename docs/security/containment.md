@@ -288,6 +288,18 @@ enforces scope; it is not the same as isolation.
   A running box adopted mid-session keeps whatever rules it was born with. Today `sweepOldBoxes`
   destroys every labelled box at startup, which hides this; that coupling is load-bearing and
   untested, and it is what would silently swallow the next tightening of these rules.
+- **Setup's import routes untrusted third-party text into an `assist` conversation.** The wizard's
+  import step asks the person to paste the list they already keep — out of a shared spreadsheet, an
+  exported tracker, a file somebody else wrote — and sends it to the copilot, which holds an `assist`
+  credential. Four things confine it, and only one of them is the box: the frame says in as many words
+  that everything after the `---` separator is data and never instructions
+  (`src/server/copilot/wizard-frame.ts`); the person is reading the conversation as it happens, which
+  is the whole safety argument for `assist` at all; the turn runs in the same box as every other
+  agent, so the mounts above bound what it can touch on disk; and the scope table is what the
+  credential may actually call, which is the full grant written out in `decision 79` rather than
+  "cards". **The residual is that prose compliance is not a mechanism.** An instruction inside the
+  paste that the model chooses to follow is refused by the scope table and by nothing else — so the
+  worst case is bounded by what `assist` holds, not by the frame.
 - **A container is not a VM.** Genuinely untrusted code wants stronger isolation than this.
 
 ### Why the two-level design is safe

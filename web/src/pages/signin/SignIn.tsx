@@ -53,7 +53,14 @@ export function SignIn({ phase, onRetry }: Props) {
                 remove. It holds a button, not prose. */}
             {phase.retry && (
               <div className="vb-field">
-                <Button onClick={onRetry}>Try again</Button>
+                {/* The only thing on this screen a person can do, so it is painted as one. It USED to
+                    be filled without asking — `.gate button` wrote the primary variant over every
+                    button in the frame — and when that rule went, the sole action on a first-contact
+                    screen quietly became a default-weight one. Whatever paints a button is the atom's
+                    to say, and this is the atom being asked. */}
+                <Button variant="primary" onClick={onRetry}>
+                  Try again
+                </Button>
               </div>
             )}
           </>

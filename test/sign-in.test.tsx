@@ -75,11 +75,17 @@ describe('when it stopped', () => {
     expect(screen.getByText(reason)).toBeTruthy();
   });
 
-  it('offers Try again where trying again could work', () => {
+  it('offers Try again where trying again could work, and paints it as the action', () => {
     const onRetry = vi.fn();
     render(<SignIn phase={{ phase: 'stopped', reason: 'busy', retry: true }} onRetry={onRetry} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    const again = screen.getByRole('button', { name: /try again/i });
+    // The only thing on a first-contact screen a person can do, so it reads as one. It used to be
+    // painted filled by `.gate button`, a surface writing the primary variant over every button in the
+    // frame; that rule is gone, and the atom is what says this now.
+    expect(again.className).toContain('vb-btn-primary');
+
+    fireEvent.click(again);
 
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

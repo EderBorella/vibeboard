@@ -288,6 +288,97 @@ export const SURFACES: Surface[] = [
     floor: { elements: 85, text: 35, contrast: 35, focus: 25 },
   },
   {
+    name: 'wizard-import',
+    what: "the setup wizard's import step — the list box, the one-liner about it and the way to send them",
+    // This surface records a 122px control height beside --ctl-h's 28px and --mark-h's 16px: the
+    // eight-row paste box, an intrinsic height no gate reads — `wizard-stack`'s 32px textarea with
+    // six more rows in it. Named here for that entry's reason, so the next reader of a baseline diff
+    // does not go hunting for a rule that sets it.
+    root: null,
+    open: async (page) => {
+      // A FOURTH PROJECT, for the reason the stack and the review steps each need one of their own:
+      // a wizard step has no URL, and the only way in is opening a project whose file names it.
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      await page.locator('.gate li').filter({ hasText: 'Bring in a list' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+      // THE YES-DOOR, OPENED, and it is the stack step's `<details>` click exactly: the two boxes this
+      // step is about do not exist until it is pressed, so without this every check would walk past
+      // the only controls on the screen and measure two buttons under a question.
+      await page.getByRole('button', { name: 'Yes — bring it in' }).click();
+    },
+    prove: async (page) => {
+      // THE TWO BOXES, which nothing else in the product renders. The paste is a textarea and the
+      // one-liner is a single line, and proving both is what says the yes-door really opened —
+      // the question screen behind it has neither.
+      await expect(page.getByLabel('Paste your list, or say where it lives')).toBeVisible();
+      await expect(
+        page.getByLabel('Anything the assistant should know about how you keep it?'),
+      ).toBeVisible();
+      // DISABLED, and that is the assertion rather than an oversight: the send is gated on there
+      // being words to send, and nothing has been typed. It is the state this surface measures.
+      await expect(page.getByRole('button', { name: 'Bring it in' })).toBeDisabled();
+      await gone(page, '.gate');
+      await gone(page, 'main.boards');
+    },
+    // WHAT THIS SURFACE CANNOT SEE, said here so nobody reads its passing as cover for the whole
+    // step: once the turn is sent this screen carries the dock's panel worn compact, inside the
+    // card's own measure — and that state needs a real model, exactly as the thinking indicator does
+    // on the `copilot` surface. `docs/smoke-test.md`'s full journey is what drives it.
+    //
+    // 45 elements are measured here and the near miss is the QUESTION screen behind the yes-door —
+    // the same card with the two boxes replaced by the no-door, measured at 39 by removing the click
+    // in `open` and running this surface. The floor sits between them, as `wizard-stack`'s does.
+    // Focus cannot separate the two (14 either way), so that number is an anti-vacuity floor only.
+    floor: { elements: 42, text: 17, contrast: 17, focus: 12 },
+  },
+  {
+    name: 'wizard-ready',
+    what: "the setup wizard's last screen — what was set up, whether anything is missing, and the way out",
+    root: null,
+    open: async (page) => {
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      await page.locator('.gate li').filter({ hasText: 'Ready to start' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+    },
+    prove: async (page) => {
+      // THE SUMMARY, AND IT IS WHAT MAKES THIS SCREEN DISTINGUISHABLE FROM A HALF-READ ONE. Each of
+      // these three lines is omitted when the wizard cannot say it, so a fixture whose file failed to
+      // load would render the heading, the button and nothing else — and that is a different screen
+      // measured under this name.
+      await expect(page.getByText('Set up as: Web App')).toBeVisible();
+      await expect(page.locator('[data-testid="verbatim-stack"]')).toBeVisible();
+      await expect(
+        page.getByText('Six documents written — read them any time in Project Control'),
+      ).toBeVisible();
+      // THE READINESS, ANSWERED. This project has its six documents, its gate documents are not
+      // flagged and the scaffolder's cards are on the board, so `ok` is the honest answer and this is
+      // the sentence the journey's own ending shows. A blocker list here would mean the fixture
+      // stopped being the state it claims to be.
+      await expect(page.getByText('Everything auto-pilot needs is here.')).toBeVisible();
+      await expect(page.locator('[data-testid="verbatim-blockers"]')).toHaveCount(0);
+      // THE ENDING, AND THE ONLY THING LEFT TO PRESS. Both halves: completion is the ending here, so
+      // the quiet skip and `Stop offering this` are gone — two more endings beside this one would
+      // read as a choice between them.
+      await expect(page.getByRole('button', { name: 'Open the board' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Not now — take me to the board' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Stop offering this' })).toHaveCount(0);
+      await gone(page, '.gate');
+      await gone(page, 'main.boards');
+    },
+    // WHAT THIS SURFACE CANNOT SEE: the import's closing sentence, which is the model's own and lives
+    // in the step that heard it rather than on disk — a setup resumed at this step has no copy of it,
+    // and neither does this fixture. The unit suite walks the import into the ending for that line.
+    //
+    // 40 elements are measured here and the near miss is this same screen with NOTHING TO REPORT —
+    // every summary line is omitted when the wizard cannot say it, so a file that failed to load
+    // renders the heading, the readiness and the button alone. Measured at 37 by stripping the stack
+    // and the résumés from the fixture and running this surface, which is why the floor is 38 and the
+    // three summary lines are proved by name above rather than left to the count.
+    floor: { elements: 38, text: 16, contrast: 16, focus: 9 },
+  },
+  {
     name: 'card',
     what: 'an open card in the dock — its tab strip, the card view, its runs and the skill rail',
     root: '[data-testid="dock-body"]',

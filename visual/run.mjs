@@ -404,13 +404,7 @@ One accent colour, generous spacing, the system font, nothing decorative.
 **I couldn't work out:** whether you want a dark mode. Tell me and it goes in.
 `,
 };
-for (const [name, content] of Object.entries(FOUNDATION)) {
-  const written = await writeControlFile(review, foundationRel(name), content);
-  if (!written) die(`the review fixture could not write ${name} — is it still a foundation document?`);
-}
-writeFileSync(
-  join(review, 'README.md'),
-  `# Meals
+const README = `# Meals
 
 A shared list of the meals we cook, so nobody has to plan dinner out of memory. Add what you made,
 see what you ate last week, and pick something out of it.
@@ -420,38 +414,61 @@ account to make.
 
 The documents that steer this project are in the foundation folder, and the setup assistant wrote
 the first draft of all of them.
-`,
-  'utf8',
-);
+`;
+
+// THE SIX DOCUMENTS ON DISK, for the three fixtures that are at or past the step that writes them.
+// One writer rather than three copies, for the reason `scaffoldProject` is imported rather than
+// reimplemented — and here it is also the difference between a coherent fixture and an impossible
+// one: a wizard file carrying six résumés over a project with no documents is a state the product
+// cannot produce, and the readiness endpoint reads the DISK.
+async function seedDocuments(projectRoot) {
+  for (const [name, content] of Object.entries(FOUNDATION)) {
+    const written = await writeControlFile(projectRoot, foundationRel(name), content);
+    if (!written) die(`a fixture could not write ${name} — is it still a foundation document?`);
+  }
+  writeFileSync(join(projectRoot, 'README.md'), README, 'utf8');
+}
+
+await seedDocuments(review);
+
+// WHAT THE ASSISTANT FILED ABOUT EACH ONE, shared by the three fixtures at or past the writing step:
+// the résumés live in the wizard file, so a project that walked through the review carries them into
+// the import and the ending. The order is the order they are written.
+const RESUMES = {
+  'README.md':
+    'What this is and how to run it. It says the app is a shared list of meals for the people who cook them, and that everything runs on your own machine for now.',
+  'STACK.md':
+    'The tools this is built with: TypeScript, React, Vite and Vitest. It also says what is deliberately not here yet — no server, no database.',
+  'CODE-QUALITY.md':
+    'The three checks that must pass before anything is called done: the types, the linter and the tests. Each one is a command you can run yourself.',
+  'TESTING.md':
+    'How this is tested, and what a smoke test means here: start the app, add a meal, reload, and see it still there.',
+  'UX.md':
+    'How it should feel. One screen, big targets for a phone, and nothing that needs explaining. Adding a meal is the only thing it asks of you.',
+  'DESIGN.md':
+    'How it should look: one accent colour, generous spacing, the system font. I could not work out whether you want a dark mode, and the document says so.',
+};
+
+// The agreed stack, which the ending reads back to the person in the model's own sentence.
+const AGREED_STACK =
+  'A small web app in TypeScript, with React for the screens and Vite to build them. Vitest for the tests. The list lives in the browser to begin with.';
+
+const ANSWERS = {
+  what: 'A shared list of the meals we cook, so nobody has to plan dinner out of memory.',
+  who: 'The two of us at home, on a phone in the kitchen.',
+  done: 'We can see what we ate last week and pick from it in under a minute.',
+};
 
 await writeWizardState(review, {
   mode: 'greenfield',
   step: 'docs',
-  answers: {
-    what: 'A shared list of the meals we cook, so nobody has to plan dinner out of memory.',
-    who: 'The two of us at home, on a phone in the kitchen.',
-    done: 'We can see what we ate last week and pick from it in under a minute.',
-  },
+  answers: ANSWERS,
   // AGREED, not suggested: the stack step is behind this one, so a review reached without it is a
   // state setup cannot reach — and it is the line `wizardFrame` puts in front of the model.
-  stack:
-    'A small web app in TypeScript, with React for the screens and Vite to build them. Vitest for the tests. The list lives in the browser to begin with.',
+  stack: AGREED_STACK,
   // ALL SIX, because a résumé map with gaps renders placeholder cards and this surface is the review
   // as a person reaching it actually finds it. The order is the order they are written.
-  resumes: {
-    'README.md':
-      'What this is and how to run it. It says the app is a shared list of meals for the people who cook them, and that everything runs on your own machine for now.',
-    'STACK.md':
-      'The tools this is built with: TypeScript, React, Vite and Vitest. It also says what is deliberately not here yet — no server, no database.',
-    'CODE-QUALITY.md':
-      'The three checks that must pass before anything is called done: the types, the linter and the tests. Each one is a command you can run yourself.',
-    'TESTING.md':
-      'How this is tested, and what a smoke test means here: start the app, add a meal, reload, and see it still there.',
-    'UX.md':
-      'How it should feel. One screen, big targets for a phone, and nothing that needs explaining. Adding a meal is the only thing it asks of you.',
-    'DESIGN.md':
-      'How it should look: one accent colour, generous spacing, the system font. I could not work out whether you want a dark mode, and the document says so.',
-  },
+  resumes: RESUMES,
 });
 
 // AND THE BLOCK THAT WRITING THEM RAISES, because a fixture has to be a state the product can reach.
@@ -492,6 +509,52 @@ seedChat(review, {
     },
   ],
   stats: { costUsd: 0.0863, turns: 1, lastDurationMs: 361_000, contextTokens: 21_480 },
+});
+
+// A FOURTH AND A FIFTH PROJECT: THE JOURNEY'S LAST TWO STEPS. Same reason there is a third — one
+// `wizard.yaml` names one step, so a project renders exactly one of the wizard's screens, and
+// re-pointing an existing file would trade a measured screen for this one. The recording pass opens
+// each surface by NAME from the picker, so a project added here disturbs none of the others.
+//
+// BOTH CARRY WHAT A PERSON WALKING THE JOURNEY WOULD HAVE BY THEN: the three answers, the agreed
+// stack, the six résumés — and the six documents on disk under them, because the résumés are the
+// summaries OF those documents and the readiness endpoint reads the disk.
+//
+// NEITHER NEEDS AN AGENT, which is the only reason they can be measured here (`VIBEBOARD_DOCKER_BIN`
+// is `/bin/false`). The import step dispatches nothing until the person presses `Bring it in`, and
+// the ending reads the file, the config and the readiness — three answers the server has without a
+// model.
+const importing = join(projects, 'import');
+mkdirSync(importing, { recursive: true });
+await scaffoldProject(importing, { name: 'Bring in a list', mode: 'greenfield', today: '2026-01-01' });
+await seedDocuments(importing);
+await writeWizardState(importing, {
+  mode: 'greenfield',
+  step: 'import',
+  answers: ANSWERS,
+  stack: AGREED_STACK,
+  resumes: RESUMES,
+});
+
+// THE ENDING, AND IT IS A PROJECT WITH NOTHING LEFT WRONG WITH IT. The six documents are written, the
+// gate documents have been read (the gates step is behind this one, and acknowledging is what clears
+// the block decision 51 raises when an assistant writes them), and the scaffolder's sample cards are
+// on the board — so the readiness answers `ok` and the screen says so. That is the journey's own
+// ending; a project still missing something renders the blocker list instead, which is the same
+// screen with a different answer on it and is what the unit suite pins.
+const done = join(projects, 'finished');
+mkdirSync(done, { recursive: true });
+await scaffoldProject(done, { name: 'Ready to start', mode: 'greenfield', today: '2026-01-01' });
+await seedDocuments(done);
+await writeWizardState(done, {
+  mode: 'greenfield',
+  step: 'ready',
+  answers: ANSWERS,
+  // WITHOUT THESE THE ENDING HAS NOTHING TO REPORT. The stack sentence and the six-document line are
+  // read off this file and nowhere else, and a summary with both omitted is the screen a setup
+  // resumed at its last step shows — honest, and not the one this surface is for.
+  stack: AGREED_STACK,
+  resumes: RESUMES,
 });
 
 const stateFile = join(root, 'state.json');

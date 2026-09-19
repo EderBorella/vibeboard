@@ -349,6 +349,89 @@
         "focus": 0
       }
     },
+    "wizard-import": {
+      "fontSizes": [
+        "12px",
+        "13px",
+        "15px",
+        "18px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "122px",
+        "16px",
+        "28px"
+      ],
+      "markerHeights": [
+        "16px"
+      ],
+      "examined": {
+        "elements": 45,
+        "textElements": 18,
+        "overflow": 12,
+        "clipping": 6,
+        "contrast": 18,
+        "tokens": 51,
+        "rows": 3,
+        "focus": 14
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "wizard-ready": {
+      "fontSizes": [
+        "12px",
+        "13px",
+        "15px",
+        "18px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "16px",
+        "28px"
+      ],
+      "markerHeights": [
+        "16px"
+      ],
+      "examined": {
+        "elements": 40,
+        "textElements": 18,
+        "overflow": 12,
+        "clipping": 4,
+        "contrast": 18,
+        "tokens": 51,
+        "rows": 3,
+        "focus": 11
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
+        "focus": 0
+      }
+    },
     "card": {
       "fontSizes": [
         "11px",

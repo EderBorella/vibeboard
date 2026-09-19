@@ -21,10 +21,10 @@ export interface Surface {
   what: string;
   // The element whose subtree is measured, or null for the whole document.
   //
-  // Null for the six top-level views, because a view IS the page. A selector for the five surfaces
-  // that render OVER a page — the open card in the dock, the archive drawer, settings, the model
-  // picker, the confirm dialog — all of which leave the board behind them, so a whole-document walk
-  // would report the board's numbers again under a second name.
+  // Null for the six top-level views, because a view IS the page. A selector for the six surfaces
+  // that render OVER a page — the open card in the dock, the archive drawer, settings, the copilot
+  // dock, the model picker, the confirm dialog — all of which leave the board behind them, so a
+  // whole-document walk would report the board's numbers again under a second name.
   root: string | null;
   // Getting there from a proven board. Kept separate from `prove` so a planted navigation failure has
   // somewhere to be planted.

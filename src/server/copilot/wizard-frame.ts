@@ -95,7 +95,9 @@ export function wizardFrame(state: WizardState | null, attach: string | undefine
     'frontmatter — docs/foundation-bootstrap.md in this project states both contracts.',
     '',
     'After writing or changing any of those documents, also store a 2–3 sentence plain-language',
-    'summary with `PUT /api/wizard/resumes/:name` — the person reads the summaries first.',
+    'summary with `PUT /api/wizard/resumes/:name` — the person reads the summaries first. Store each',
+    'one immediately after the document it is about, before you start the next: they appear on the',
+    'screen as they arrive, and the person is waiting on the first, not on all six.',
     ...(looking ? ['', looking] : []),
   ].join('\n');
 }

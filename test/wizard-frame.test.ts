@@ -73,6 +73,16 @@ describe('wizardFrame', () => {
     expect(frame).toContain('PUT /api/control/foundation/:name');
     expect(frame).toContain("I couldn't work out");
   });
+
+  // WHEN, NOT ONLY THAT. "After writing or changing any of those documents" reads as a job for the end,
+  // and a live model batched all six there: four minutes of the review step polling an empty side of
+  // the screen while the person watched nothing arrive. The summaries are the only thing that moves
+  // while the turn runs, so the brief says each one lands before the next document is started.
+  it('asks for each résumé immediately, rather than for all six at the end', () => {
+    const frame = wizardFrame(docs(), undefined) ?? '';
+    expect(frame).toContain('immediately after the document it is about, before you start the next');
+    expect(frame).toContain('waiting on the first, not on all six');
+  });
 });
 
 // THE IMPORT, WHICH IS THE COPILOT UNDER A FRAME AND NEVER A RUN (decision 79). The frame is the only

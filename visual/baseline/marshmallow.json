@@ -371,14 +371,14 @@
         "16px"
       ],
       "examined": {
-        "elements": 45,
-        "textElements": 18,
-        "overflow": 12,
+        "elements": 46,
+        "textElements": 19,
+        "overflow": 13,
         "clipping": 6,
-        "contrast": 18,
+        "contrast": 19,
         "tokens": 51,
         "rows": 3,
-        "focus": 14
+        "focus": 15
       },
       "findings": {
         "type": 0,

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ComponentProps } from 'react';
 import { config, snapshot } from '../../../../.storybook/fixtures';
 import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
-import type { ControlFile, ControlGroup, FileRead } from '../../lib/api';
+import type { ControlFile, ControlGroup, FileRead, Readiness } from '../../lib/api';
 import type { ProjectSnapshot, WizardState } from '../../lib/shared';
 import { WizardView } from './WizardView';
 
@@ -254,3 +254,34 @@ const ready: Story = {
 export const ReadyAt900: Story = { ...ready, globals: { viewport: { value: 'w900' } } };
 export const ReadyAt1200: Story = { ...ready, globals: { viewport: { value: 'w1200' } } };
 export const ReadyAt1440: Story = { ...ready, globals: { viewport: { value: 'w1440' } } };
+
+// THE SAME ENDING WITH SOMETHING STILL MISSING, and this is the ONLY place a person can look at that
+// list. The browser harness measures the ending on a fixture whose readiness is `ok` — it asserts the
+// blocker list is absent, deliberately — and the unit suite reads the sentences out of a DOM with no
+// layout engine. So the one screen in setup that reports bad news has never been seen set.
+//
+// THE SENTENCES ARE THE SERVER'S, VERBATIM from `blockersFrom` in src/server/autopilot/routes.ts.
+// They are what the wizard renders unreworded (each names the file or the block that clears it), so a
+// story that invented plainer ones would be showing a screen this product cannot produce.
+//
+// ANNOTATED, like every row in this file: a `RouteTable` value is `object`, and the ending reads
+// `ok` and `blockers` off this one — an un-annotated literal is checked by nothing at all.
+const blocked: Readiness = {
+  ok: false,
+  blockers: [
+    'foundation/UX.md has not been written yet.',
+    'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
+  ],
+  readme: { ok: true },
+  foundation: { present: [], missing: ['UX.md'], ok: false },
+  gates: { ok: true, count: 1 },
+  smoke: { ok: true },
+  phases: { problems: [], count: 6 },
+  unreviewedGates: [],
+};
+
+export const ReadyWithBlockers: Story = {
+  args: { start: 'ready', snapshot: kinded },
+  decorators: [withRoutes({ ...EMPTY, '/api/wizard': ending, '/api/autopilot/readiness': blocked })],
+  globals: { viewport: { value: 'w1200' } },
+};

@@ -92,6 +92,24 @@ const type = (label: RegExp, value: string): void => {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 };
 
+// A read held open, so the window between mounting a step and its answer landing can be stood in
+// rather than reasoned about. `mockResolvedValue` closes that window before the first assertion.
+function deferred<T>(): { promise: Promise<T>; settle: (value: T) => Promise<void> } {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return {
+    promise,
+    settle: async (value) => {
+      await act(async () => {
+        resolve(value);
+        await promise;
+      });
+    },
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -462,6 +480,34 @@ describe('the backend step', () => {
     expect(await screen.findByText('A few questions')).toBeTruthy();
   });
 
+  // A WRITE RACING ITS OWN READ. `putWizard` replaces the file whole, and this step holds none of what
+  // is in it, so a Continue pressed before the read lands writes `{ mode, step }` over the answers —
+  // and over the resumes a later phase puts there. Nothing errors and nothing on screen changes; the
+  // file is simply shorter afterwards.
+  it('will not write until the file it is about to replace has been read', async () => {
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+    view({ start: 'backend', snapshot: opened });
+
+    // The live check is the step's OTHER gate, and it has answered clean — so what is still holding
+    // Continue down is the read and nothing else.
+    await waitFor(() => expect(screen.getByText('Connected and ready.')).toBeTruthy());
+    const go = screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+
+    await read.settle({ state: { mode: 'greenfield', step: 'backend', answers: { what: 'a game' } } });
+
+    expect(go.disabled).toBe(false);
+    fireEvent.click(go);
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'form',
+        answers: { what: 'a game' },
+      }),
+    );
+  });
+
   it('offers to build when a build is what would fix it', async () => {
     api.getSandbox.mockResolvedValue(refused('docker', NO_IMAGE, { buildable: true }));
     view({ start: 'backend', snapshot: opened });
@@ -622,6 +668,33 @@ describe('the form step', () => {
           who: 'the field team',
           done: 'one meter read end to end',
         },
+      }),
+    );
+  });
+
+  // The same race as the backend step's, and this is the step where it costs the most: it writes the
+  // three answers, so a press before the read lands would drop the resumes a later phase stores beside
+  // them. Continue is the only control here, so nothing else can be holding it down.
+  it('will not write until the file it is about to replace has been read', async () => {
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+    form();
+
+    const go = screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+
+    await read.settle({
+      state: { mode: 'greenfield', step: 'form', resumes: { 'foundation/TESTING.md': 'how it is checked' } },
+    });
+
+    expect(go.disabled).toBe(false);
+    fireEvent.click(go);
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'handoff',
+        resumes: { 'foundation/TESTING.md': 'how it is checked' },
+        answers: { what: '', who: '', done: '' },
       }),
     );
   });

@@ -76,13 +76,23 @@ function adoptTarget(input: string): { relative: boolean; path: string; name: st
 // holds none of it — a step is mounted when it is reached and unmounted when it is left — so a step that
 // wrote `{ mode, step }` from what it happens to know would silently delete the answers of the step
 // before it. Read on entry, written on the way out.
-const NO_WIZARD: { state: WizardState | null } = { state: null };
-
-function useSaved(mode: ScaffoldMode): (step: WizardStep) => WizardState {
-  const { value } = useFetched(getWizard, [], NO_WIZARD);
-  // The fallback is for the one case the file can be missing here: it was cleared in another tab. Setup
-  // then starts recording again from this step rather than refusing to move.
-  return (step) => ({ ...(value.state ?? { mode, step }), step });
+//
+// WHICH MAKES THE READ A GATE AND NOT JUST A SOURCE. `null` here is "not read yet", and it is a
+// different fact from a file that is not there: a Continue pressed in the window before the answer
+// lands does exactly what the paragraph above forbids, and nothing errors — the file is simply shorter
+// afterwards, one step's answers gone. A read that FAILED stays `null` for the same reason: a failure
+// is no evidence the file is absent, so writing over it would lose the same thing.
+function useSaved(mode: ScaffoldMode): {
+  read: boolean;
+  saved: (step: WizardStep) => WizardState;
+} {
+  const { value } = useFetched<{ state: WizardState | null } | null>(getWizard, [], null);
+  return {
+    read: value !== null,
+    // The fallback is for the one case the file can be missing with the read landed: it was cleared in
+    // another tab. Setup then starts recording again from this step rather than refusing to move.
+    saved: (step) => ({ ...(value?.state ?? { mode, step }), step }),
+  };
 }
 
 export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Props) {
@@ -265,7 +275,7 @@ function BackendStep({
   bump: number;
   onContinue: () => void;
 }) {
-  const saved = useSaved(mode);
+  const { read, saved } = useSaved(mode);
   // Re-asked on entry, after the assistant changes, and after a build lands: all three change the
   // answer, and none of them is observable any other way. `useSandbox` re-fetches on whatever it is
   // keyed to, which is this counter and nothing else on the screen.
@@ -368,8 +378,9 @@ function BackendStep({
 
       <Stack gap={4}>
         {/* Nothing gets past a machine that cannot run an agent — and nobody has to leave setup to fix
-            it, which is the whole of why the check is here rather than at the first dispatch. */}
-        <Button variant="primary" disabled={!ready || busy !== null} onClick={go}>
+            it, which is the whole of why the check is here rather than at the first dispatch. `read`
+            is the second gate and has nothing to do with the machine: see `useSaved`. */}
+        <Button variant="primary" disabled={!ready || !read || busy !== null} onClick={go}>
           Continue
         </Button>
       </Stack>
@@ -424,7 +435,7 @@ function FormStep({
   snapshot: ProjectSnapshot | null;
   onContinue: () => void;
 }) {
-  const saved = useSaved(mode);
+  const { read, saved } = useSaved(mode);
   const [what, setWhat] = useState('');
   const [who, setWho] = useState('');
   const [done, setDone] = useState('');
@@ -538,7 +549,9 @@ function FormStep({
       </details>
 
       <Stack gap={4}>
-        <Button variant="primary" disabled={busy !== null} onClick={go}>
+        {/* Gated on the read for `useSaved`'s reason: this step's write is the one that would drop the
+            resumes a later phase stores beside these answers. */}
+        <Button variant="primary" disabled={!read || busy !== null} onClick={go}>
           Continue
         </Button>
       </Stack>

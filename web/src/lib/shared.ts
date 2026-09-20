@@ -371,8 +371,9 @@ void _everySnapshotFieldIsListed;
 // abandoned, so its absence is what tells the shell there is no wizard to offer.
 //
 // A LIST, then the union derived from it, for the reason `BOX_KINDS` above is a list: a type has no
-// runtime value, so nothing could hold the two sides together. Asserted in test/mirror.test.ts.
-export const WIZARD_STEPS = ['backend', 'form', 'handoff'] as const;
+// runtime value, so nothing could hold the two sides together. Asserted in test/mirror.test.ts. The
+// order is the order the steps are walked. decision 77.
+export const WIZARD_STEPS = ['backend', 'scan', 'form', 'stack', 'docs', 'gates', 'handoff'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardAnswers {
@@ -381,10 +382,25 @@ export interface WizardAnswers {
   done?: string;
 }
 
+// What a scan or a stack run proposed. Free strings on purpose — see the store's copy; a suggestion
+// the product cannot make sense of is still something the person must be able to see and overrule.
+export interface WizardSuggestions {
+  answers?: WizardAnswers;
+  kind?: string;
+  stack?: string;
+  packages?: string[];
+}
+
 export interface WizardState {
   mode: ScaffoldMode;
   step: WizardStep;
   answers?: WizardAnswers;
+  // What an agent proposed, never what the person said: the form reads this into EMPTY fields only,
+  // so a suggestion cannot overwrite an answer. Written by the runs, through their own route.
+  // decision 77.
+  suggested?: WizardSuggestions;
+  // The stack as agreed, once the person has approved or overruled the suggestion above.
+  stack?: string;
   // Plain-language summaries of the foundation documents, written during the loop and dying with this
   // file. The browser reads them; nothing here writes them.
   resumes?: Record<string, string>;
@@ -394,8 +410,11 @@ export interface WizardState {
 // and asserted against them in test/mirror.test.ts. The steps were guarded from the start and the
 // fields were not — and `putWizard` sends the whole state, so a key this side does not know about is
 // one the browser silently deletes rather than one it merely cannot show.
-export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'resumes'] as const;
+export const WIZARD_STATE_KEYS = ['mode', 'step', 'answers', 'suggested', 'stack', 'resumes'] as const;
 export const WIZARD_ANSWER_KEYS = ['what', 'who', 'done'] as const;
+// The block an agent fills, mirroring `WIZARD_SUGGESTION_KEYS`. The server filters a prefill body to
+// these keys, so a field this side knows and that list does not is one no run can ever deliver.
+export const WIZARD_SUGGESTION_KEYS = ['answers', 'kind', 'stack', 'packages'] as const;
 
 // `never` when every field is listed; otherwise these lines fail to compile and name the one missed.
 type UnlistedWizardField = Exclude<keyof WizardState, (typeof WIZARD_STATE_KEYS)[number]>;
@@ -404,3 +423,11 @@ void _everyWizardFieldIsListed;
 type UnlistedAnswerField = Exclude<keyof WizardAnswers, (typeof WIZARD_ANSWER_KEYS)[number]>;
 const _everyAnswerFieldIsListed: UnlistedAnswerField extends never ? true : UnlistedAnswerField = true;
 void _everyAnswerFieldIsListed;
+type UnlistedWizardSuggestionField = Exclude<
+  keyof WizardSuggestions,
+  (typeof WIZARD_SUGGESTION_KEYS)[number]
+>;
+const _everyWizardSuggestionFieldIsListed: UnlistedWizardSuggestionField extends never
+  ? true
+  : UnlistedWizardSuggestionField = true;
+void _everyWizardSuggestionFieldIsListed;

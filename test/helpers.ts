@@ -160,7 +160,11 @@ export interface TestProject {
   // header is filled in automatically for every other request, so this is only needed when the SCOPE is
   // the point. The store itself is deliberately NOT returned: nothing destructured it, and a field no test
   // exercises is one more thing to keep true for no one.
-  mint: (scope: 'work' | 'checkup' | 'service', run: string, card?: string) => Credential;
+  //
+  // `assist` is in the union because the copilot's credential is minted through this same call
+  // (`mintChat` is `mintRun('assist', …)`), and the wizard's two agent routes are split on exactly
+  // that scope — one the runs may call, one the copilot may.
+  mint: (scope: 'work' | 'checkup' | 'service' | 'assist', run: string, card?: string) => Credential;
 }
 
 // The setup most route tests re-typed by hand: a temp folder, scaffolded and opened, with an

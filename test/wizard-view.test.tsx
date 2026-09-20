@@ -2,8 +2,9 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FOUNDATION_FILES } from '../src/core/layout.js';
 import { defaultConfig } from '../src/store/project/config.js';
-import type { SandboxState } from '../web/src/lib/api.js';
+import type { Readiness, SandboxState } from '../web/src/lib/api.js';
 import type { ProjectConfig, ProjectSnapshot, WizardState } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
@@ -20,6 +21,20 @@ const api = vi.hoisted(() => ({
     .mockResolvedValue({ ok: true, backend: 'managed', agentRefusal: null, refusalKind: null }),
   buildAgentImage: vi.fn().mockResolvedValue({ ok: true, already: false }),
   patchConfig: vi.fn().mockResolvedValue({}),
+  // The wizard's own dispatch door. A card-less run is refused to this browser through `POST /api/runs`,
+  // so setup's two runs have one of their own — see src/server/boards/wizard-routes.ts.
+  runWizardSkill: vi.fn().mockResolvedValue({ run: { run: 'run-1', status: 'running' } }),
+  // THE DOCS STEP'S FOUR. The grant the copilot writes the documents under; the question the wizard
+  // asks the moment it stops — writing two of those documents as an agent is what raises it — and the
+  // listing and the read the gate step opens each document's text with. A clean project by default, so
+  // a test about the turn does not have to describe a block that is not there.
+  setAuthority: vi.fn().mockResolvedValue({ authorised: true }),
+  // Answered per test from `readiness()` below, which is the endpoint's REAL shape: the docs step
+  // reads three of its fields and a fixture carrying one of them would pass the other two's check.
+  getReadiness: vi.fn(),
+  acknowledgeGates: vi.fn().mockResolvedValue({ ok: true }),
+  listControlFiles: vi.fn().mockResolvedValue([]),
+  getControlFile: vi.fn().mockResolvedValue({ content: '' }),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -28,20 +43,45 @@ vi.mock('../web/src/lib/api.js', () => api);
 // the TAB's socket generation rather than on a literal, which `socketFor` would answer by replacing the
 // tab's own connection.
 const ws = vi.hoisted(() => {
-  type Msg = { type: string; state?: string; line?: string };
+  // `record` is the run frame's payload, the shape `run:update` broadcasts. Typed loosely on purpose:
+  // what the scan step reads off it is an id, a status and an outcome, and a fixture carrying a whole
+  // RunRecord would hide which three of its fields the step actually depends on.
+  type Msg = {
+    type: string;
+    // A string for a build frame and an object for the copilot's own state — the two frames this
+    // socket carries that are not a run record, and the fake passes each through untouched.
+    state?: string | { running: boolean };
+    line?: string;
+    record?: { run: string; status: string; outcome?: string };
+    event?: { kind: string; name?: string; text?: string };
+    // A REPLAYED TRANSCRIPT, which is how the dock's conversation arrives on connect: the copilot
+    // channel replaces the client's items wholesale from what is on disk. Carried here because the
+    // docs step's reading of "did this turn fail" is a question about WHICH items, and a fake that
+    // could only append live ones could not put an old one in front of it.
+    items?: { kind: string; text: string; toolName?: string }[];
+    chats?: unknown[];
+    stats?: { costUsd: number; turns: number; lastDurationMs: number; contextTokens: number };
+  };
+  type Socket = { subscribe: (fn: (m: Msg) => void) => () => void; send: (payload: object) => void };
   const subscribers = new Map<number, Set<(m: Msg) => void>>();
-  const sockets = new Map<number, { subscribe: (fn: (m: Msg) => void) => () => void }>();
+  const sockets = new Map<number, Socket>();
   const asked: number[] = [];
+  // WHAT THE TAB SENT. The docs step's turn goes UP this socket rather than through a route, so a fake
+  // that only listened could not tell a turn sent from one merely prepared.
+  const sent: object[] = [];
   const useSharedWs = (bump: number) => {
     asked.push(bump);
     const existing = sockets.get(bump);
     if (existing) return existing;
     const set = new Set<(m: Msg) => void>();
     subscribers.set(bump, set);
-    const socket = {
+    const socket: Socket = {
       subscribe: (fn: (m: Msg) => void) => {
         set.add(fn);
         return () => set.delete(fn);
+      },
+      send: (payload: object) => {
+        sent.push(payload);
       },
     };
     sockets.set(bump, socket);
@@ -50,10 +90,12 @@ const ws = vi.hoisted(() => {
   return {
     useSharedWs,
     asked,
+    sent,
     reset: () => {
       sockets.clear();
       subscribers.clear();
       asked.length = 0;
+      sent.length = 0;
     },
     push: (msg: Msg, bump = 0) => {
       for (const fn of subscribers.get(bump) ?? []) fn(msg);
@@ -74,6 +116,23 @@ const onExit = vi.fn();
 // across the tsc/Vite seam the way the settings tests cast it.
 const config = defaultConfig('demo') as unknown as ProjectConfig;
 const opened = { name: 'demo', root: '/work/demo', config } as unknown as ProjectSnapshot;
+
+// WHAT THE READINESS ENDPOINT ACTUALLY ANSWERS, whole. The docs step reads `unreviewedGates`,
+// `foundation.missing` AND `readme.ok` from one response — "did it actually write anything" is the
+// other half of "may auto-pilot start" — so a fixture carrying only the first would let the other two
+// checks pass over fields that were never there. `present` is the real list for the same reason the
+// probe fixtures are the probe's own.
+const readiness = (over: Partial<Readiness> = {}): Readiness => ({
+  ok: true,
+  blockers: [],
+  readme: { ok: true, path: 'README.md' },
+  foundation: { present: FOUNDATION_FILES.map((f) => f.name), missing: [], ok: true },
+  gates: { ok: true, count: 1 },
+  smoke: { ok: true },
+  phases: { problems: [], count: 6 },
+  unreviewedGates: [],
+  ...over,
+});
 
 const view = (over: Partial<ComponentProps<typeof WizardView>> = {}) =>
   render(
@@ -109,6 +168,12 @@ function deferred<T>(): { promise: Promise<T>; settle: (value: T) => Promise<voi
     },
   };
 }
+
+// A READY project by default. `clearAllMocks` clears the CALLS and leaves the implementation, so a
+// case that describes a half-written project would otherwise be the answer for the rest of the file.
+beforeEach(() => {
+  api.getReadiness.mockResolvedValue(readiness());
+});
 
 afterEach(() => {
   cleanup();
@@ -666,6 +731,170 @@ describe('the backend step', () => {
   });
 });
 
+// THE FIRST AGENT MOMENT, and it only exists in map mode: almost every answer the next screen asks
+// for is already written down in the folder the person is bringing in. A run reads it and fills the
+// form in — as SUGGESTIONS, into empty fields only, which is the whole of what decision 77 lets an
+// agent that has read an unvetted folder do.
+describe('the scan step (map mode)', () => {
+  // Re-stated per test, because `clearAllMocks` clears the CALLS and leaves the implementation: the
+  // rejection one case below installs would otherwise be the door's answer for the rest of the file.
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-1', status: 'running' } });
+  });
+
+  const scan = () => view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+
+  // A `run:update` frame as the server broadcasts one, on the tab's own socket generation.
+  const settle = async (status: string, outcome?: string, run = 'run-1'): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run, status, ...(outcome ? { outcome } : {}) } });
+    });
+  };
+
+  it('reads the folder through the wizard’s own door, and says what it is doing', async () => {
+    scan();
+
+    // ONE ARGUMENT, and the door takes no others: which skill is the only thing the browser chooses.
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalledWith('scan-project'));
+    expect(screen.getByText('Reading your files…')).toBeTruthy();
+    expect(
+      screen.getByText('A minute or two. You can skip this and answer everything yourself.'),
+    ).toBeTruthy();
+  });
+
+  // RE-ENTRY MUST NOT RE-SCAN. The file already holds what the last run found, and a second run would
+  // cost real money to produce the same suggestions over the answers the first one already made.
+  it('does not read it twice: coming back with suggestions goes straight to the questions', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'brownfield', step: 'scan', suggested: { answers: { what: 'a timeline of releases' } } },
+    });
+    scan();
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+  });
+
+  // Nothing is dispatched until the file has been READ, for `useSaved`'s reason turned around: the
+  // answer to "has this already been scanned" is on disk, and a dispatch fired before it lands is the
+  // second run the case above exists to prevent.
+  it('waits for the file before it starts anything', async () => {
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+    scan();
+
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+
+    await read.settle({ state: { mode: 'brownfield', step: 'scan' } });
+
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalledWith('scan-project'));
+  });
+
+  it('hands over to the questions when the run has read what it can', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('success', 'success');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.queryByText(/blanks are yours/)).toBeNull();
+  });
+
+  // THE FRAME IS FILTERED TO THE RUN THIS STEP STARTED. Every run on the project broadcasts on this
+  // socket — auto-pilot's, a run started from a card in another tab — and any of them settling would
+  // otherwise walk the person off a scan that is still reading.
+  it('ignores another run settling, and moves on when its own does', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('success', 'success', 'some-other-run');
+    expect(screen.getByText('Reading your files…')).toBeTruthy();
+
+    await settle('success', 'success');
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+  });
+
+  // A run that ended in anything but a clean success still hands over: the questions are answerable
+  // without it, and holding a person on a screen about a run they did not ask for is the worst of both.
+  it('carries on with a plain notice when the run could not read everything', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('attention', 'attention');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.getByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+  });
+
+  // The same handover for a run that never produced a report at all. `outcome` is absent on a crash —
+  // `withReport` is what sets it — so "not a success" is the honest test rather than "attention".
+  it('carries on when the run failed outright', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('failed');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.getByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+  });
+
+  // IT USED TO WAIT ON A READ IT THREW AWAY. The answer was discarded, so the wait protected nothing:
+  // the run posts its prefill BEFORE the frame that says it settled, and the questions read the file
+  // for themselves on the way in and again at Continue. All it bought was a round trip between a run
+  // ending and the person seeing anything.
+  it('hands over as soon as its run settles, without waiting on a read of its own', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    const read = deferred<{ state: WizardState | null }>();
+    api.getWizard.mockReturnValue(read.promise);
+
+    await settle('success', 'success');
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    await read.settle({
+      state: { mode: 'brownfield', step: 'form', suggested: { answers: { what: 'a timeline' } } },
+    });
+  });
+
+  // AN UPGRADED MID-SETUP PROJECT HAS NO SUCH SKILL: `seedSkills` only writes into an absent folder, so
+  // a project scaffolded before these two existed will never grow them. The door answers 404 and the
+  // only thing to do about it is ask the person, which is what the next screen does anyway.
+  it('lands on the blank questions with a plain notice when the door refuses', async () => {
+    api.runWizardSkill.mockRejectedValue(Object.assign(new Error('No such skill'), { status: 404 }));
+    scan();
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(
+      screen.getByText('I couldn’t read your files this time — the questions below are all yours.'),
+    ).toBeTruthy();
+    expect((screen.getByLabelText(/what are you making/i) as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('can be skipped onto the blank questions, with nothing said about it', async () => {
+    scan();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip and answer them myself' }));
+
+    expect(await screen.findByText('A few questions')).toBeTruthy();
+    expect(screen.queryByText(/blanks are yours/)).toBeNull();
+    expect((screen.getByLabelText(/what are you making/i) as HTMLTextAreaElement).value).toBe('');
+  });
+
+  // The step before it is what sends anyone here, and only in map mode: a new project has nothing to
+  // read, so it goes straight to the questions.
+  it('is where Continue on the machine check goes when a folder was brought in', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'backend' } });
+    view({ mode: 'brownfield', start: 'backend', snapshot: opened });
+
+    const go = await screen.findByRole('button', { name: 'Continue' });
+    await waitFor(() => expect((go as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(go);
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'brownfield', step: 'scan' }));
+  });
+});
+
 // THE QUESTIONS, AND THE TWO CHOICES THAT ARE NOT QUESTIONS (W6, W7, W8). Everything a beginner is asked
 // is in their own words; everything an engineer wants is behind one fold. What the step writes is two
 // stores at once — the answers to the wizard's own file, the two project choices to the config — and the
@@ -765,7 +994,7 @@ describe('the form step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'brownfield',
-        step: 'handoff',
+        step: 'stack',
         resumes: { 'foundation/TESTING.md': 'how it is checked' },
         answers: {
           what: 'a tool for reading meters',
@@ -796,11 +1025,169 @@ describe('the form step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'greenfield',
-        step: 'handoff',
+        step: 'stack',
         resumes: { 'foundation/TESTING.md': 'how it is checked' },
         answers: { what: '', who: '', done: '' },
       }),
     );
+  });
+
+  // A SCAN CAN LAND WHILE THE QUESTIONS ARE ON SCREEN. The step before hands over the moment its run
+  // settles, and the run posts what it found into the same file — so a person may already be typing
+  // when the suggestion arrives. `putWizard` REPLACES the file, so a Continue built from the read
+  // taken on entry deletes it. The stack step's settle-read, taken at the press because this step
+  // has no run of its own to watch.
+  it('does not delete a suggestion that landed after it was opened', async () => {
+    form();
+    const go = await screen.findByRole('button', { name: 'Continue' });
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'form',
+        suggested: { stack: 'TypeScript and Vite', packages: ['ripgrep'] },
+      },
+    });
+    fireEvent.click(go);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'stack',
+        suggested: { stack: 'TypeScript and Vite', packages: ['ripgrep'] },
+        answers: { what: '', who: '', done: '' },
+      }),
+    );
+  });
+
+  // WHAT THE PERSON SAID WINS, ALWAYS, and this is the screen where a scan's words and a person's
+  // words meet. A suggestion fills a field that has no answer in the file and says so where it does;
+  // over an answer it is not shown at all, which is decision 77's "propose, never answer" made
+  // visible rather than merely enforced at the route.
+  const SUGGESTED = 'Suggested from your files — edit anything wrong.';
+
+  it('fills only the blanks from what the run found, and marks the ones it filled', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: 'mine, in my own words' },
+        suggested: {
+          answers: { what: 'a timeline of releases', who: 'the field team' },
+          kind: 'game',
+        },
+      },
+    });
+    form();
+
+    const box = (label: RegExp) => screen.getByLabelText(label) as HTMLTextAreaElement;
+    await screen.findByRole('button', { name: 'Continue' });
+    // The answered field keeps the person's sentence and is not marked.
+    expect(box(/what are you making/i).value).toBe('mine, in my own words');
+    // The empty one takes the suggestion and IS marked.
+    expect(box(/who is it for/i).value).toBe('the field team');
+    expect(box(/does "done" look like/i).value).toBe('');
+    expect(screen.getAllByText(SUGGESTED)).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // AND THE WRITE IS THE PROOF. A form that showed the answer and sent the suggestion would look
+    // right on screen and overwrite the person's words on disk.
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'brownfield',
+        step: 'stack',
+        suggested: {
+          answers: { what: 'a timeline of releases', who: 'the field team' },
+          kind: 'game',
+        },
+        answers: { what: 'mine, in my own words', who: 'the field team', done: '' },
+      }),
+    );
+    // The suggested kind is preselected, because nobody has pressed a tab.
+    expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'game' } }));
+  });
+
+  it('lets a suggestion be typed over, and stops calling it a suggestion', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        suggested: { answers: { what: 'a timeline of releases' }, kind: 'game' },
+      },
+    });
+    form();
+
+    const what = (await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement;
+    expect(what.value).toBe('a timeline of releases');
+    fireEvent.change(what, { target: { value: 'actually a meter reader' } });
+    expect(screen.queryByText(SUGGESTED)).toBeNull();
+    // And a tab pressed beats the suggested kind, which is the other half of overruling.
+    fireEvent.click(screen.getByRole('button', { name: 'Web App' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answers: { what: 'actually a meter reader', who: '', done: '' },
+        }),
+      ),
+    );
+    expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'web' } }));
+  });
+
+  // A KIND THE PRODUCT DOES NOT HAVE is a real answer from a scan — `WizardSuggestions.kind` is a free
+  // string for exactly that reason — and it must not preselect a tab that does not exist, nor blank
+  // the one the project already has.
+  it('ignores a suggested kind that is not one of the three', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'brownfield', step: 'form', suggested: { kind: 'embedded-firmware' } },
+    });
+    form();
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.patchConfig).toHaveBeenCalledWith(expect.objectContaining({ box: { kind: 'web' } })),
+    );
+  });
+
+  // AN ANSWER SAVED AS AN EMPTY STRING IS AN EMPTY FIELD, and it is the ordinary case rather than an
+  // exotic one: Continue writes all three answers whatever was typed, so anybody who has passed this
+  // screen once has three of them on disk. Read as "answered", a suggestion would be marked on the
+  // field and then not shown in it — the hint and the box disagreeing about the same fact.
+  it('treats an answer saved as empty as a blank the suggestion may fill', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: '', who: '', done: '' },
+        suggested: { answers: { what: 'a timeline of releases' } },
+      },
+    });
+    form();
+
+    const what = (await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement;
+    expect(what.value).toBe('a timeline of releases');
+    expect(screen.getAllByText(SUGGESTED)).toHaveLength(1);
+  });
+
+  // THE ANSWERS COME BACK ON RE-ENTRY, with no suggestion anywhere near it. Pressing Back — or
+  // resuming setup a day later — used to show three empty boxes over three saved answers, and
+  // Continue then wrote the blanks over them.
+  it('shows what was answered last time, unmarked', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'brownfield',
+        step: 'form',
+        answers: { what: 'a meter reader', who: 'the field team', done: 'one meter read' },
+      },
+    });
+    form();
+
+    expect(((await screen.findByLabelText(/what are you making/i)) as HTMLTextAreaElement).value).toBe(
+      'a meter reader',
+    );
+    expect(screen.queryByText(SUGGESTED)).toBeNull();
   });
 
   it('keeps everything an engineer wants behind one fold', async () => {
@@ -814,6 +1201,704 @@ describe('the form step', () => {
   });
 });
 
+// THE STACK, AFTER THE FORM AND NEVER INSIDE IT (W9). What the project is built with is a question the
+// person mostly cannot answer and the model mostly can — so it is proposed rather than asked, on a
+// screen built for overruling it. The agreement is what the docs step is briefed with and what the box
+// is built to install, which is why it is settled HERE rather than left to the first run to discover.
+describe('the stack step', () => {
+  const answers = {
+    what: 'a tool for reading meters',
+    who: 'the field team',
+    done: 'one meter read end to end',
+  };
+
+  // Re-stated per test for the scan describe's reason: `clearAllMocks` clears the CALLS and leaves the
+  // implementation, so a rejection installed by one case would be the door's answer for the rest.
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'stack', answers } });
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-2', status: 'running' } });
+  });
+
+  const stack = () => view({ start: 'stack', snapshot: opened });
+
+  // The file as it stands once the run has posted its proposal into it — what the step reads back when
+  // the run settles, and what its own write then has to carry forward.
+  const posted = (suggested: Record<string, unknown>) => ({
+    state: { mode: 'greenfield', step: 'stack', answers, suggested },
+  });
+
+  const settle = async (outcome?: string, run = 'run-2'): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run, status: 'success', ...(outcome ? { outcome } : {}) } });
+    });
+  };
+
+  it('asks for a stack in the words the person used, and says what it is doing', async () => {
+    stack();
+
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    const [skill, prompt] = api.runWizardSkill.mock.calls[0] as [string, string];
+    expect(skill).toBe('suggest-stack');
+    // THE ANSWERS AS THE SERVER HAS THEM. The form wrote them one step ago and the file is the only
+    // copy: a prompt built from what this screen happens to remember would be empty on a resume.
+    expect(prompt).toContain('a tool for reading meters');
+    expect(prompt).toContain('the field team');
+    expect(prompt).toContain('one meter read end to end');
+    // And the kind, which the form wrote to the config rather than to the wizard's own file.
+    expect(prompt).toContain('The kind of project: web');
+    expect(screen.getByText('Choosing a stack that fits…')).toBeTruthy();
+  });
+
+  // RE-ENTRY MUST NOT RE-ASK. Coming back — Back from the documents, or resuming setup tomorrow —
+  // would spend a second run to propose what has already been agreed.
+  it('does not ask twice: coming back to an agreed stack spends no run', async () => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'greenfield', step: 'stack', answers, stack: 'Node, React and Vitest' },
+    });
+    stack();
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+    expect(api.runWizardSkill).not.toHaveBeenCalled();
+  });
+
+  it('shows what the run proposed once it has read the file back', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+
+    await settle('success');
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+  });
+
+  // THE PERSON'S WORD IS FINAL (W9). A proposal typed over is not a proposal any more, and what
+  // reaches the file is what they wrote.
+  it('takes the person’s own sentence over the proposal', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+    await settle('success');
+
+    expect(await screen.findByText('Node, React and Vitest')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/name your own/i), {
+      target: { value: 'Python, and nothing else' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Use this stack' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'docs', stack: 'Python, and nothing else' }),
+      ),
+    );
+  });
+
+  it('writes the agreed stack to the file and what the box installs to the config', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+    api.getWizard.mockResolvedValue(
+      posted({ stack: 'Node, React and Vitest', packages: ['ffmpeg', 'imagemagick'] }),
+    );
+    await settle('success');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this stack' }));
+
+    // THE WHOLE FILE, INCLUDING WHAT THE RUN WROTE INTO IT WHILE THIS SCREEN WAS OPEN. `putWizard`
+    // replaces the file, and the copy read on entry predates the proposal being agreed to here — so a
+    // write built from the entry read would delete the suggestion it is agreeing with.
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'docs',
+        answers,
+        suggested: { stack: 'Node, React and Vitest', packages: ['ffmpeg', 'imagemagick'] },
+        stack: 'Node, React and Vitest',
+      }),
+    );
+    // W9's payoff: what the sandbox has to install is known BEFORE the step that needs one, and it is
+    // the config that decides how a box is built.
+    expect(api.patchConfig).toHaveBeenCalledWith({
+      box: { kind: 'web', packages: ['ffmpeg', 'imagemagick'] },
+    });
+  });
+
+  // THE ONE SUGGESTION ON THIS SCREEN WITH A MACHINE EFFECT, and it was hidden. The packages the run
+  // proposed are installed into every sandbox this project ever gets — the stack sentence, by
+  // contrast, is read by a model and by nobody else — and the only place they appeared was inside a
+  // fold that is closed until somebody opens it. `Use this stack` then installed a list they had
+  // never been shown.
+  it('says what will be installed in the body of the screen, not only inside the fold', async () => {
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest', packages: ['jq', 'ripgrep'] }));
+    stack();
+
+    expect(await screen.findByRole('button', { name: 'Use this stack' })).toBeTruthy();
+    const said = screen.getByTestId('verbatim-packages');
+    expect(said.textContent).toBe('It will also install: jq, ripgrep');
+    // OUTSIDE the fold, which is the whole point — a `<details>` renders none of its contents until
+    // it is opened, so a sentence inside one is a sentence nobody reads.
+    expect(said.closest('details')).toBeNull();
+  });
+
+  it('says nothing about installing when nothing extra was proposed', async () => {
+    api.getWizard.mockResolvedValue(posted({ stack: 'Node, React and Vitest' }));
+    stack();
+
+    expect(await screen.findByRole('button', { name: 'Use this stack' })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-packages')).toBeNull();
+  });
+
+  // A run that ended in anything but a clean success still hands over to the screen: the person can
+  // name a stack themselves, and holding them on a report about a run they never asked for is worse.
+  it('asks for one in the person’s own words when the run could not propose', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await settle('attention');
+
+    expect(await screen.findByText('I couldn’t work one out — name your own below.')).toBeTruthy();
+    // Nothing to agree WITH, so the button cannot be pressed until there is something to agree to.
+    const go = screen.getByRole('button', { name: 'Use this stack' }) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText(/name your own/i), { target: { value: 'Go and SQLite' } });
+    expect(go.disabled).toBe(false);
+    fireEvent.click(go);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'docs', stack: 'Go and SQLite' }),
+      ),
+    );
+  });
+
+  // THE DOOR REFUSING READS THE SAME WAY. A project part-way through setup when this arrived has no
+  // such skill — `seedSkills` only writes into an absent folder — and there is nothing to do about it
+  // but ask the person.
+  it('lands on the same screen with a plain notice when the door refuses', async () => {
+    api.runWizardSkill.mockRejectedValue(Object.assign(new Error('No such skill'), { status: 404 }));
+    stack();
+
+    expect(await screen.findByText('I couldn’t ask this time — name your own below.')).toBeTruthy();
+  });
+
+  it('can be skipped onto naming one yourself', async () => {
+    stack();
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip and name it myself' }));
+
+    expect(await screen.findByLabelText(/name your own/i)).toBeTruthy();
+    expect(screen.queryByText(/name your own below/)).toBeNull();
+  });
+
+  // The step before it is what sends anyone here, and the file has to say so too: a Continue that
+  // wrote one step and showed another is a setup you cannot resume into.
+  it('is where Continue on the questions goes', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
+    view({ start: 'form', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'stack' })),
+    );
+    expect(await screen.findByText('Choosing a stack that fits…')).toBeTruthy();
+  });
+});
+
+// THE THIRD AGENT MOMENT, AND IT IS THE COPILOT RATHER THAN A RUN (W3). Writing a README and five
+// guiding documents out of three answers is a conversation, so the wizard drives the same copilot the
+// dock does — and the brief is composed on the SERVER, at the credential seam, which is why the only
+// thing sent from here is one plain sentence.
+describe('the docs step', () => {
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({
+      state: { mode: 'greenfield', step: 'docs', answers: { what: 'a tool for reading meters' } },
+    });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    api.getReadiness.mockResolvedValue(readiness());
+  });
+
+  const docs = () => view({ start: 'docs', snapshot: opened });
+
+  // The copilot's own state frame, as the server broadcasts it: `onStart` raises it and the `finally`
+  // of the turn lowers it, so this is the only thing that says a turn has ended.
+  const turn = async (running: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running } });
+    });
+  };
+
+  it('asks before it writes anything, and sends nothing until the answer is yes', async () => {
+    docs();
+
+    expect(await screen.findByText('Let the assistant write the drafts?')).toBeTruthy();
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Let it write' }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    expect(ws.sent[0]).toMatchObject({
+      type: 'copilot:send',
+      // ONE SENTENCE, AND THE BRIEF IS NOT IN IT. `wizardFrame` composes the contract and the answers
+      // on the server, at the seam the credential uses — a brief the browser sends is one the browser
+      // can edit, and it would also land in the person's own transcript.
+      text: "Please set up this project's documents from my answers.",
+    });
+  });
+
+  // THE GRANT HAS TO LAND FIRST, and this is not a tidiness point: the credential is minted per turn
+  // from the authority the server holds at the moment the turn arrives. A turn that overtook the grant
+  // would run without one and could not write a single foundation document.
+  it('has the authority before the turn, not merely at the same time', async () => {
+    const grant = deferred<{ authorised: boolean }>();
+    api.setAuthority.mockReturnValue(grant.promise);
+    docs();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+
+    await waitFor(() => expect(api.setAuthority).toHaveBeenCalledWith(true));
+    expect(ws.sent).toHaveLength(0);
+
+    await grant.settle({ authorised: true });
+
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  it('sends nothing when the answer is no, and leaves the offer standing', async () => {
+    docs();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Write the drafts' })).toBeTruthy();
+  });
+
+  it('shows what it is working on, and each summary as it lands', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      },
+    });
+    // THE TURN STARTING IS THE CUE TO LOOK, and a clock keeps looking while it runs.
+    await turn(true);
+
+    expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
+    expect(screen.getByText('README.md')).toBeTruthy();
+
+    // The tool name comes off the transcript rather than out of the file, so it needs no read.
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name: 'Write' } });
+    });
+    expect(await screen.findByText('Write')).toBeTruthy();
+  });
+
+  // A READ PER TRANSCRIPT ITEM IS A READ PER TOOL CALL. A turn that writes six documents makes dozens
+  // of them, each one a request for a file that changes six times in as many minutes — and every
+  // extra item in the transcript, a hidden one included, asked again.
+  it('does not ask the file again for every tool call', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await waitFor(() => expect(api.getWizard.mock.calls.length).toBeGreaterThan(1));
+    const asked = api.getWizard.mock.calls.length;
+
+    for (const name of ['Write', 'Edit', 'Bash', 'Read', 'Write', 'Edit']) {
+      await act(async () => {
+        ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name } });
+      });
+    }
+
+    expect(api.getWizard.mock.calls.length).toBe(asked);
+    // And the screen is still following the turn, so this is a throttle rather than a switch-off.
+    expect(await screen.findByText('Edit')).toBeTruthy();
+  });
+
+  // THE TRANSCRIPT IS THE CONVERSATION'S, NOT THIS SCREEN'S, and it is hydrated from disk on connect.
+  // "Did the turn fail" was read by scanning the whole of it, so one error item from a conversation
+  // days old made every turn after it report a failure — under a screen that was working, with the
+  // offer to write the drafts put back over a turn already running.
+  it('reads a failure out of this turn, not out of the conversation it is in', async () => {
+    docs();
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [{ kind: 'error', text: 'the sign-in had expired' }],
+        stats: { costUsd: 0, turns: 0, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+
+    expect(screen.queryByText(/Something went wrong while it was writing/)).toBeNull();
+
+    // AND THE FIXTURE IS THICK ENOUGH TO TELL THE TWO APART: an error in THIS turn still says so, so
+    // the assertion above is about which items were scanned and not about the copy being gone.
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'error', text: 'it fell over' } });
+    });
+
+    expect(
+      screen.getByText('Something went wrong while it was writing — you can ask it to try again.'),
+    ).toBeTruthy();
+  });
+
+  // A TURN THAT NEVER STARTED CANNOT HAVE ENDED. `running` is false before the first frame, so an
+  // ending read off that alone would walk the person off this screen the moment they authorised.
+  it('does not treat the state before the turn as the turn ending', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(false);
+
+    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(api.getReadiness).not.toHaveBeenCalled();
+  });
+
+  // WRITING THE TWO EXECUTED DOCUMENTS AS AN AGENT TRIPS THE BLOCK BY DESIGN (decision 51). The wizard
+  // surfaces the reading in its own voice rather than letting a refused Start do it later.
+  it('goes to the reading step when a gate document was rewritten', async () => {
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
+  });
+
+  it('goes straight to the end when none was', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // "DONE" HAS TO MEAN SOMETHING WAS WRITTEN. The step read the readiness and looked at one field of
+  // it — the gate block — so a turn that wrote nothing at all, or that died four documents in, walked
+  // the person to "That is setup done" over a project with no README and no foundation. The same
+  // response already says which documents are there; it was simply not asked.
+  describe('when the turn did not write everything', () => {
+    const half = readiness({
+      foundation: { present: ['STACK.md'], missing: ['CODE-QUALITY.md', 'UX.md'], ok: false },
+    });
+
+    const wrote = async (): Promise<void> => {
+      docs();
+      fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+      await waitFor(() => expect(ws.sent).toHaveLength(1));
+      await turn(true);
+      await turn(false);
+    };
+
+    it('says so plainly and stays, rather than reporting setup done', async () => {
+      api.getReadiness.mockResolvedValue(half);
+
+      await wrote();
+
+      expect(
+        await screen.findByText('It didn’t finish — 2 of the documents are still unwritten.'),
+      ).toBeTruthy();
+      // NAMED, AND IN WORDS. A filename is the one thing a beginner cannot act on, and these are the
+      // same six names the review screen wears.
+      expect(screen.getByText('Quality gates, How it feels')).toBeTruthy();
+      expect(screen.queryByText('That is setup done')).toBeNull();
+      expect(screen.queryByText('One thing to read before anything runs')).toBeNull();
+      // AND THE FILE STAYS WHERE IT IS. Moving the step on over half-written documents is the same
+      // lie written to disk, where the next open would believe it.
+      expect(api.putWizard).not.toHaveBeenCalled();
+    });
+
+    // The README is not a foundation document and is read from its own field, so a turn that wrote
+    // all five and never touched the README is a real state — and the one `foundation.missing` alone
+    // cannot see.
+    it('counts a missing README among them', async () => {
+      api.getReadiness.mockResolvedValue(readiness({ readme: { ok: false, reason: 'no README' } }));
+
+      await wrote();
+
+      expect(
+        await screen.findByText('It didn’t finish — one of the documents is still unwritten.'),
+      ).toBeTruthy();
+      expect(screen.getByText('The introduction')).toBeTruthy();
+    });
+
+    it('offers the writing again, and takes it', async () => {
+      api.getReadiness.mockResolvedValue(half);
+      await wrote();
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+
+      await waitFor(() => expect(ws.sent).toHaveLength(2));
+      // The honest state goes with the offer being taken: a second turn is running, and a report
+      // about the first one under it reads as a verdict on this one.
+      expect(screen.queryByText(/still unwritten/)).toBeNull();
+    });
+  });
+
+  // THE FILE HAS TO MOVE WITH THE SCREEN, and this step wrote nothing at all: the file sat at `docs`
+  // after every exit but the last, so `wizardFrame` prefixed EVERY later conversation on the project
+  // with a brief about writing foundation documents — and resuming re-offered the question that
+  // rewrites all six over whatever had been edited since.
+  //
+  // FROM A FRESH READ, not the one taken on entry. The copilot files its summaries INTO this file
+  // while the turn runs, and `putWizard` replaces it whole — so the entry read is stale by exactly
+  // the thing this step produced. The stack step's settle-read, for the same reason.
+  it('writes the step it moved to, carrying the summaries the turn filed', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        answers: { what: 'a tool for reading meters' },
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      },
+    });
+    await turn(false);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith({
+        mode: 'greenfield',
+        step: 'handoff',
+        answers: { what: 'a tool for reading meters' },
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      }),
+    );
+  });
+
+  it('writes the reading step too, when a gate document was rewritten', async () => {
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await turn(false);
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'gates' })),
+    );
+  });
+
+  // COMING BACK TO A STEP THAT HAS ALREADY RUN. The question is "let the assistant write the drafts?"
+  // and the answer rewrites the README and all five documents — so raising it over a project that has
+  // them is an offer to destroy work, phrased as an offer to start.
+  describe('resuming with the summaries already filed', () => {
+    const written = {
+      mode: 'greenfield',
+      step: 'docs',
+      answers: { what: 'a tool for reading meters' },
+      resumes: {
+        'README.md': 'What the project is, in a paragraph.',
+        'STACK.md': 'TypeScript, Vite and vitest.',
+      },
+    };
+
+    it('asks nothing, sends nothing, and shows what was written', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      expect(await screen.findByRole('button', { name: 'Carry on writing' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+      expect(screen.queryByText('Let the assistant write the drafts?')).toBeNull();
+      expect(ws.sent).toHaveLength(0);
+      expect(api.setAuthority).not.toHaveBeenCalled();
+      expect(screen.getByText('What the project is, in a paragraph.')).toBeTruthy();
+      expect(screen.getByText('TypeScript, Vite and vitest.')).toBeTruthy();
+    });
+
+    it('puts the question back when asked to carry on', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Carry on writing' }));
+
+      expect(await screen.findByText('Let the assistant write the drafts?')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Let it write' }));
+      await waitFor(() => expect(ws.sent).toHaveLength(1));
+    });
+
+    it('moves on without a turn when asked to continue, and writes the step', async () => {
+      api.getWizard.mockResolvedValue({ state: written });
+      docs();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+
+      expect(await screen.findByText('That is setup done')).toBeTruthy();
+      expect(ws.sent).toHaveLength(0);
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+    });
+  });
+});
+
+// DECISION 51 IN THE WIZARD'S OWN VOICE. CODE-QUALITY.md carries the `gates:` commands and TESTING.md
+// the `smoke:` one, and the server runs both OUTSIDE the sandbox as the person — so an agent rewriting
+// either blocks auto-pilot until somebody has read it. Cleared by a press and by nothing else, which is
+// why the press has to be worth something: the documents are on this screen to be read.
+describe('the gates step', () => {
+  const foundation = [
+    {
+      key: 'foundation',
+      label: 'Foundation',
+      creatable: false,
+      files: [
+        {
+          name: 'CODE-QUALITY.md',
+          path: '.vibeboard/foundation/CODE-QUALITY.md',
+          category: 'foundation',
+          managed: true,
+          deletable: false,
+          renameable: false,
+        },
+        {
+          name: 'TESTING.md',
+          path: '.vibeboard/foundation/TESTING.md',
+          category: 'foundation',
+          managed: true,
+          deletable: false,
+          renameable: false,
+        },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }));
+    api.listControlFiles.mockResolvedValue(foundation);
+    api.getControlFile.mockResolvedValue({ content: 'gates:\n  - npm test\n' });
+    api.acknowledgeGates.mockResolvedValue({ ok: true });
+  });
+
+  const gates = () => view({ start: 'gates', snapshot: opened });
+
+  it('names each document and opens the text of it', async () => {
+    gates();
+
+    expect(await screen.findByText('CODE-QUALITY.md')).toBeTruthy();
+    expect(screen.getByText('TESTING.md')).toBeTruthy();
+    // THE PATH COMES FROM THE LISTING, not from a copy of the layout kept in the browser. The names
+    // the block carries are bare filenames, and where a foundation document lives is the server's
+    // fact — the same listing Project Control opens every file from.
+    await waitFor(() =>
+      expect(api.getControlFile).toHaveBeenCalledWith('.vibeboard/foundation/CODE-QUALITY.md'),
+    );
+    expect(api.getControlFile).toHaveBeenCalledWith('.vibeboard/foundation/TESTING.md');
+    const shown = (await screen.findAllByLabelText('CODE-QUALITY.md'))[0] as HTMLTextAreaElement;
+    expect(shown.value).toBe('gates:\n  - npm test\n');
+  });
+
+  // THE PRESS IS A CLAIM ABOUT WHAT IS ON THE SCREEN — "I've read them" — and it is the only way the
+  // block is ever cleared. It was live from the first paint: `unreviewedGates` reads `?? []` before
+  // the answer lands, so for one round trip the screen named no documents, showed no documents, and
+  // offered a button asserting both had been read. The next thing that button leads to is Start.
+  it('will not take the word of somebody with nothing in front of them', async () => {
+    const asked = deferred<Readiness>();
+    api.getReadiness.mockReturnValue(asked.promise);
+    gates();
+
+    const carry = (await screen.findByRole('button', {
+      name: "I've read them — carry on",
+    })) as HTMLButtonElement;
+    expect(carry.disabled).toBe(true);
+
+    await asked.settle(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }));
+
+    await waitFor(() => expect(carry.disabled).toBe(false));
+  });
+
+  // The other half of "in front of them": the readiness names a document and the LISTING is what
+  // turns that name into a path to open it with. Without the path the fold holds "Opening…" for
+  // ever, so the name is on the screen and the document is not.
+  it('waits for the documents it named to be openable', async () => {
+    api.listControlFiles.mockResolvedValue([
+      { key: 'foundation', label: 'Foundation', creatable: false, files: [foundation[0].files[0]] },
+    ]);
+    gates();
+
+    const carry = (await screen.findByRole('button', {
+      name: "I've read them — carry on",
+    })) as HTMLButtonElement;
+    // CODE-QUALITY.md is in the listing and TESTING.md is not, so one of the two documents this
+    // screen is naming cannot be opened at all.
+    expect(await screen.findByText('TESTING.md')).toBeTruthy();
+    await waitFor(() => expect(api.getControlFile).toHaveBeenCalled());
+    expect(carry.disabled).toBe(true);
+    expect(api.acknowledgeGates).not.toHaveBeenCalled();
+  });
+
+  it('clears the block and moves on once the server agrees it is clear', async () => {
+    api.getReadiness
+      .mockResolvedValueOnce(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }))
+      .mockResolvedValue(readiness());
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // AND THE FILE MOVES WITH IT. This step wrote nothing, so a setup finished through the reading step
+  // left `docs` on disk — which is what `wizardFrame` keys on, and what a resume re-offers the
+  // rewrite from. From a fresh read for the docs step's reason: the summaries the copilot filed are
+  // in the file and not in this screen, and `putWizard` replaces it whole.
+  it('writes the step it moved to, carrying what is in the file', async () => {
+    const written = {
+      mode: 'greenfield',
+      step: 'gates',
+      answers: { what: 'a tool for reading meters' },
+      resumes: { 'CODE-QUALITY.md': 'The commands your work has to pass.' },
+    };
+    api.getWizard.mockResolvedValue({ state: written });
+    api.getReadiness
+      .mockResolvedValueOnce(readiness({ unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'] }))
+      .mockResolvedValue(readiness());
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+  });
+
+  // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. A screen that moved on before the server agreed would
+  // put somebody past a block that is still there — and the next thing they press is Start.
+  it('does not move on while the block is still there', async () => {
+    gates();
+
+    fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
+
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(screen.getByText('One thing to read before anything runs')).toBeTruthy();
+  });
+});
+
 // W7, OVER EVERY STEP AND NOT THE ONE THAT HAPPENS TO HAVE A FOLD. The tripwire lived inside the form
 // step's describe and swept four words on one screen; the three words that were actually on the wizard
 // — "container", "Repository", "copilot" — were all on the other three steps, so it passed over each of
@@ -822,11 +1907,12 @@ describe('the form step', () => {
 // TWO EXEMPTIONS, BOTH BY ELEMENT AND NEITHER BY WORD:
 //
 //   - `<details>`, which is labelled "For engineers" and is the place those words belong.
-//   - the probe's own sentence, which is the server's and is rendered verbatim on purpose — it is the
-//     only thing on the screen that names the command or the setting that clears the fault, and the
-//     gate that will refuse the first run computes it. Rewording it here would send somebody to fix
-//     something that is not broken. It carries a test handle so this can skip it by element; the
-//     fixtures below put jargon INSIDE it, so removing the handle turns this red rather than green.
+//   - anything rendered VERBATIM because the words are not this screen's to choose. Two of those now:
+//     the probe's own sentence, which is the only thing on the screen that names the command or the
+//     setting that clears the fault — reworded here it would send somebody to fix what is not broken —
+//     and the model's stack proposal, which the person is being shown precisely so they can overrule
+//     it. Both carry a `verbatim-` test handle and this skips them by element; the fixtures below put
+//     jargon INSIDE each, so removing a handle turns this red rather than green.
 //
 // The list is every word the product's own code uses constantly, which is exactly why they leak.
 describe('the words on every step (W7)', () => {
@@ -845,7 +1931,7 @@ describe('the words on every step (W7)', () => {
   const sweep = (what: string, container: HTMLElement): void => {
     const plain = container.cloneNode(true) as HTMLElement;
     for (const fold of plain.querySelectorAll('details')) fold.remove();
-    for (const quoted of plain.querySelectorAll('[data-testid="verbatim-reason"]')) quoted.remove();
+    for (const quoted of plain.querySelectorAll('[data-testid^="verbatim"]')) quoted.remove();
     const text = (plain.textContent ?? '').toLowerCase();
     // A step that rendered nothing would pass every assertion below it.
     expect(text.length, `${what} rendered almost nothing`).toBeGreaterThan(60);
@@ -854,6 +1940,9 @@ describe('the words on every step (W7)', () => {
 
   beforeEach(() => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'backend' } });
+    // The scan sweep below needs a door that answers and a run that does not settle, so the screen it
+    // is reading is the waiting one. Re-stated here for the reason the scan describe re-states it.
+    api.runWizardSkill.mockResolvedValue({ run: { run: 'run-1', status: 'running' } });
   });
 
   it('asks for a project in plain words, through either door', () => {
@@ -895,6 +1984,81 @@ describe('the words on every step (W7)', () => {
     }
   });
 
+  it('says what it is doing while it reads, in plain words', async () => {
+    // The waiting screen is where "repository" wants to be said, which is why it is swept here: the
+    // person it is talking to brought in a FOLDER, and that is the word they used for it themselves.
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    const { container } = view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+    await screen.findByText('Reading your files…');
+
+    sweep('reading the folder', container);
+  });
+
+  it('chooses a stack, and reads out the model’s own words, in plain words', async () => {
+    // The waiting screen first, where "repository" wants to be said again.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'stack', answers: {} } });
+    const waiting = view({ start: 'stack', snapshot: opened });
+    await screen.findByText('Choosing a stack that fits…');
+    sweep('choosing a stack', waiting.container);
+    cleanup();
+
+    // Then the proposal, whose sentence is the MODEL'S and is rendered whole — full of the words this
+    // sweeps for, because the fixture is what proves the exemption is the element and not the word.
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'stack',
+        answers: {},
+        stack: 'A Node repository, its config in yaml, run in a Docker container',
+        // The package names are the model's too, and they are said in the BODY of the screen now
+        // rather than only inside the fold — so `verbatim-packages` is a third exemption, and the
+        // fixture is what proves it is the element and not the word.
+        suggested: { packages: ['docker-cli', 'yamllint'] },
+      },
+    });
+    const proposal = view({ start: 'stack', snapshot: opened });
+    await screen.findByRole('button', { name: 'Use this stack' });
+    expect(screen.getByTestId('verbatim-packages').textContent).toContain('docker-cli');
+    sweep('the stack proposal', proposal.container);
+  });
+
+  it('asks to write the documents, and reads out the gate commands, in plain words', async () => {
+    // The docs step opens on the question, so the sweep reads the dialog as well as the screen under
+    // it — the question is the first thing anybody sees here.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs' } });
+    const writing = view({ start: 'docs', snapshot: opened });
+    await screen.findByText('Let the assistant write the drafts?');
+    sweep('writing the documents', writing.container);
+    cleanup();
+
+    // And the gate step, whose documents are full of the words this sweeps for — inside the fold,
+    // where they belong, so what is read here is the sentence asking somebody to open one.
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'gates' } });
+    api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
+    api.listControlFiles.mockResolvedValue([
+      {
+        key: 'foundation',
+        label: 'Foundation',
+        creatable: false,
+        files: [
+          {
+            name: 'CODE-QUALITY.md',
+            path: '.vibeboard/foundation/CODE-QUALITY.md',
+            category: 'foundation',
+            managed: true,
+            deletable: false,
+            renameable: false,
+          },
+        ],
+      },
+    ]);
+    api.getControlFile.mockResolvedValue({ content: 'gates:\n  - docker compose config\n' });
+    const reading = view({ start: 'gates', snapshot: opened });
+    await screen.findByRole('button', { name: "I've read them — carry on" });
+
+    sweep('the gate commands', reading.container);
+  });
+
   it('asks its questions and hands over in plain words', async () => {
     api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'form' } });
     const form = view({ start: 'form', snapshot: opened });
@@ -903,5 +2067,53 @@ describe('the words on every step (W7)', () => {
     cleanup();
 
     sweep('the hand-off', view({ start: 'handoff', snapshot: opened }).container);
+  });
+
+  // THE QUESTIONS WITH THE SCAN'S NEWS ON THEM, which is a different screen from the one above and
+  // the one a person brought a folder in actually sees. The notice is written on the step BEFORE and
+  // read on this one, so neither step's own sweep covers it — and it is the sentence most likely to
+  // reach for "repository", because it is about the files that were just read.
+  it('says what the reading run could not do, in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'brownfield', step: 'scan' } });
+    const { container } = view({ mode: 'brownfield', start: 'scan', snapshot: opened });
+    await waitFor(() => expect(api.runWizardSkill).toHaveBeenCalled());
+
+    await act(async () => {
+      ws.push({ type: 'run:update', record: { run: 'run-1', status: 'attention', outcome: 'attention' } });
+    });
+
+    // The premise: the notice really is on the screen being swept, not merely somewhere in the app.
+    expect(await screen.findByText('I couldn’t read everything — the blanks are yours.')).toBeTruthy();
+    sweep('the questions after a half-read folder', container);
+  });
+
+  // THE DOCUMENTS BEING WRITTEN, which is where the model's own words are thickest: the tool it
+  // reached for and the summaries it filed are both on screen, both exempt by element, and neither
+  // was covered — the case above this one reads the question and stops there.
+  it('shows the writing in plain words, around the words that are not its own', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs' } });
+    const { container } = view({ start: 'docs', snapshot: opened });
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        // A summary FULL of the words this sweeps for, because it is the model's prose and the
+        // exemption is the element. A fixture without them would leave the handle untested.
+        resumes: { 'STACK.md': 'A Node repository, its config in yaml, run in a Docker container.' },
+      },
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'tool_use', name: 'DockerBuild' } });
+    });
+
+    expect(await screen.findByTestId('verbatim-tool')).toBeTruthy();
+    expect(await screen.findByTestId('verbatim-resume')).toBeTruthy();
+    sweep('the documents being written', container);
   });
 });

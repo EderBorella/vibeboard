@@ -79,6 +79,13 @@ describe('web/shared mirrors src/core', () => {
     expect([...web.WIZARD_ANSWER_KEYS].sort()).toEqual([...storeWizard.WIZARD_ANSWER_KEYS].sort());
   });
 
+  // And the third set, which is the one an AGENT fills: `PUT /api/wizard/prefill` filters its body to
+  // these keys, so a name only one side knows is either a suggestion the browser drops on the next
+  // Continue or one the server refuses to store at all.
+  it('mirrors every wizard suggestion field', () => {
+    expect([...web.WIZARD_SUGGESTION_KEYS].sort()).toEqual([...storeWizard.WIZARD_SUGGESTION_KEYS].sort());
+  });
+
   // The gap slice D's review found, one level in: `AutopilotConfig` is hand-mirrored and nothing
   // guarded its FIELD SET, so a key added on one side is a setting the UI silently cannot show or
   // save. An interface has no runtime keys, so the web side exports the list explicitly.

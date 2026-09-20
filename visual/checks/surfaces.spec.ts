@@ -3,6 +3,7 @@ import { auditFocus, auditStyles, type Offender, RUN_TIME_TOKENS, TYPE_SCALE } f
 import {
   type Baseline,
   expect,
+  openFixtureProject,
   readBaseline,
   recording,
   type SurfaceBaseline,
@@ -143,12 +144,19 @@ async function measure(page: Page, surface: Surface): Promise<SurfaceBaseline> {
 
 // Recorded in one test rather than one per surface, because `visual:record` greps on this title and a
 // baseline file written by ten separate tests would be ten separate reads and writes of one file.
-test('record the baseline for every surface', async ({ board, theme }) => {
+test('record the baseline for every surface', async ({ board, theme, baseURL }) => {
   test.skip(!recording, 'recording only — run npm run visual:record');
+  if (!baseURL) throw new Error('baseURL is not configured');
   const surfaces: Record<string, SurfaceBaseline> = {};
   for (const surface of SURFACES) {
     // A fresh board per surface, exactly as the checking tests get: the overlays do not close
     // themselves and a settings modal left open would be measured as part of the next surface.
+    //
+    // AND THE PROJECT WITH IT, because a reload is not enough: `wizard-stack` reaches its step by
+    // opening the second project, and the server holds one open project for the whole run — so the
+    // reload after it renders that project's unfinished setup and the wait below times out. The
+    // checking tests get this from the `board` fixture; this loop is inside one test and has to ask.
+    await openFixtureProject(board, baseURL);
     await board.reload();
     await board.locator('[data-testid="ap-bar"]').waitFor({ state: 'visible' });
     await surface.open(board);

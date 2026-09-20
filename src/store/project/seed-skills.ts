@@ -341,6 +341,58 @@ not have to read the whole chain.
 Change nothing on disk except the report you are asked to write.
 `,
   },
+  // THE WIZARD'S TWO, and the only seeds dispatched with no card: setup runs them as project runs,
+  // so neither is scoped to a board and neither is about anything on one. What they may write is one
+  // narrow route that fills `suggested` — they propose, the person answers. decision 77.
+  {
+    slug: 'scan-project',
+    content: `---
+name: Scan project
+description: Read an existing repository and tell setup what is already there
+---
+# Scan this project
+
+You are looking at a repository that is being brought under VibeBoard. Read enough to describe it —
+the README if there is one, the package manifests, the top of the source tree. Do not build or run
+anything.
+
+Then tell the setup assistant what you found, with
+\`PUT /api/wizard/prefill\` and a JSON body:
+
+- \`answers.what\` — what this project is, one or two plain sentences.
+- \`answers.who\` — who uses it, if the repository says; omit if you are guessing.
+- \`answers.done\` — what working seems to mean here (a test suite? a deploy?); omit if unclear.
+- \`kind\` — one of \`web\`, \`game\`, \`research\` if the evidence is strong; omit otherwise.
+- \`stack\` — the languages, frameworks and tools actually in use, one plain sentence.
+- \`packages\` — Debian system packages the toolchain clearly needs, if any. Omit when in doubt.
+
+Omitting beats inventing: every field you send is shown to a person as a suggestion, and a plausible
+wrong guess costs them more than a blank. Then finish your report as the contract asks.
+`,
+  },
+  {
+    slug: 'suggest-stack',
+    content: `---
+name: Suggest a stack
+description: Propose a stack that fits what the setup form gathered
+---
+# Suggest a stack
+
+The person answered a few questions about the project they want to build; the dispatch prompt carries
+their answers and the kind of project. Propose a stack that fits: languages, frameworks, test tooling
+— boring and well-trodden beats novel. In an existing repository, the stack that is already there
+wins unless it is unworkable; say so rather than replacing it.
+
+Send the proposal with \`PUT /api/wizard/prefill\`:
+
+- \`stack\` — the proposal in two or three plain sentences a beginner can read. Name versions only
+  where pinning matters.
+- \`packages\` — the Debian system packages the sandbox will need for this stack. An empty list is a
+  fine answer.
+
+Then finish your report as the contract asks, with \`summary\` restating the proposal in one line.
+`,
+  },
 ];
 
 // Seed ONLY when the skills folder is absent. Deleting a skill removes its folder and leaves

@@ -120,10 +120,11 @@ describe('which board a run may create a card on', () => {
     expect(res.json().error).toContain('POST /api/suggestions');
   });
 
-  // DECISION 47: a story checkup may create the siblings it believes were missed, on its own board.
-  it('lets a story checkup create a card on product — its own board', async () => {
+  // DECISION 47: a story's judgement may create the siblings it believes were missed, on its own board —
+  // the authority it kept when it absorbed the story checkup (decision 80).
+  it('lets a story judgement create a card on product — its own board', async () => {
     const { app, store, root } = await open();
-    const run = store.mintRun('work', 'run-6', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-6', root, 'P-001', { board: 'product', skill: 'review-story' });
     const res = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'backlog',
@@ -230,9 +231,9 @@ describe('the column a created card enters', () => {
 
   // RULING 61. The bug it prevents is the one that manufactures a false success: unstamped, a checkup's
   // sibling could be created straight into `product/done`, where it becomes `complete`'s positive evidence.
-  it('stamps a story checkup’s sibling into product/backlog, not the column it asked for', async () => {
+  it('stamps a story judgement’s sibling into product/backlog, not the column it asked for', async () => {
     const { app, store, root } = await open();
-    const run = store.mintRun('work', 'run-9', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-9', root, 'P-001', { board: 'product', skill: 'review-story' });
     const created = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'done',
@@ -374,8 +375,8 @@ describe('the vertical a run’s new card belongs to', () => {
   });
 
   // RULING 61's other half: a sibling inherits the group of the card the run is ABOUT, not that card's
-  // parent's — otherwise a story checkup's siblings would land in no vertical at all.
-  it('stamps a story checkup’s sibling with the group of the card it ran on', async () => {
+  // parent's — otherwise a story judgement's siblings would land in no vertical at all.
+  it('stamps a story judgement’s sibling with the group of the card it ran on', async () => {
     const { app, store, root } = await open();
     // A person's story, already labelled with its feature's vertical.
     const story = await create(app, admin, {
@@ -386,7 +387,7 @@ describe('the vertical a run’s new card belongs to', () => {
     });
     const run = store.mintRun('work', 'run-15', root, story.json().id, {
       board: 'product',
-      skill: 'checkup-story',
+      skill: 'review-story',
     });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',
@@ -739,11 +740,11 @@ describe('the parent a run’s new card hangs off', () => {
   });
 
   // THE CASE THAT MAKES "link to the run's own card" WRONG, and getting it wrong would silently do nothing: a
-  // story checkup creates SIBLINGS on its own board, and a sibling linked to its sibling is nobody's child.
-  it('is the card ABOVE the run’s own card for a story checkup, which creates siblings', async () => {
+  // story judgement creates SIBLINGS on its own board, and a sibling linked to its sibling is nobody's child.
+  it('is the card ABOVE the run’s own card for a story judgement, which creates siblings', async () => {
     const { app, store, root } = await open();
     // The scaffolded P-001 already hangs off F-001, which is the vertical the sibling belongs in.
-    const run = store.mintRun('work', 'run-p4', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-p4', root, 'P-001', { board: 'product', skill: 'review-story' });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'backlog',
@@ -781,7 +782,7 @@ describe('the parent a run’s new card hangs off', () => {
     expect(linksIn(story)).toEqual([]);
   });
 
-  it('creates the card anyway when a story checkup’s own card has no feature above it', async () => {
+  it('creates the card anyway when a story judgement’s own card has no feature above it', async () => {
     const { app, store, root } = await open();
     const loose = await create(app, admin, {
       board: 'product',
@@ -790,7 +791,7 @@ describe('the parent a run’s new card hangs off', () => {
     });
     const run = store.mintRun('work', 'run-p7', root, loose.json().id, {
       board: 'product',
-      skill: 'checkup-story',
+      skill: 'review-story',
     });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',

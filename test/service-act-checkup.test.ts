@@ -38,11 +38,15 @@ describe('a checkup’s evidence', () => {
     skill: 'checkup-feature',
     card: feature,
   };
-  const STORY_CHECKUP: TickAction = {
+  // THE STORY'S JUDGEMENT is told what is under its card exactly as the checkup it absorbed was — it reads
+  // the same `CHECKUP_PHASES` list — but it takes the gates-first path, so it carries the run its verdict
+  // lands on.
+  const STORY_REVIEW: TickAction = {
     kind: 'dispatch',
-    phase: 'story-checkup',
-    skill: 'checkup-story',
+    phase: 'story-review',
+    skill: 'review-story',
     card: story,
+    previous: 'WORK-1',
   };
 
   const board = () => [feature, story, story2, task];
@@ -72,7 +76,7 @@ describe('a checkup’s evidence', () => {
     expect(r.requests[0]?.checkup?.smoke).toMatchObject({ mode: 'smoke', passed: true });
   });
 
-  it('does not run the smoke command for a story checkup', async () => {
+  it('does not run the smoke command for a story judgement', async () => {
     // A story has no end-to-end command of its own; the one `foundation/TESTING.md` declares is the feature's.
     let ran = 0;
     const r = recorder({ boardCards: board() });
@@ -86,7 +90,7 @@ describe('a checkup’s evidence', () => {
           },
         } as unknown as ActDeps['verify'],
       }),
-      STORY_CHECKUP,
+      STORY_REVIEW,
       context,
     );
     expect(ran).toBe(0);
@@ -105,9 +109,9 @@ describe('a checkup’s evidence', () => {
     expect(r.requests[0]?.checkup?.feature).toBe(true);
   });
 
-  it('does not mark a story checkup', async () => {
+  it('does not mark a story judgement', async () => {
     const r = recorder({ boardCards: board() });
-    await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_CHECKUP, context);
+    await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_REVIEW, context);
     expect(r.requests[0]?.checkup?.feature).toBeUndefined();
   });
 
@@ -178,8 +182,9 @@ describe('a checkup’s evidence', () => {
           record({ card: 'E-001', skill: 'implement', status: 'attention', started: '2026-08-06T10:00:00Z' }),
           // And the review AFTER it, whose own turn went perfectly while it sent the work back.
           record({
-            card: 'E-001',
-            skill: 'review',
+            card: 'P-001',
+            board: 'product',
+            skill: 'review-story',
             status: 'success',
             verdict: 'sent-back',
             started: '2026-08-06T10:30:00Z',
@@ -188,8 +193,8 @@ describe('a checkup’s evidence', () => {
       },
     });
     await performAction(
-      deps(r.client),
-      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      deps(r.client, { verify: verify(smokePass) }),
+      { kind: 'dispatch', phase: 'story-review', skill: 'review-story', card: story, previous: 'W-1' },
       context,
     );
     expect(r.requests[0]?.checkup?.children).toEqual([
@@ -199,7 +204,7 @@ describe('a checkup’s evidence', () => {
 
   it('marks a blocked child as blocked, so the prompt need not know which slug means it', async () => {
     const r = recorder({ boardCards: board() });
-    await performAction(deps(r.client), STORY_CHECKUP, context);
+    await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_REVIEW, context);
     expect(r.requests[0]?.checkup?.children).toEqual([{ id: 'E-001', column: 'blocked', blocked: true }]);
   });
 
@@ -258,17 +263,31 @@ describe('a checkup’s evidence', () => {
     expect(result.stop?.detail).toContain('foundation/TESTING.md');
   });
 
-  it('runs a story checkup while a gate document is unread, because it spawns nothing', async () => {
-    // The refusal is about EXECUTION, not about checkups: a story checkup has no command of its own, so
-    // refusing it would cost the project for a risk that is not there.
+  // AND IN FRONT OF THE STORY'S JUDGEMENT, which is a CHANGE decision 80 brings rather than a rule restated.
+  // The story checkup this absorbed spawned nothing, so refusing it would have cost the project for a risk
+  // that was not there; the judgement runs the gate commands itself, in this process, so the refusal that
+  // stands in front of every spawn stands in front of this one too.
+  it('runs no gate command for a story judgement while a gate document is unread', async () => {
+    let ran = 0;
     const r = recorder({ boardCards: board() });
     const result = await performAction(
-      deps(r.client, { state: async () => ({ unreviewedGates: ['TESTING.md'] }) }),
-      STORY_CHECKUP,
+      deps(r.client, {
+        state: async () => ({ unreviewedGates: ['TESTING.md'] }),
+        verify: {
+          gates: async () => {
+            ran += 1;
+            return await gates();
+          },
+          smoke: smokePass,
+        } as unknown as ActDeps['verify'],
+      }),
+      STORY_REVIEW,
       context,
     );
-    expect(r.dispatched).toEqual(['checkup-story']);
-    expect(result.stop).toBeUndefined();
+    expect(ran).toBe(0);
+    expect(r.dispatched).toEqual([]);
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('will not run a gate command');
   });
 
   it('sends no checkup evidence with any other phase', async () => {

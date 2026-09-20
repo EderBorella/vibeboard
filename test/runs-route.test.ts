@@ -159,14 +159,16 @@ describe('POST /api/runs', () => {
   it('gives a review run the judging contract, and no threshold to quote', async () => {
     const argsLog = await recordingShimArgs();
     const project = await projectWithCard();
+    // A STORY, since decision 80: the judging contract is `review-story`'s, and that phase sits on product.
+    const story = await productCard(project);
     const { run } = (
       await project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'review' },
+        payload: { board: 'product', card: story, skill: 'review-story' },
       })
     ).json() as { run: RunRecord };
-    await settled(project, project.card, run.run);
+    await settledOn(project, 'product', story, run.run);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
     const prompt = await promptFrom(argsLog);
@@ -1192,7 +1194,7 @@ describe('POST /api/runs with no card', () => {
 // The precedent is exact and already in this file: `project: true` is refused from every scope but `service`,
 // the browser included. This follows it, including that.
 describe('POST /api/runs — the loop’s own evidence', () => {
-  const REVIEWING = (review: unknown) => ({ skill: 'review', review });
+  const REVIEWING = (review: unknown) => ({ skill: 'review-story', review });
 
   async function asService(): Promise<TestProject & { card: string; headers: Record<string, string> }> {
     const project = await projectWithCard();
@@ -1258,8 +1260,7 @@ describe('POST /api/runs — the loop’s own evidence', () => {
         board: 'engineering',
         card: project.card,
         // Any skill: the field is refused before the skill is even resolved, because it is about who may
-        // supply the loop's own facts rather than about what the run is for. `checkup-story` is seeded in a
-        // later task, and this rule must not wait for it.
+        // supply the loop's own facts rather than about what the run is for.
         skill: 'execute',
         checkup: { children: [], blocked: [], suggestions: [] },
       },
@@ -1301,14 +1302,15 @@ describe('POST /api/runs — the loop’s own evidence', () => {
     expect(refused.statusCode).toBe(403);
 
     // The same dispatch without the field is allowed, and is told the truth about the gates instead.
+    const story = await productCard(project);
     const { run } = (
       await project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'review' },
+        payload: { board: 'product', card: story, skill: 'review-story' },
       })
     ).json() as { run: RunRecord };
-    await settled(project, project.card, run.run);
+    await settledOn(project, 'product', story, run.run);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
     const prompt = await promptFrom(argsLog);

@@ -45,15 +45,20 @@ export const IMPLEMENT = (card = CARD()): TickAction => ({
   card,
 });
 
-// The review phase. It carries the run it is judging, because a verdict lands on a run and there is nothing
-// for one to be written onto otherwise — and it does NOT take the ordinary dispatch path at all: its gates run
+// A story at its judging point, which is where it stands while the judgement runs: `story-review` has no
+// entry stamp, so a fixture in any other column would be testing a board state the machine never produces.
+export const STORY = (id = 'P-001'): Card => ({ ...CARD(id, 'product'), columnSlug: 'in-progress' });
+
+// THE STORY'S JUDGEMENT (decision 80). It carries the run its verdict will be WRITTEN onto — a story's
+// break-down, or the fix that answered a send-back — because a verdict lands on a run and there is nothing
+// for one to be written onto otherwise. It does NOT take the ordinary dispatch path at all: its gates run
 // first, in this process (decision 51).
-export const REVIEW = (card = CARD()): TickAction => ({
+export const REVIEW = (card = STORY()): Extract<TickAction, { kind: 'dispatch' }> => ({
   kind: 'dispatch',
-  phase: 'task-review',
-  skill: 'review',
+  phase: 'story-review',
+  skill: 'review-story',
   card,
-  previous: 'IMPL-1',
+  previous: 'WORK-1',
 });
 
 // The phase with NO entry column that DOES take the ordinary path: a task being fixed is already in

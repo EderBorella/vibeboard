@@ -652,21 +652,22 @@ describe('decideTick — the story loop', () => {
     expect(detailOf(action)).toContain('Add a blocked column');
   });
 
-  // AND THE STORY CHECKUP DOES NOT BLOCK ITS CARD. Only a break-down does: a checkup point that will not
-  // close is a judgement about work already delivered, so there is nothing "waiting for a person" about the
-  // story itself. Pinned, or adding a phase to that list later would be a silent change of behaviour.
-  it('stops stalled, rather than blocking the story, when its checkup has used every attempt', () => {
+  // AND THE STORY'S JUDGEMENT DOES NOT BLOCK ITS CARD. Only a break-down does: a judging point that will
+  // not close is about work already delivered, so there is nothing "waiting for a person" about the story
+  // itself. Pinned, or adding a phase to that list later would be a silent change of behaviour.
+  it('stops stalled, rather than blocking the story, when its judgement will not complete', () => {
     const cards = [
       feature(['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
       card('E-001', 'engineering', 'done', 10, ['P-001']),
     ];
-    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'checkup-story') }));
+    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'review-story') }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('checkup-story');
+    expect(detailOf(action)).toContain('review');
+    expect(detailOf(action)).not.toContain('blocked');
   });
 
-  it('dispatches checkup-story once every task is settled', () => {
+  it('dispatches story-review once every task is settled', () => {
     const cards = [
       feature(['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']),
@@ -675,19 +676,19 @@ describe('decideTick — the story loop', () => {
     ];
     expect(decideTick(input({ cards }))).toMatchObject({
       kind: 'dispatch',
-      phase: 'story-checkup',
-      skill: 'checkup-story',
+      phase: 'story-review',
+      skill: 'review-story',
     });
   });
 
-  // THE STORY CHECKUP'S CREATING ROUND IS BOUNDED TOO, and it looked as though it needed no bound: ruling 54
-  // makes creating siblings and closing the story ONE act, so there is no second visit to this point — while
-  // the exit stamp succeeds. A REFUSED move leaves the story settled and in `in-progress`, and the next tick
-  // dispatched another checkup with a fresh creating round, up to `attemptCap` of them, each entitled to
-  // create more siblings.
-  it('stops stalled when the story checkup has spent its creating round and still will not close', () => {
-    const creating = run('P-001', 'product', 'checkup-story', 'success');
-    const second = run('P-001', 'product', 'checkup-story', 'attention');
+  // THE STORY JUDGEMENT'S CREATING ROUND IS BOUNDED TOO, and it looked as though it needed no bound: ruling
+  // 54 makes creating siblings and closing the story ONE act, so there is no second visit to this point —
+  // while the exit stamp succeeds. A REFUSED move leaves the story settled and in `in-progress`, and the
+  // next tick dispatched another judgement with a fresh creating round, up to `attemptCap` of them, each
+  // entitled to create more siblings.
+  it('stops stalled when the story judgement has spent its creating round and still will not close', () => {
+    const creating = run('P-001', 'product', 'review-story', 'success');
+    const second = run('P-001', 'product', 'review-story', 'attention');
     const cards = [
       feature(['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
@@ -699,12 +700,12 @@ describe('decideTick — the story loop', () => {
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('P-001');
     expect(detailOf(action)).toContain('creating');
-    // The noun matters: this is the story's checkup point, not the feature's.
+    // The noun matters: this is the story's judging point, not the feature's.
     expect(detailOf(action)).toContain('close the story');
   });
 
-  it('still dispatches the story checkup that follows the creating round, so it can close', () => {
-    const creating = run('P-001', 'product', 'checkup-story', 'success');
+  it('still dispatches the story judgement that follows the creating round, so it can close', () => {
+    const creating = run('P-001', 'product', 'review-story', 'success');
     const cards = [
       feature(['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
@@ -713,20 +714,20 @@ describe('decideTick — the story loop', () => {
     ];
     expect(decideTick(input({ cards, runs: [creating] }))).toMatchObject({
       kind: 'dispatch',
-      phase: 'story-checkup',
+      phase: 'story-review',
     });
   });
 
   // THE FIXTURE MUST HAVE TWO TASKS: with one, "all settled" and "any settled" are the same answer.
-  it('does not dispatch checkup-story while one of two tasks is in review', () => {
+  it('does not dispatch story-review while one of two tasks is unsettled', () => {
     const cards = [
       feature(['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']),
       card('E-001', 'engineering', 'done', 10, ['P-001']),
-      card('E-002', 'engineering', 'review', 20, ['P-001']),
+      card('E-002', 'engineering', 'in-progress', 20, ['P-001']),
     ];
     const action = decideTick(input({ cards }));
-    expect(action.kind === 'dispatch' && action.phase).not.toBe('story-checkup');
+    expect(action.kind === 'dispatch' && action.phase).not.toBe('story-review');
   });
 
   // L2 DRAINS BEFORE L1 ADVANCES. A feature with an unsettled story must not reach its own checkup.
@@ -774,12 +775,21 @@ const work = (skill: 'implement' | 'fix', cardId = 'E-001'): RunRecord =>
 const judged = (skill: 'implement' | 'fix', passed: boolean, cardId = 'E-001'): RunRecord =>
   withVerification(work(skill, cardId), gates(passed));
 
-// A review that answered, and one that did not. Only the second kind counts towards the review bound.
-const answered = (verdict: 'done' | 'sent-back', cardId = 'E-001'): RunRecord => ({
-  ...run(cardId, 'engineering', 'review', 'success'),
+// THE STORY'S OWN WORK RUNS (decision 80): its break-down, and the fix that answers a send-back. Both are
+// `bounded: 'skill'` phases on product, which is what `isWorkRun` reads — so these are what a story-level
+// verdict lands on and what `latestWorkRun` answers with.
+const storyWork = (skill: 'break-down' | 'fix', cardId = 'P-001'): RunRecord =>
+  run(cardId, 'product', skill, 'success');
+
+const storyJudged = (skill: 'break-down' | 'fix', passed: boolean, cardId = 'P-001'): RunRecord =>
+  withVerification(storyWork(skill, cardId), gates(passed));
+
+// A judgement that answered, and one that did not. Only the second kind counts towards the review bound.
+const answered = (verdict: 'done' | 'sent-back', cardId = 'P-001'): RunRecord => ({
+  ...run(cardId, 'product', 'review-story', 'success'),
   verdict,
 });
-const inconclusive = (cardId = 'E-001'): RunRecord => run(cardId, 'engineering', 'review', 'failed');
+const inconclusive = (cardId = 'P-001'): RunRecord => run(cardId, 'product', 'review-story', 'failed');
 
 // The story that owns the tasks, in progress with its break-down done.
 const story = (taskIds: string[]): Card[] => [
@@ -819,9 +829,27 @@ describe('decideTick — the task loop', () => {
 
   it('finishes one task before starting the next', () => {
     // The trace's own shape: E-001 goes all the way to done before E-002 is picked up.
-    const cards = [...story(['E-001', 'E-002']), task('E-001', 'review', 10), task('E-002', 'backlog', 20)];
-    const action = decideTick(input({ cards, runs: [work('implement')] }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', card: { id: 'E-001' } });
+    const cards = [
+      ...story(['E-001', 'E-002']),
+      task('E-001', 'in-progress', 10),
+      task('E-002', 'backlog', 20),
+    ];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-implement', card: { id: 'E-001' } });
+  });
+
+  // A TASK THE OLD MACHINE LEFT IN `review`, which is every board mid-flight when decision 80 landed. Its
+  // work is on the tree, and that is all `done` means for a task now — so it settles rather than making its
+  // story unjudgeable for ever. Without this the board stalls: `review` is neither terminal nor blocked, so
+  // `allSettled` is false and the story never reaches its own judgement.
+  it('settles a task the old machine left in review, so its story can be judged', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    expect(decideTick(input({ cards, runs: [work('implement')] }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'task-implement',
+      to: 'done',
+      card: { id: 'E-001' },
+    });
   });
 
   it('dispatches implement for a task in in-progress with no verdict on record', () => {
@@ -833,62 +861,10 @@ describe('decideTick — the task loop', () => {
     });
   });
 
-  it('sends a task at the implement cap to review anyway', () => {
-    // Section 5: the gates and the reviewer judge it. NOT blocked, and NOT a stop.
-    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    const runs = threeRunsOf('E-001', 'engineering', 'implement');
-    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'review' });
-  });
-});
-
-describe('decideTick — the review loop', () => {
-  it('reviews a task in review whose work run carries no verdict', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const implement = work('implement');
-    const action = decideTick(input({ cards, runs: [implement] }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', skill: 'review' });
-    // Told WHICH run it is judging, or it judges whatever else it can find on the card.
-    expect(action.kind === 'dispatch' && action.previous).toBe(implement.run);
-  });
-
-  // "HAS THIS ALREADY BEEN DONE" — the row that stops a second judgement being paid for.
-  it('re-stamps rather than re-judging a task whose verdict already passed', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    expect(decideTick(input({ cards, runs: [judged('implement', true)] }))).toMatchObject({
-      kind: 'stamp',
-      phase: 'task-review-remove',
-      to: 'done',
-    });
-  });
-
-  it('re-stamps a task whose verdict already failed back to in-progress', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    expect(decideTick(input({ cards, runs: [judged('implement', false)] }))).toMatchObject({
-      kind: 'stamp',
-      phase: 'task-review-remove',
-      to: 'in-progress',
-    });
-  });
-
-  // THE FIXTURE WITH TWO WORK RUNS, which is what tells the two rows apart. P4 asks whether the LATEST work
-  // run carries a verdict; "the latest work run that carries one" is a different question, and every fixture
-  // above has a single work run, so neither can distinguish them.
-  //
-  // The sequence is the ordinary one: implement, gates fail, fix, back to review. The fix has not been judged,
-  // so it is the review's turn — reading the implement run's old failure as still outstanding would send the
-  // card back to in-progress for another fix, and it would do so after every fix, until the cap blocked a task
-  // whose gates had failed exactly once.
-  it('reviews a task back in review after a fix, rather than re-stamping it on the old verdict', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const failed = judged('implement', false);
-    const fixed = work('fix');
-    const action = decideTick(input({ cards, runs: [failed, fixed] }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', skill: 'review' });
-    // And it judges THE FIX, not the implement run that was already judged.
-    expect(action.kind === 'dispatch' && action.previous).toBe(fixed.run);
-  });
-
-  it('dispatches fix for a task in in-progress with an outstanding failed verdict', () => {
+  // THE ONE SEND-BACK A TASK STILL HAS: the loop's own correctness refusal. A run that left nothing behind
+  // earns a failed verdict (`recordEmptyRun` in service/act/outcomes.ts) and that is now the only way a task
+  // reaches `fix` — the judgement that used to send it back is the story's.
+  it('dispatches fix for a task whose run left a failed verdict behind', () => {
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
     const failed = judged('implement', false);
     const action = decideTick(input({ cards, runs: [failed] }));
@@ -897,7 +873,6 @@ describe('decideTick — the review loop', () => {
     expect(action.kind === 'dispatch' && action.previous).toBe(failed.run);
   });
 
-  // ONE BUDGET FOR BOTH SEND-BACK KINDS. Two would let a task alternate and spend twice the cap.
   it('blocks a task that has used every fix attempt, and does not stop the loop', () => {
     const cards = [...story(['E-001', 'E-002']), task('E-001', 'in-progress'), task('E-002', 'backlog', 20)];
     const runs = [judged('implement', false), ...threeRunsOf('E-001', 'engineering', 'fix')];
@@ -908,65 +883,170 @@ describe('decideTick — the review loop', () => {
     });
   });
 
-  it('spends the same fix budget whether the send-backs came from gates or from the reviewer', () => {
-    // Two gate failures and one review send-back, each with its own fix run: the fourth attempt is blocked
-    // rather than granted from a second budget.
+  it('settles a task at the implement cap anyway', () => {
+    // Section 5: the gates and the judge take it as it stands, and since decision 80 both of those run over
+    // the STORY — which a settled task is what lets reach them. NOT blocked, and NOT a stop.
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    const runs = [
-      judged('implement', false),
-      run('E-001', 'engineering', 'fix', 'failed'),
-      judged('fix', false),
-      run('E-001', 'engineering', 'fix', 'failed'),
-      answered('sent-back'),
-      run('E-001', 'engineering', 'fix', 'failed'),
-      judged('fix', false),
-    ];
-    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'blocked' });
+    const runs = threeRunsOf('E-001', 'engineering', 'implement');
+    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'done' });
+  });
+});
+
+// THE STORY'S JUDGEMENT, WHERE THE REVIEW LIVES SINCE DECISION 80. A story with one settled task under it
+// is at its judging point, and which of P4, P4r and P5 that position is in is answered from the RECORD —
+// product has no column meaning "awaiting judgement" and the format is frozen.
+const settledStory = (): Card[] => [
+  card('F-001', 'features', 'in-progress', 10, ['P-001']),
+  card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+  task('E-001', 'done'),
+];
+
+describe('decideTick — the story judgement', () => {
+  it('judges a story whose work run carries no verdict', () => {
+    const brokeDown = storyWork('break-down');
+    const action = decideTick(input({ cards: settledStory(), runs: [brokeDown] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review', skill: 'review-story' });
+    // The verdict has to land on a run, and it is told which — the same lookup P4r reads back.
+    expect(action.kind === 'dispatch' && action.previous).toBe(brokeDown.run);
   });
 
-  // A REVIEW THAT CANNOT COMPLETE IS NOT A BLOCKED TASK (decision 51). It names the review.
+  // A STORY WITH NO WORK RUN OF ITS OWN is still judged: one whose tasks were made by hand, or one that
+  // skipped its break-down because it arrived with them attached, has no record to name — and refusing
+  // would leave it unsettled for ever over a run nobody ever wrote.
+  it('judges a story that has no work run of its own, naming none', () => {
+    const action = decideTick(input({ cards: settledStory() }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.previous).toBeUndefined();
+  });
+
+  // "HAS THIS ALREADY BEEN DONE" — the row that stops a second judgement being paid for.
+  it('re-stamps rather than re-judging a story whose verdict already passed', () => {
+    const runs = [storyJudged('break-down', true)];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-review',
+      to: 'done',
+    });
+  });
+
+  it('fixes a story whose verdict already failed, rather than judging it again', () => {
+    const refused = storyJudged('break-down', false);
+    const action = decideTick(input({ cards: settledStory(), runs: [refused] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix', skill: 'fix' });
+    // The run carrying the findings, so the fix is handed the evidence rather than told to look.
+    expect(action.kind === 'dispatch' && action.previous).toBe(refused.run);
+  });
+
+  // THE FIXTURE WITH TWO WORK RUNS, which is what tells P4 from P5 at all. P4 asks whether the LATEST work
+  // run carries a verdict; "the latest work run that carries one" is a different question, and every
+  // fixture above has a single work run, so neither can distinguish them.
+  //
+  // The sequence is the ordinary one: the story is refused, a fix answers it, and the fix has not been
+  // judged — so it is the judgement's turn. Reading the send-back's failure as still outstanding would
+  // dispatch another fix after every fix, until the cap blocked a story that was refused exactly once.
+  it('judges a story again after a fix, rather than reading the old verdict as outstanding', () => {
+    const refused = storyJudged('break-down', false);
+    const fixed = storyWork('fix');
+    const action = decideTick(input({ cards: settledStory(), runs: [refused, fixed] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review', skill: 'review-story' });
+    // And it judges THE FIX, not the run that was already judged.
+    expect(action.kind === 'dispatch' && action.previous).toBe(fixed.run);
+  });
+
+  // ONE BUDGET FOR BOTH SEND-BACK KINDS. Two would let a story alternate and spend twice the cap.
+  //
+  // THE LAST FIX CARRIES THE VERDICT, and that is the fixture rather than a detail: a fix run with no
+  // verdict on it is the JUDGEMENT's turn, not another fix — so three bare fix runs would be dispatched a
+  // review, which is the healthy cycle and not this bound. The cap is reached on the send-back after the
+  // third fix.
+  it('blocks a story that has used every fix attempt, and does not stop the loop', () => {
+    const runs = [
+      storyJudged('break-down', false),
+      run('P-001', 'product', 'fix', 'failed'),
+      run('P-001', 'product', 'fix', 'failed'),
+      storyJudged('fix', false),
+    ];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-fix',
+      to: 'blocked',
+    });
+  });
+
+  it('spends the same fix budget whether the send-backs came from gates or from the judge', () => {
+    // Two gate failures and one judge send-back, each with its own fix run: the fourth attempt is blocked
+    // rather than granted from a second budget.
+    const runs = [
+      storyJudged('break-down', false),
+      run('P-001', 'product', 'fix', 'failed'),
+      storyJudged('fix', false),
+      run('P-001', 'product', 'fix', 'failed'),
+      answered('sent-back'),
+      run('P-001', 'product', 'fix', 'failed'),
+      storyJudged('fix', false),
+    ];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'stamp',
+      to: 'blocked',
+    });
+  });
+
+  // A REVIEW THAT CANNOT COMPLETE IS NOT A BLOCKED CARD (decision 51). It names the review.
   it('stops stalled naming the review when the review runs will not complete', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const runs = [work('implement'), inconclusive(), inconclusive(), inconclusive()];
-    const action = decideTick(input({ cards, runs }));
+    const runs = [storyWork('break-down'), inconclusive(), inconclusive(), inconclusive()];
+    const action = decideTick(input({ cards: settledStory(), runs }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('review');
-    // It must NOT say the task is unfixable: a dead API key is not work nobody can fix.
+    // It must NOT say the story is unfixable: a dead API key is not work nobody can fix.
     expect(detailOf(action)).not.toContain('blocked');
   });
 
   it('does not count three completed reviews towards that bound', () => {
     // Finding A, through the tick: `BURNS.success` is true, so a cap over every review run would stall a
-    // perfectly healthy task at three.
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const runs = [work('implement'), answered('done'), answered('sent-back'), answered('done')];
-    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'dispatch', phase: 'task-review' });
+    // perfectly healthy story at three.
+    const runs = [storyWork('break-down'), answered('done'), answered('sent-back'), answered('done')];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-review',
+    });
   });
 
-  // A REVIEW WHOSE VERDICT COULD NOT BE RECORDED re-reviews without limit, and the two bounds above both miss
-  // it. The trigger asks whether the latest WORK run carries a verification, so a review that answered and
-  // whose verdict the endpoint refused leaves that run exactly as it was: it is not inconclusive — it HAS a
-  // verdict — and `dispatches: 1` resets the idle counter, so `MAX_IDLE_TICKS` never arrives either. The task
-  // pays for a full review every tick for as long as the write keeps failing.
-  it('stops stalled once a task has had every review its fix budget can justify', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    // Four reviews that each answered, and a work run still carrying no verdict: exactly the shape a verdict
-    // that cannot be written leaves behind.
-    const runs = [work('implement'), answered('done'), answered('done'), answered('done'), answered('done')];
-    const action = decideTick(input({ cards, runs }));
+  // A REVIEW WHOSE VERDICT COULD NOT BE RECORDED re-reviews without limit, and the two bounds above both
+  // miss it. The trigger asks whether the latest WORK run carries a verification, so a review that answered
+  // and whose verdict the endpoint refused leaves that run exactly as it was: it is not inconclusive — it
+  // HAS a verdict — and `dispatches: 1` resets the idle counter, so `MAX_IDLE_TICKS` never arrives either.
+  // The story pays for a full review every tick for as long as the write keeps failing.
+  it('stops stalled once a story has had every review its fix budget can justify', () => {
+    // Four reviews that each answered, and a work run still carrying no verdict: exactly the shape a
+    // verdict that cannot be written leaves behind.
+    const runs = [
+      storyWork('break-down'),
+      answered('done'),
+      answered('done'),
+      answered('done'),
+      answered('done'),
+    ];
+    const action = decideTick(input({ cards: settledStory(), runs }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('E-001');
+    expect(detailOf(action)).toContain('P-001');
     expect(detailOf(action)).toContain('reviews');
     // NOT blocked: a verdict this server cannot write is not work nobody can fix.
     expect(detailOf(action)).not.toContain('blocked');
   });
 
   it('still allows the review a full fix budget entitles it to', () => {
-    // `attemptCap + 1` is the healthy MAXIMUM rather than a margin — implement, a review and a fix for each
+    // `attemptCap + 1` is the healthy MAXIMUM rather than a margin — the work, a review and a fix for each
     // send-back, then the review that passes — so three spent must leave the fourth available.
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const runs = [work('implement'), answered('sent-back'), answered('sent-back'), answered('sent-back')];
-    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'dispatch', phase: 'task-review' });
+    const runs = [
+      storyWork('break-down'),
+      answered('sent-back'),
+      answered('sent-back'),
+      answered('sent-back'),
+    ];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-review',
+    });
   });
 });
 

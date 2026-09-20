@@ -56,8 +56,23 @@ const gates = (passed: boolean): Verification =>
     ? { mode: 'gates', passed: true, at: 'T' }
     : { mode: 'gates', passed: false, at: 'T', command: 'npm test', output: '1 failed' };
 
-const rev = (verdict: ReviewVerdict, card = 'E-001'): RunRecord =>
-  withReport(base({ skill: 'review', card }), { outcome: 'success', verdict, body: '## Judgement' }, 'T');
+// THE JUDGEMENT, which is a STORY's since decision 80: `review-story` on product, and `isReviewRun` reads
+// the phase table, so a run recorded on any other board is not one.
+const rev = (verdict: ReviewVerdict, card = 'P-001'): RunRecord =>
+  withReport(
+    base({ skill: 'review-story', card, board: 'product' }),
+    { outcome: 'success', verdict, body: '## Judgement' },
+    'T',
+  );
+
+// A judgement that ended and answered nothing.
+const judgeDied = (card = 'P-001'): RunRecord =>
+  withoutReport(
+    base({ skill: 'review-story', card, board: 'product' }),
+    'failed',
+    'The agent exited with code 1 and wrote no report.',
+    'T',
+  );
 
 function card(board: BoardName, id: string, over: Partial<Card> = {}): Card {
   return {
@@ -158,21 +173,25 @@ describe('latest, when two runs share a second', () => {
 
 describe('inconclusiveReviews', () => {
   it('counts a failed review run', () => {
-    expect(inconclusiveReviews([died('review')], 'E-001')).toBe(1);
+    expect(inconclusiveReviews([judgeDied()], 'P-001')).toBe(1);
   });
 
   it('counts a review that finished and reported no verdict', () => {
     // `attention` FINISHED — it has a report — but a report with no `verdict:` decided nothing.
-    const silent = withReport(base({ skill: 'review' }), { outcome: 'attention', body: 'I am unsure' }, 'T');
+    const silent = withReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      { outcome: 'attention', body: 'I am unsure' },
+      'T',
+    );
     expect(silent.status).toBe('attention');
-    expect(inconclusiveReviews([silent], 'E-001')).toBe(1);
+    expect(inconclusiveReviews([silent], 'P-001')).toBe(1);
   });
 
   // THE ONE THAT MATTERS. Three healthy reviews must not stop the loop: `BURNS.success` is true, so a cap
   // over every review run would stall a perfectly healthy task at three — while the spec's own arithmetic
   // expects `attemptCap + 1` review runs per task.
   it('counts none of three completed reviews that each answered', () => {
-    expect(inconclusiveReviews([rev('done'), rev('sent-back'), rev('done')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([rev('done'), rev('sent-back'), rev('done')], 'P-001')).toBe(0);
   });
 
   // THE E-022 CASE, closed 2026-09-01. A review whose report the SERVER could not read is not the work
@@ -181,19 +200,24 @@ describe('inconclusiveReviews', () => {
   // rebuilt. The only way back was moving files out of `results/` by hand.
   it('does not count a review whose report the server could not read', () => {
     const unreadable = withReport(
-      base({ skill: 'review' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'attention', body: 'judged', unreadable: 'its verdict reads "maybe"' },
       'T',
     );
     expect(unreadable.fault).toBe('unreadable-report');
     expect(unreadable.verdict).toBeUndefined(); // so the OLD rule would have counted it
-    expect(inconclusiveReviews([unreadable], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([unreadable], 'P-001')).toBe(0);
   });
 
   it('does not count a cancelled review — you stopped it', () => {
     // `burnsAttempt` is false for a cancellation, and a decision you took is not an attempt the agent had.
-    const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');
-    expect(inconclusiveReviews([stopped], 'E-001')).toBe(0);
+    const stopped = withoutReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      'cancelled',
+      'You stopped it.',
+      'T',
+    );
+    expect(inconclusiveReviews([stopped], 'P-001')).toBe(0);
   });
 
   it('does not count a work run that carries no verdict', () => {
@@ -203,91 +227,96 @@ describe('inconclusiveReviews', () => {
   });
 
   it('is scoped to the card', () => {
-    expect(inconclusiveReviews([died('review', 'E-002')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([judgeDied('P-002')], 'P-001')).toBe(0);
   });
 });
 
-// EVERY REVIEW A TASK HAS COST, which is the total the spec's arithmetic row states and which
+// EVERY REVIEW A STORY HAS COST, which is the total the spec's arithmetic row states and which
 // `inconclusiveReviews` deliberately does not count. It exists for the reviews that ANSWERED and still left
-// the task in review — a verdict the endpoint refused, for instance.
+// the card open — a verdict the endpoint refused, for instance.
 describe('reviewsRun', () => {
   it('counts the reviews that answered, which the inconclusive bound does not', () => {
     const runs = [rev('done'), rev('sent-back'), rev('done')];
-    expect(reviewsRun(runs, 'E-001')).toBe(3);
-    expect(inconclusiveReviews(runs, 'E-001')).toBe(0);
+    expect(reviewsRun(runs, 'P-001')).toBe(3);
+    expect(inconclusiveReviews(runs, 'P-001')).toBe(0);
   });
 
-  it('counts an inconclusive review too, because it is still a review the task paid for', () => {
-    expect(reviewsRun([died('review'), rev('done')], 'E-001')).toBe(2);
+  it('counts an inconclusive review too, because it is still a review the card paid for', () => {
+    expect(reviewsRun([judgeDied(), rev('done')], 'P-001')).toBe(2);
   });
 
   it('does not count a cancelled review — you stopped it', () => {
-    const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');
-    expect(reviewsRun([stopped], 'E-001')).toBe(0);
+    const stopped = withoutReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      'cancelled',
+      'You stopped it.',
+      'T',
+    );
+    expect(reviewsRun([stopped], 'P-001')).toBe(0);
   });
 
   it('does not count the work runs, or another card’s reviews', () => {
-    expect(reviewsRun([work('implement'), work('fix'), rev('done', 'E-002')], 'E-001')).toBe(0);
+    expect(reviewsRun([work('implement'), work('fix'), rev('done', 'P-002')], 'P-001')).toBe(0);
   });
 });
 
 describe('creatingRoundSpent', () => {
   const story = card('product', 'P-001', { columnSlug: 'in-progress' });
 
-  it('is false when no checkup has run at this point', () => {
-    expect(creatingRoundSpent([story], [], 'P-001', 'checkup-story')).toBe(false);
+  it('is false when no judgement has run at this point', () => {
+    expect(creatingRoundSpent([story], [], 'P-001', 'review-story')).toBe(false);
   });
 
   it("is true once a card on the board names one of this card's checkup runs as its creator", () => {
     // `createdBy`, stamped by the endpoint from the credential — NOT `created`, which the agent wrote.
     const checkup = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-002'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-002', { createdBy: checkup.run })];
-    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-story')).toBe(true);
+    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'review-story')).toBe(true);
   });
 
   it('is false when the checkup run CLAIMED a card it did not create', () => {
     // A run reporting `created: ['P-004']` with no such card on the board has spent no round. Finding F:
     // the report is the agent's claim about itself, and this is the second of the four places it applies.
     const boastful = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-004'], body: '## Missing' },
       'T',
     );
-    expect(creatingRoundSpent([story], [boastful], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent([story], [boastful], 'P-001', 'review-story')).toBe(false);
   });
 
   it('is false when the checkup ran and created nothing', () => {
     // Its ordinary CLOSING case (decision 47) — getting this the other way round refuses every close.
     const closed = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', summary: 'nothing missing', body: '## Composed' },
       'T',
     );
-    expect(creatingRoundSpent([story], [closed], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent([story], [closed], 'P-001', 'review-story')).toBe(false);
   });
 
-  it('is scoped to the skill, so a story checkup does not spend a feature checkup round', () => {
+  it('is scoped to the skill, so a story judgement does not spend a feature checkup round', () => {
     const checkup = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-002'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-002', { createdBy: checkup.run })];
-    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-story')).toBe(true);
+    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'review-story')).toBe(true);
     expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-feature')).toBe(false);
   });
 
-  it("is scoped to the card, so another story's checkup does not spend this one's round", () => {
+  it("is scoped to the card, so another story's judgement does not spend this one's round", () => {
     const elsewhere = withReport(
-      base({ skill: 'checkup-story', card: 'P-009', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-009', board: 'product' }),
       { outcome: 'success', created: ['P-010'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-010', { createdBy: elsewhere.run })];
-    expect(creatingRoundSpent(cards, [elsewhere], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent(cards, [elsewhere], 'P-001', 'review-story')).toBe(false);
   });
 });

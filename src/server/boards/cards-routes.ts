@@ -119,10 +119,10 @@ function whereItGoes(config: ProjectConfig, board: BoardName): string {
 // — the stamp below loads it for the vertical — and stamped the group from it while not linking to it.
 //
 // THE PARENT IS THE CARD ON THE BOARD ABOVE WHAT THIS PHASE CREATES, in the run's vertical. "Link to the run's
-// own card" is the version that looks right and silently does nothing: `story-checkup` creates SIBLINGS on its
+// own card" is the version that looks right and silently does nothing: `story-review` creates SIBLINGS on its
 // own board, whose parent is the feature, and a sibling linked to its sibling is nobody's child. So: the run's
 // own card when it sits on that board (both break-downs, `feature-checkup`), the card above it when the phase
-// creates on its own board (`story-checkup`), and none at all when the phase creates features — nothing sits
+// creates on its own board (`story-review`), and none at all when the phase creates features — nothing sits
 // above a feature.
 //
 // UNRESOLVABLE MEANS NO LINK AND NO REFUSAL, the trade the group already makes: the run's own card may have

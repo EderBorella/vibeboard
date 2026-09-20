@@ -17,15 +17,14 @@ export type PhaseName =
   | 'story-breakdown'
   | 'story-breakdown-skip'
   | 'task-implement'
-  | 'task-review'
-  | 'task-review-remove'
   | 'task-fix'
-  | 'story-checkup'
+  | 'story-fix'
+  | 'story-review'
   | 'feature-checkup';
 
 export interface Phase {
   name: PhaseName;
-  skill?: string; // absent = the loop acts alone (the two skips, task-review-remove)
+  skill?: string; // absent = the loop acts alone (the two break-down skips)
   board?: BoardName; // absent for the bootstrap: a project run has no card
   entry?: string; // column slug stamped before the dispatch
   exitPass?: string;
@@ -71,51 +70,56 @@ export const PHASES: readonly Phase[] = [
     bounded: 'none',
   },
   // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
+  //
+  // `done` AND NOT `review` (decision 80). A task is finished when its work lands; the STORY is what gets
+  // judged, once every task under it is settled. Engineering's Review column stays in the scaffolder's
+  // defaults and is simply no longer a state the loop stamps — the on-disk format is frozen, and a person
+  // dragging a card into it is still allowed to.
   {
     name: 'task-implement',
     skill: 'implement',
     board: 'engineering',
     entry: 'in-progress',
-    exitPass: 'review',
+    exitPass: 'done',
     bounded: 'skill',
   },
-  // No entry stamp: the card is already in review, and a move to where it is would be a write for
-  // nothing. Bounded over INCONCLUSIVE reviews rather than reviews (spec, the review cycle row): a
-  // successful review burns an attempt, so counting them all would stall a healthy task at three.
-  {
-    name: 'task-review',
-    skill: 'review',
-    board: 'engineering',
-    exitPass: 'done',
-    exitFail: 'in-progress',
-    bounded: 'review',
-  },
-  // "Has this already been done": the judgement happened and only the move failed. Re-stamp, never
-  // re-judge.
-  {
-    name: 'task-review-remove',
-    board: 'engineering',
-    exitPass: 'done',
-    exitFail: 'in-progress',
-    bounded: 'none',
-  },
   // No entry stamp: its trigger is a task already in `in-progress`, so there is no move to make.
+  //
+  // Its one remaining trigger is the loop's OWN correctness refusal — a run that left nothing behind earns
+  // a failed verdict (`recordEmptyRun` in service/act/outcomes.ts). The judgement that used to send a task
+  // back is at the story now, and `story-fix` below is what answers that one.
   {
     name: 'task-fix',
     skill: 'fix',
     board: 'engineering',
-    exitPass: 'review',
+    exitPass: 'done',
     bounded: 'skill',
   },
-  // Stays in `product/in-progress` while it runs, so no entry stamp. It creates on its OWN board —
-  // sibling stories (decision 47) — and ruling 61 stamps those too.
+  // WHERE A SENT-BACK STORY'S WORK IS REDONE, and without it a refused judgement has nowhere to go: the
+  // story sits settled in `in-progress` carrying a failed verdict, and every later tick re-stamps it to
+  // where it already is. The same shape `task-fix` has one level down, and the same SINGLE budget across
+  // both send-back kinds — a story the gates sent back and one the judge sent back spend one count.
+  //
+  // No `exitPass`: a fix does not close a story, the judge does. The story stays where it is, and the next
+  // tick finds a work run carrying no verdict — which is the judgement's own trigger.
+  { name: 'story-fix', skill: 'fix', board: 'product', bounded: 'skill' },
+  // THE ONE JUDGEMENT A STORY GETS (decision 80), and it absorbs the story checkup. At story granularity
+  // "does this do what the card asked" and "do the tasks under it compose into it" are the same question,
+  // and asking both paid two cold starts for one answer.
+  //
+  // Stays in `product/in-progress` while it runs, so no entry stamp. It keeps the checkup's authority to
+  // create on its OWN board — sibling stories (decision 47) — and ruling 61 stamps those too.
+  //
+  // Bounded over INCONCLUSIVE judgements rather than judgements (spec, the review cycle row): a successful
+  // one burns an attempt, so counting them all would stall a healthy story at three.
   {
-    name: 'story-checkup',
-    skill: 'checkup-story',
+    name: 'story-review',
+    skill: 'review-story',
     board: 'product',
     exitPass: 'done',
+    exitFail: 'in-progress',
     creates: 'product',
-    bounded: 'skill',
+    bounded: 'review',
   },
   // `creates: product` on a `features` card: a feature checkup's product is stories under the feature
   // it ran on, which is why `creates` is declared apart from `board`.

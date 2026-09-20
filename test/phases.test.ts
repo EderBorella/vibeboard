@@ -17,31 +17,52 @@ describe('the phase table', () => {
     });
   });
 
-  it('stamps a task into in-progress before implement and review after it', () => {
+  it('stamps a task into in-progress before implement and done after it', () => {
     expect(phase('task-implement')).toMatchObject({
       board: 'engineering',
       entry: 'in-progress',
-      exitPass: 'review',
+      exitPass: 'done',
       skill: 'implement',
     });
     // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
     expect(phase('task-implement').creates).toBeUndefined();
   });
 
-  it('sends a task back to in-progress and forward to done from review', () => {
-    expect(phase('task-review')).toMatchObject({
-      board: 'engineering',
+  // DECISION 80, AS THE TABLE STATES IT. The union is the load-bearing half: a `task-review` left in it
+  // would mean two judgements on one story's work, which is the cost this removes.
+  it('has no per-task judgement at all', () => {
+    const names: string[] = PHASES.map((p) => p.name);
+    expect(names).not.toContain('task-review');
+    expect(names).not.toContain('task-review-remove');
+    expect(names).not.toContain('story-checkup');
+    expect(PHASES.filter((p) => p.bounded === 'review').map((p) => p.name)).toEqual(['story-review']);
+  });
+
+  it('sends a story back to in-progress and forward to done from its judgement', () => {
+    expect(phase('story-review')).toMatchObject({
+      board: 'product',
       exitPass: 'done',
       exitFail: 'in-progress',
-      skill: 'review',
+      skill: 'review-story',
+      // It keeps the checkup's authority to write sibling stories (decision 47).
+      creates: 'product',
       bounded: 'review',
     });
-    // No entry stamp: it is already in review, and a move to where it is would be a write for nothing.
-    expect(phase('task-review').entry).toBeUndefined();
+    // No entry stamp: it runs where the story already stands, and a move to where it is would be a write
+    // for nothing.
+    expect(phase('story-review').entry).toBeUndefined();
+  });
+
+  // A SEND-BACK NEEDS SOMEWHERE TO GO. Without this row a refused story sits settled in `in-progress`
+  // carrying a failed verdict, and every later tick re-stamps it to where it already is.
+  it('answers a sent-back story with a fix that does not close it', () => {
+    expect(phase('story-fix')).toMatchObject({ board: 'product', skill: 'fix', bounded: 'skill' });
+    expect(phase('story-fix').exitPass).toBeUndefined();
+    expect(phase('story-fix').entry).toBeUndefined();
   });
 
   it('has no skill for the phases the loop carries out alone', () => {
-    for (const name of ['feature-breakdown-skip', 'story-breakdown-skip', 'task-review-remove'] as const) {
+    for (const name of ['feature-breakdown-skip', 'story-breakdown-skip'] as const) {
       expect(phase(name).skill, name).toBeUndefined();
     }
   });
@@ -63,11 +84,10 @@ describe('the phase table', () => {
     expect([...LIFECYCLE_SKILLS].sort()).toEqual([
       'break-down',
       'checkup-feature',
-      'checkup-story',
       'derive-features',
       'fix',
       'implement',
-      'review',
+      'review-story',
     ]);
   });
 
@@ -95,6 +115,12 @@ describe('phaseForRun', () => {
     expect(phaseForRun('break-down', 'features')?.creates).toBe('product');
     expect(phaseForRun('break-down', 'product')?.creates).toBe('engineering');
   });
+  // AND `fix` IS THE SECOND OF THEM since decision 80 — one skill, a task's phase and a story's, which is
+  // what keeps `isWorkRun` in bounds.ts able to tell a story's fix from a task's.
+  it('resolves fix on engineering to task-fix, and on product to story-fix', () => {
+    expect(phaseForRun('fix', 'engineering')?.name).toBe('task-fix');
+    expect(phaseForRun('fix', 'product')?.name).toBe('story-fix');
+  });
   it('resolves a card-less run to the bootstrap', () => {
     expect(phaseForRun('derive-features')?.name).toBe('bootstrap');
   });
@@ -108,7 +134,7 @@ describe('phaseForRun', () => {
   });
   it('resolves each single-board lifecycle skill', () => {
     expect(phaseForRun('implement', 'engineering')?.name).toBe('task-implement');
-    expect(phaseForRun('checkup-story', 'product')?.name).toBe('story-checkup');
+    expect(phaseForRun('review-story', 'product')?.name).toBe('story-review');
     expect(phaseForRun('checkup-feature', 'features')?.name).toBe('feature-checkup');
   });
 });

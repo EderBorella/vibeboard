@@ -106,11 +106,11 @@ describe('the phase skills the phase table names', () => {
     expect(boardsOf('derive-features')).toEqual(['features']);
     expect(boardsOf('implement')).toEqual(['engineering']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
-    // The lifecycle's own, each scoped to the one board its phase sits on: a `fix` and a `review` are always
-    // about a task, a story checkup about a story, a feature checkup about a feature.
-    expect(boardsOf('fix')).toEqual(['engineering']);
-    expect(boardsOf('review')).toEqual(['engineering']);
-    expect(boardsOf('checkup-story')).toEqual(['product']);
+    // The lifecycle's own, each scoped to the boards its phases sit on. `fix` is TWO phases since decision
+    // 80 — a task's and a story's — so it is the one skill here that answers on more than one board; the
+    // story's judgement is about a story, a feature checkup about a feature.
+    expect(boardsOf('fix')).toEqual(['engineering', 'product']);
+    expect(boardsOf('review-story')).toEqual(['product']);
     expect(boardsOf('checkup-feature')).toEqual(['features']);
   });
 
@@ -226,7 +226,7 @@ describe('the phase skills the phase table names', () => {
 
   it('keeps the manual skills a person already had', () => {
     expect(SEED_SKILLS.map((s) => s.slug)).toEqual(
-      expect.arrayContaining(['execute', 'research', 'review', 'summarise']),
+      expect.arrayContaining(['execute', 'research', 'summarise']),
     );
   });
 });
@@ -247,8 +247,8 @@ describe('the lifecycle skills', () => {
   // DECISION 45, VERBATIM, and this is the boundary that makes the attempt cap unescapable. Without it a
   // checkup can create work to get past a blocked task — and that story gets three fix attempts of its own,
   // then another checkup, then another story, through the one authority these runs have.
-  it('tells both checkups the blocked-task rule, verbatim', () => {
-    for (const slug of ['checkup-story', 'checkup-feature']) {
+  it('tells the story judgement and the feature checkup the blocked-task rule, verbatim', () => {
+    for (const slug of ['review-story', 'checkup-feature']) {
       expect(body(slug), slug).toContain('A blocked task is **settled**, not outstanding');
       expect(body(slug), slug).toContain('Do not create work to get past a blocked task');
       expect(body(slug), slug).toContain(
@@ -266,7 +266,7 @@ describe('the lifecycle skills', () => {
   it('tells every creating skill to read the board first', () => {
     // Decision 43: creating work is not idempotent, so a creating phase must look first. And one card per
     // call, never a shell loop the agent cannot verify.
-    for (const slug of ['derive-features', 'break-down', 'checkup-story', 'checkup-feature']) {
+    for (const slug of ['derive-features', 'break-down', 'review-story', 'checkup-feature']) {
       expect(body(slug), slug).toMatch(/read the board first/i);
       expect(body(slug), slug).toContain('one card per call');
     }
@@ -300,23 +300,25 @@ describe('the lifecycle skills', () => {
     expect(body('fix')).toMatch(/do not widen/i);
   });
 
-  it('tells review to change nothing and to answer with a verdict', () => {
+  it('tells the story judgement to change nothing and to answer with a verdict', () => {
     // "Change nothing" rather than "do not edit": a judge that fixes what it is judging is grading its own
     // work, and the credential grants it nothing on the board either way.
-    expect(body('review')).toContain('Change nothing');
-    expect(body('review')).toContain('verdict');
+    expect(body('review-story')).toContain('Change nothing');
+    expect(body('review-story')).toContain('verdict');
   });
 
-  it('tells review it is judging ONE run, not the card’s whole history', () => {
-    // The first hand-run's finding, in the skill as well as in the prompt: an earlier run on this card may
-    // have succeeded, and its work is not this run's work.
-    expect(body('review')).toMatch(/one run/i);
+  // THE FRAME DECISION 80 REMOVED. The retired `review` skill opened "Judge ONE run against the card", and
+  // that sentence is why it could not fail: a reviewer scoped to one task's turn is never shown two tasks at
+  // once, so it cannot see that the third undid the first. 77 of 77 returned `done`.
+  it('does not tell the story judgement it is judging one run, and asks whether the tasks compose', () => {
+    expect(body('review-story')).not.toMatch(/one run/i);
+    expect(body('review-story')).toContain('do the tasks COMPOSE?');
   });
 
-  it('tells both checkups they do not move their own card', () => {
-    // The loop stamps the column (decision 38). A checkup that moved its card would be a card advancing on
-    // the say-so of the run being judged.
-    for (const slug of ['checkup-story', 'checkup-feature']) {
+  it('tells the story judgement and the feature checkup they do not move their own card', () => {
+    // The loop stamps the column (decision 38). A judge that moved its card would be a card advancing on
+    // the say-so of the run judging it.
+    for (const slug of ['review-story', 'checkup-feature']) {
       expect(body(slug), slug).toMatch(/do not move/i);
     }
   });
@@ -330,24 +332,29 @@ describe('the lifecycle skills', () => {
   // RULING 64: a skill file states OBLIGATIONS, never facts the prompt owns. What is true right now — which
   // gates ran, what the reviewer said, which children are blocked — is the loop's to compute and the prompt's
   // to state, and a body that repeats it contradicts the prompt wrapped around it.
-  it('does not tell review that auto-pilot ran the gates, which is false for a hand dispatch', () => {
+  it('does not tell the story judgement auto-pilot ran the gates, which is false for a hand dispatch', () => {
     // The prompt says nobody ran them when nobody did. The obligation — read what it says — survives; the
     // claim about what happened does not.
-    expect(body('review')).not.toMatch(/auto-pilot runs the gates/i);
-    expect(body('review')).toContain('This prompt tells you what the gates did');
-    expect(body('review')).toContain('Do not assume');
+    expect(body('review-story')).not.toMatch(/auto-pilot ran every command/i);
+    expect(body('review-story')).toContain('This prompt tells you what the gates did');
+    expect(body('review-story')).toContain('Do not assume');
   });
 
-  it('does not tell either checkup to close its own card while also telling it not to move one', () => {
+  it('does not tell the feature checkup to close its own card while also telling it not to move one', () => {
     // Two required contracts, one of which cannot be carried out: the loop stamps the column, and a checkup
     // has no authority to close anything. What it owes is a report saying the work is finished.
-    for (const slug of ['checkup-story', 'checkup-feature']) {
-      expect(body(slug), slug).not.toMatch(/close it\b/i);
-      expect(body(slug), slug).toContain('**say so in your report**');
-      // And the obligation it replaced is still there, so this did not delete the rule with the wording.
-      expect(body(slug), slug).toMatch(/is finished/i);
-    }
+    expect(body('checkup-feature')).not.toMatch(/close it\b/i);
+    expect(body('checkup-feature')).toContain('**say so in your report**');
+    // And the obligation it replaced is still there, so this did not delete the rule with the wording.
+    expect(body('checkup-feature')).toMatch(/is finished/i);
     expect(body('checkup-feature')).not.toMatch(/you may close the feature/i);
+  });
+
+  // THE SAME RULE, ONE SHAPE DOWN. The story's judgement has a `verdict` where the checkup had a report, so
+  // "say so in your report" is not its contract — answering `done` is. It must still not be told to close.
+  it('does not tell the story judgement to close its own card', () => {
+    expect(body('review-story')).not.toMatch(/close it\b/i);
+    expect(body('review-story')).toContain('Answer with a verdict');
   });
 
   // THE BRIEF IS A CEILING, and this is the first real run's other finding. The test project's README says
@@ -373,8 +380,8 @@ describe('the lifecycle skills', () => {
   // THE VERIFIER HALF, and the more durable one: the checkups are the only runs that see a whole feature at
   // once, so they are where a story nobody asked for can actually be noticed. Identical bytes in both, because
   // the rule is one rule.
-  it('gives both checkups the job of noticing over-scope, in the same words', () => {
-    for (const slug of ['checkup-story', 'checkup-feature']) {
+  it('gives both judging points the job of noticing over-scope, in the same words', () => {
+    for (const slug of ['review-story', 'checkup-feature']) {
       expect(body(slug), slug).toContain(
         "**The brief is a ceiling, and this phase is where over-scope is noticed.** Read the\nproject's README: it and the card below are the bound on what belongs under this\ncard.",
       );
@@ -391,8 +398,8 @@ describe('the lifecycle skills', () => {
   // ever mentioned linking, so a checkup agent following its instructions exactly created an orphan even before
   // the endpoint bug. The server writes the link now, so what these must not acquire is the obligation ruling 65
   // took off break-down — two writers for one fact, one of which can send an incomplete list.
-  it('tells neither checkup to link what it creates, and asks each for a card per call', () => {
-    for (const slug of ['checkup-story', 'checkup-feature']) {
+  it('tells neither judging point to link what it creates, and asks each for a card per call', () => {
+    for (const slug of ['review-story', 'checkup-feature']) {
       expect(body(slug), slug).not.toContain('/links');
       expect(body(slug), slug).toContain('one card per call');
     }

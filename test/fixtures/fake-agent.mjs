@@ -175,6 +175,12 @@ async function createCards(mode, args) {
   return created;
 }
 
+// A CREATING RUN THAT IS ALSO A JUDGING ONE, which the story's judgement is: it may write sibling stories
+// for what was MISSED (decision 47) and it MUST answer a verdict, because a report with none passes nothing.
+// Decided from the PROMPT rather than from a second marker, which is how a real agent decides it too — and a
+// shim that could only do one of the two could not express the phase at all.
+const judging = prompt.includes('## Judging (required)');
+
 if (behaviour === 'create' || behaviour === 'createlinks') {
   // A creating run: it changes no files at all, so what it produced is only visible on the board — which is
   // exactly why `createdNothing` compares the board before and after rather than reading this report.
@@ -184,7 +190,7 @@ if (behaviour === 'create' || behaviour === 'createlinks') {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(
       path,
-      `---\noutcome: success\nsummary: created ${created.length} card${created.length === 1 ? '' : 's'}\ncreated: [${created.join(', ')}]\n---\n## What I did\n\nOne POST per card.\n`,
+      `---\noutcome: success\nsummary: created ${created.length} card${created.length === 1 ? '' : 's'}\n${judging ? 'verdict: done\n' : ''}created: [${created.join(', ')}]\n---\n## What I did\n\nOne POST per card.\n`,
       'utf8',
     );
   }

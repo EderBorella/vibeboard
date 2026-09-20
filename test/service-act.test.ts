@@ -89,7 +89,7 @@ describe('one dispatch, end to end', () => {
       FIX(),
       context,
     );
-    expect(order).toEqual(['commit', 'dispatch', 'move:review']);
+    expect(order).toEqual(['commit', 'dispatch', 'move:done']);
   });
 
   it('commits the run’s own tree, on the run’s own branch', async () => {
@@ -108,17 +108,18 @@ describe('one dispatch, end to end', () => {
     expect(result.dispatches).toBe(1);
     expect(r.moves).toEqual([
       { card: 'E-001', to: 'in-progress' },
-      { card: 'E-001', to: 'review' },
+      { card: 'E-001', to: 'done' },
     ]);
   });
 
   // DECISION 40. The loop reads its own record of how the run ended — `status`, which the runner assigns —
-  // and never the `outcome` the agent wrote about itself. A run that finished saying it could not do the work
-  // still goes to review, where the gates and the reviewer judge it.
+  // and never the `outcome` the agent wrote about itself. A run that finished saying it could not do the
+  // work still settles its task, where since decision 80 the STORY's gates and judgement take it as it
+  // stands — the claim cannot change where the card goes either way.
   it('ignores what the agent said about its own work', async () => {
     const r = recorder({ settle: [record({ status: 'attention', outcome: 'attention' })] });
     await performAction(deps(r.client), IMPLEMENT(), context);
-    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'review' });
+    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'done' });
   });
 
   it('does not stamp on exit when the run did not settle', async () => {

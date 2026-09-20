@@ -7,8 +7,8 @@ import type { Verification } from './verify.js';
 // Every count in §5 that `accounting.ts` does not already answer. Pure, and every one of them is a QUERY
 // over records already on disk plus the board — no new stored counter to drift out of step (decision 46).
 //
-// Which phase a run belongs to is asked of the TABLE rather than restated here (`phaseForRun`), so the two
-// skills a verdict lands on and the one skill that judges them have a single home.
+// Which phase a run belongs to is asked of the TABLE rather than restated here (`phaseForRun`), so the skills
+// a verdict lands on and the skill that judges them have a single home.
 
 // Ordering is by WHEN THE RUN STARTED, with the id as the tie-break, so no caller has to pass runs in
 // any particular order.
@@ -40,12 +40,16 @@ export const startedAt = (run: RunRecord): number => {
 const latest = (runs: RunRecord[]): RunRecord | undefined =>
   [...runs].sort((a, b) => startedAt(a) - startedAt(b) || a.run.localeCompare(b.run)).at(-1);
 
-// A run whose WORK a verdict is written onto: the engineering phases whose exit is `review`, which is
-// `implement` and `fix`. Read off the table rather than listed again — and a review run is excluded by
-// construction, because a reviewer does not judge itself.
-const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.exitPass === 'review';
+// A run whose WORK a verdict is written onto: a dispatching phase that BUILDS rather than judges, which the
+// table already says as `bounded: 'skill'`. For a task that is its implement and its fix; for a story, since
+// the judgement moved up (decision 80), its break-down and its fix — the runs a story-level verdict lands on.
+//
+// `exitPass === 'review'` was the marker and could not survive that move: no phase exits to a review column
+// any more, so it selected nothing at all. A judging run is still excluded by construction, and that is the
+// property both of these exist for — a reviewer does not judge itself.
+const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'skill';
 
-const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.name === 'task-review';
+const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'review';
 
 // The verdict this task currently stands under, or nothing. FILTERED TO RUNS THAT CARRY ONE, which is what
 // makes a dead `fix` leave the earlier failure standing: the task was sent back, the fix produced no

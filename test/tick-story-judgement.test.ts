@@ -117,13 +117,9 @@ const brokeDown = (): RunRecord[] => [dispatched(0, broken()[1] as Card, 'break-
 describe('what one healthy story costs', () => {
   it('judges the story once, after its tasks are done, and closes it', () => {
     const walked = walk(broken(), brokeDown(), 'P-001');
-    expect(walked.phases).toEqual([
-      'task-implement',
-      'task-review',
-      'task-implement',
-      'task-review',
-      'story-checkup',
-    ]);
+    // THREE, where it was five before decision 80: implement, implement, one judgement. The two task
+    // reviews and the story checkup were four cold starts asking one question twice.
+    expect(walked.phases).toEqual(['task-implement', 'task-implement', 'story-review']);
   });
 
   it('leaves the story in done and both tasks in done', () => {
@@ -147,13 +143,7 @@ const oneTask = (): Card[] => [
 describe('what a story that is sent back once costs', () => {
   it('fixes what the judgement refused and judges it again', () => {
     const walked = walk(oneTask(), brokeDown(), 'P-001', [false]);
-    expect(walked.phases).toEqual([
-      'task-implement',
-      'task-review',
-      'task-fix',
-      'task-review',
-      'story-checkup',
-    ]);
+    expect(walked.phases).toEqual(['task-implement', 'story-review', 'story-fix', 'story-review']);
   });
 
   it('closes the story rather than judging it for ever', () => {

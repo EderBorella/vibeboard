@@ -307,7 +307,7 @@ export async function forgiveCardRuns(
   // A STRIKE, NOT MERELY A BURN — and the difference is a success.
   //
   // `burnsAttempt` alone was the obvious filter and it is wrong. Measured against the real poisoned
-  // card, P-011 in tic-tac-toe: three failed `checkup-story` runs, which are what the user is clearing,
+  // card, P-011 in tic-tac-toe: three failed story-checkup runs, which are what the user is clearing,
   // and one `break-down` from hours earlier that SUCCEEDED and produced E-013. Forgiving on `burnsAttempt`
   // cleared all four, taking `attemptsUsed(runs, 'P-011', 'break-down')` to zero — so the loop would have
   // been free to break the card down a second time and hang another set of children off it.

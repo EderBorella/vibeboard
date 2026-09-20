@@ -21,9 +21,13 @@ import { smokeRanLine } from './sentences.js';
 
 export type CheckupEvidence = NonNullable<DispatchRequest['checkup']>;
 
-// THE TWO CHECKUP PHASES, and only the feature's has a smoke command: the one `foundation/TESTING.md` declares
-// exercises the whole feature, and there is no per-story equivalent to run.
-export const CHECKUP_PHASES: readonly PhaseName[] = ['story-checkup', 'feature-checkup'];
+// THE TWO PHASES TOLD WHAT IS UNDER THEIR CARD, and only the feature's has a smoke command: the one
+// `foundation/TESTING.md` declares exercises the whole feature, and there is no per-story equivalent to run.
+//
+// ONE LIST READ BY BOTH PATHS. The feature's takes the ordinary dispatch path and `act/index.ts` gathers from
+// here; the story's judgement runs its gates first (decision 51) and so asks for this itself, in `review.ts`.
+// A second list would be a story judged with no idea what is under it, and nothing to say so.
+export const CHECKUP_PHASES: readonly PhaseName[] = ['story-review', 'feature-checkup'];
 
 // EVERYTHING A CHECKUP IS TOLD, gathered here because it cannot fetch any of it (ruling 60). Every card run is
 // minted `work` scope: `GET /api/runs` is `service`-only, `GET /api/suggestions` is not `work`'s, and the diary

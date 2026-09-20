@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FOUNDATION_FILES } from '../src/core/layout.js';
+import { FOUNDATION_FILES, foundationRel } from '../src/core/layout.js';
 import { defaultConfig } from '../src/store/project/config.js';
 import type { Readiness, SandboxState } from '../web/src/lib/api.js';
 import type { ProjectConfig, ProjectSnapshot, WizardState } from '../web/src/lib/shared.js';
@@ -35,6 +35,17 @@ const api = vi.hoisted(() => ({
   acknowledgeGates: vi.fn().mockResolvedValue({ ok: true }),
   listControlFiles: vi.fn().mockResolvedValue([]),
   getControlFile: vi.fn().mockResolvedValue({ content: '' }),
+  // The README is not a control file — it lives at the project root — so the card that opens it goes
+  // through the explorer's door instead. The two reads are different endpoints and this is the fake
+  // for the second one.
+  readFsFile: vi
+    .fn()
+    .mockResolvedValue({ kind: 'text', path: 'README.md', name: 'README.md', size: 0, content: '' }),
+  // THE EMBEDDED PANEL'S OWN TWO, and they are here because the docs step renders the dock's organism
+  // rather than a chat of its own (decision 78). An unmocked export of a mocked module is `undefined`,
+  // so without these the review layout dies on the first render with "listModels is not a function".
+  listModels: vi.fn().mockResolvedValue([]),
+  getModelStatus: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -107,6 +118,12 @@ vi.mock('../web/src/lib/ws', () => ({ useSharedWs: ws.useSharedWs }));
 
 const { WizardView } = await import('../web/src/pages/wizard/WizardView.js');
 const { useWizard } = await import('../web/src/lib/useWizard.js');
+const { useCopilot } = await import('../web/src/organisms/copilot/useCopilot.js');
+
+// jsdom implements no scrolling at all. The copilot transcript scrolls itself to the bottom on mount,
+// and the documents step's review embeds that panel — so without this the review cannot render here.
+// Nothing about scrolling is under test; test/work-area.test.tsx does the same for the same reason.
+Element.prototype.scrollTo = Element.prototype.scrollTo ?? ((): void => {});
 
 const onOpened = vi.fn();
 const onExit = vi.fn();
@@ -134,18 +151,47 @@ const readiness = (over: Partial<Readiness> = {}): Readiness => ({
   ...over,
 });
 
-const view = (over: Partial<ComponentProps<typeof WizardView>> = {}) =>
-  render(
+// THE DOCK'S PROPS, exactly the set `WorkArea` hands `CopilotPanel`: the docs step embeds the same
+// organism, so it takes the same ones. Inert handlers — what this file is about is the conversation,
+// and the selects above it are the dock's own subject.
+// NO `onClose`, because the shell stopped passing one: the review renders the panel `compact`, which
+// has no header and therefore no ✕ to hide it with (W11).
+const panel = {
+  backend: 'claude-code',
+  mode: 'bypassPermissions',
+  model: 'sonnet',
+  effort: 'medium',
+  overridden: false,
+  onMode: () => {},
+  onModel: () => {},
+  onEffort: () => {},
+  onBackend: () => {},
+  onReset: () => {},
+};
+
+// WHAT THE SHELL DOES, AND WHY IT IS A COMPONENT RATHER THAN A LITERAL. The conversation is a HOOK:
+// App mounts ONE `useCopilot` for the tab and hands it to the dock and to setup alike, so a fixture
+// object here would be a second transcript of one socket — the exact fault this phase went to remove.
+// The real hook over the faked socket, keyed to the generation the view was handed, so `ws.asked`
+// still answers for the whole tree.
+function Shell({ over }: { over: Partial<ComponentProps<typeof WizardView>> }) {
+  const bump = over.bump ?? 0;
+  const copilot = useCopilot(bump);
+  return (
     <WizardView
       mode="greenfield"
       start="identity"
       snapshot={null}
-      bump={0}
       onOpened={onOpened}
       onExit={onExit}
       {...over}
-    />,
+      bump={bump}
+      copilot={{ copilot, ...panel }}
+    />
   );
+}
+
+const view = (over: Partial<ComponentProps<typeof WizardView>> = {}) => render(<Shell over={over} />);
 
 const type = (label: RegExp, value: string): void => {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -1420,12 +1466,73 @@ describe('the docs step', () => {
 
   const docs = () => view({ start: 'docs', snapshot: opened });
 
+  // THE ONLY WAY PAST THIS STEP, and the words matter: W3's ruling is that the loop runs until the
+  // USER judges it ready, and no machine signal expresses that. Named once because a dozen cases
+  // press it.
+  const ADVANCE = 'It reads right — continue';
+
   // The copilot's own state frame, as the server broadcasts it: `onStart` raises it and the `finally`
   // of the turn lowers it, so this is the only thing that says a turn has ended.
   const turn = async (running: boolean): Promise<void> => {
     await act(async () => {
       ws.push({ type: 'copilot:state', state: { running } });
     });
+  };
+
+  const SUMMARIES: Record<string, string> = {
+    'README.md': 'What the project is, in a paragraph.',
+    'STACK.md': 'TypeScript, Vite and vitest.',
+    'CODE-QUALITY.md': 'The commands your work has to pass.',
+    'TESTING.md': 'What a test is for here.',
+    'UX.md': 'Plain screens, and few choices at a time.',
+    'DESIGN.md': 'One type scale and four corners.',
+  };
+  // Every plain name the map holds. Hand-written on purpose: this is the one place the WORDS are
+  // the subject, and deriving them from the same map the screen reads would assert nothing.
+  const PLAIN = ['The introduction', 'The stack', 'Quality gates', 'Testing', 'How it feels', 'How it looks'];
+
+  // THE PATH COMES FROM THE LISTING, exactly as the gates step opens its documents — where a
+  // foundation document lives is the server's fact and not a copy of the layout kept in the browser.
+  const listing = [
+    {
+      key: 'foundation',
+      label: 'Foundation',
+      creatable: false,
+      files: FOUNDATION_FILES.map((f) => ({
+        name: f.name,
+        path: foundationRel(f.name),
+        category: 'foundation',
+        managed: true,
+        deletable: false,
+        renameable: false,
+      })),
+    },
+  ];
+
+  const filed = (resumes: Record<string, string>) => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'docs', resumes } });
+    api.listControlFiles.mockResolvedValue(listing);
+    return docs();
+  };
+
+  const cardFor = (plain: string): HTMLElement => {
+    const card = screen.getAllByTestId('doc-card').find((c) => (c.textContent ?? '').startsWith(plain));
+    if (!card) throw new Error(`no card reading "${plain}"`);
+    return card;
+  };
+
+  // SAYING "THIS ONE". It was a click anywhere on the card and is the card's FACE now — a real control,
+  // because the gesture had no tab stop, no focus ring and no Enter when it was a handler on the box.
+  const face = (plain: string): HTMLElement => within(cardFor(plain)).getByRole('button', { name: plain });
+
+  // A message typed into the embedded conversation and sent, which is the loop: the person reads a
+  // summary, dislikes something, and says so. The composer is the dock's own organism wearing this
+  // screen's label — `compact` drops the header and the panel takes its placeholder from the embedder,
+  // because "Message the copilot" is a sentence the plain-words sweep refuses (W11, W7).
+  const COMPOSER = 'Say what you’d change';
+  const say = (text: string): void => {
+    fireEvent.change(screen.getByPlaceholderText(COMPOSER), { target: { value: text } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
   };
 
   it('asks before it writes anything, and sends nothing until the answer is yes', async () => {
@@ -1491,7 +1598,9 @@ describe('the docs step', () => {
     await turn(true);
 
     expect(await screen.findByText('What the project is, in a paragraph.')).toBeTruthy();
-    expect(screen.getByText('README.md')).toBeTruthy();
+    // IN WORDS, NOT AS A FILENAME, which is what this assertion said until the cards landed: the card
+    // face is the plain name and the filename waits on the view that opens the file (decision 78).
+    expect(screen.getByText('The introduction')).toBeTruthy();
 
     // The tool name comes off the transcript rather than out of the file, so it needs no read.
     await act(async () => {
@@ -1554,6 +1663,31 @@ describe('the docs step', () => {
     ).toBeTruthy();
   });
 
+  // AND A FAILURE BELONGS TO THE TURN IT HAPPENED IN, which is the other end of the same rule. The
+  // scan window was opened once, by the offer, and never moved — so the report from a turn that fell
+  // over stayed on the screen under every turn after it, including the one the person asked for to
+  // fix it. "Something went wrong while it was writing" over a rewrite that has just succeeded is a
+  // screen accusing itself.
+  it('takes the failure down when a later turn goes through', async () => {
+    docs();
+    fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'error', text: 'it fell over' } });
+    });
+    await turn(false);
+
+    // The premise: the report really is on the screen before the second turn, or the assertion below
+    // is about a sentence that was never there.
+    expect(screen.getByText(/Something went wrong while it was writing/)).toBeTruthy();
+
+    await turn(true);
+    await turn(false);
+
+    expect(screen.queryByText(/Something went wrong while it was writing/)).toBeNull();
+  });
+
   // A TURN THAT NEVER STARTED CANNOT HAVE ENDED. `running` is false before the first frame, so an
   // ending read off that alone would walk the person off this screen the moment they authorised.
   it('does not treat the state before the turn as the turn ending', async () => {
@@ -1563,12 +1697,17 @@ describe('the docs step', () => {
 
     await turn(false);
 
+    // The review is what a settle reveals now rather than the next step, so this is the assertion
+    // that says the settle was not believed: no layout, and nothing asked of the machine.
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
     expect(screen.queryByText('That is setup done')).toBeNull();
     expect(api.getReadiness).not.toHaveBeenCalled();
   });
 
   // WRITING THE TWO EXECUTED DOCUMENTS AS AN AGENT TRIPS THE BLOCK BY DESIGN (decision 51). The wizard
   // surfaces the reading in its own voice rather than letting a refused Start do it later.
+  // THE PRESS IS WHAT ASKS, since the loop landed: the settle opens the review and nothing else, so
+  // both branches below are reached by the person saying the documents read right. decision 78.
   it('goes to the reading step when a gate document was rewritten', async () => {
     api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
     docs();
@@ -1577,6 +1716,7 @@ describe('the docs step', () => {
 
     await turn(true);
     await turn(false);
+    fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
     expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
   });
@@ -1588,6 +1728,7 @@ describe('the docs step', () => {
 
     await turn(true);
     await turn(false);
+    fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
     expect(await screen.findByText('That is setup done')).toBeTruthy();
   });
@@ -1607,6 +1748,9 @@ describe('the docs step', () => {
       await waitFor(() => expect(ws.sent).toHaveLength(1));
       await turn(true);
       await turn(false);
+      // The machine is asked when the person says it reads right, and this is where a project with
+      // four of the six documents is caught: the press is the only thing that asks.
+      fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
     };
 
     it('says so plainly and stays, rather than reporting setup done', async () => {
@@ -1638,7 +1782,9 @@ describe('the docs step', () => {
       expect(
         await screen.findByText('It didn’t finish — one of the documents is still unwritten.'),
       ).toBeTruthy();
-      expect(screen.getByText('The introduction')).toBeTruthy();
+      // THE SENTENCE UNDER THE NOTICE, which is a paragraph — the same words are on a card and in the
+      // selector above the chat by now, and this case is about what the report NAMES.
+      expect(screen.getAllByText('The introduction').map((el) => el.tagName)).toContain('P');
     });
 
     it('offers the writing again, and takes it', async () => {
@@ -1679,6 +1825,7 @@ describe('the docs step', () => {
       },
     });
     await turn(false);
+    fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
@@ -1698,6 +1845,7 @@ describe('the docs step', () => {
 
     await turn(true);
     await turn(false);
+    fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'gates' })),
@@ -1718,12 +1866,14 @@ describe('the docs step', () => {
       },
     };
 
-    it('asks nothing, sends nothing, and shows what was written', async () => {
+    // A RESUME LANDS IN THE REVIEW, never on the offer to write: the summaries are already there, so
+    // there is nothing for a holding screen to hold. Plan C's `Carry on writing` / `Continue` pair is
+    // what this replaces — more writing is asked for in the conversation now. decision 78.
+    it('asks nothing, sends nothing, and opens on what was written', async () => {
       api.getWizard.mockResolvedValue({ state: written });
       docs();
 
-      expect(await screen.findByRole('button', { name: 'Carry on writing' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+      expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
       expect(screen.queryByText('Let the assistant write the drafts?')).toBeNull();
       expect(ws.sent).toHaveLength(0);
       expect(api.setAuthority).not.toHaveBeenCalled();
@@ -1731,26 +1881,396 @@ describe('the docs step', () => {
       expect(screen.getByText('TypeScript, Vite and vitest.')).toBeTruthy();
     });
 
-    it('puts the question back when asked to carry on', async () => {
+    // SUPERSEDES 'puts the question back when asked to carry on'. There is no second offer to raise:
+    // the conversation is on the screen, and asking it for more writing is a message rather than a
+    // button that re-raises the question about rewriting all six.
+    it('asks for more writing in the conversation rather than behind a button', async () => {
       api.getWizard.mockResolvedValue({ state: written });
       docs();
+      await screen.findByRole('button', { name: ADVANCE });
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Carry on writing' }));
+      expect(screen.queryByRole('button', { name: 'Carry on writing' })).toBeNull();
+      say('the introduction says nothing about who it is for');
 
-      expect(await screen.findByText('Let the assistant write the drafts?')).toBeTruthy();
-      fireEvent.click(screen.getByRole('button', { name: 'Let it write' }));
-      await waitFor(() => expect(ws.sent).toHaveLength(1));
+      expect(ws.sent.at(-1)).toMatchObject({
+        type: 'copilot:send',
+        text: 'the introduction says nothing about who it is for',
+      });
+      expect(screen.queryByText('Let the assistant write the drafts?')).toBeNull();
     });
 
-    it('moves on without a turn when asked to continue, and writes the step', async () => {
+    it('moves on without a turn when the person says it reads right, and writes the step', async () => {
       api.getWizard.mockResolvedValue({ state: written });
       docs();
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+      fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
       expect(await screen.findByText('That is setup done')).toBeTruthy();
       expect(ws.sent).toHaveLength(0);
       await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+    });
+  });
+
+  // THE SIX DOCUMENTS AS SOMETHING A PERSON CAN READ (W7, decision 78). A summary first, because a
+  // beginner asked to review six documents they did not write will read none of them; the document
+  // itself one press away, because the summary is the model's account of it and the file is the fact.
+  describe('the résumé cards', () => {
+    // SCOPED TO THE CARDS, and it has to be: the selector above the chat wears the same six plain
+    // names, so a bare `findByText` here matches twice and says nothing about which one rendered.
+    it('wears the plain name and the summary, one card per document', async () => {
+      filed(SUMMARIES);
+      await screen.findAllByTestId('doc-card');
+
+      for (const plain of PLAIN) expect(cardFor(plain)).toBeTruthy();
+      for (const summary of Object.values(SUMMARIES)) expect(screen.getByText(summary)).toBeTruthy();
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+    });
+
+    // THE TRIPWIRE FOR THIS SURFACE, and the same shape as the plain-words sweep: a filename is the
+    // one thing a beginner cannot act on, and six of them down the side of the review screen is the
+    // wizard talking to itself. Swept rather than named one by one, so a seventh card is covered by
+    // this the day it is added.
+    it('puts no filename on any card face', async () => {
+      filed(SUMMARIES);
+      // Waited for BY HANDLE and not by one of the plain names: a sweep whose premise is the very
+      // thing it sweeps for cannot fail on the fault it names — put the filenames back on the faces
+      // and this would have died at the `findByText` above, with the assertion below never reached.
+      await screen.findAllByTestId('doc-card');
+
+      for (const card of screen.getAllByTestId('doc-card')) {
+        const face = card.textContent ?? '';
+        expect(face.length, 'a card rendered almost nothing').toBeGreaterThan(10);
+        expect(face, face).not.toContain('.md');
+      }
+    });
+
+    // A MISSING SUMMARY MUST BE VISIBLE, NOT ABSENT. Rendering only what was written turns a
+    // six-document project with three summaries into a three-document project, and the person
+    // reviewing it has no way to know what they were not shown.
+    it('keeps the set at six when only one document has been summarised', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+
+      expect(await screen.findAllByTestId('doc-card')).toHaveLength(6);
+      expect(cardFor('The introduction')).toBeTruthy();
+      expect(screen.getAllByText('No summary yet — ask for one in the chat')).toHaveLength(5);
+    });
+
+    // The same absence while a turn is running is a different fact — it is being written right now —
+    // and saying "ask for one in the chat" under a turn that is writing it reads as a fault.
+    it('says a document is on its way while the turn is still running', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+      await screen.findAllByTestId('doc-card');
+
+      await turn(true);
+
+      expect(screen.getAllByText('Being written…')).toHaveLength(5);
+      expect(screen.queryByText('No summary yet — ask for one in the chat')).toBeNull();
+    });
+
+    it('opens the document itself, and the filename is on that view', async () => {
+      api.getControlFile.mockResolvedValue({ content: 'gates:\n  - npm test\n' });
+      filed(SUMMARIES);
+      await screen.findAllByTestId('doc-card');
+
+      fireEvent.click(within(cardFor('Quality gates')).getByRole('button', { name: 'Read it all' }));
+
+      await waitFor(() => expect(api.getControlFile).toHaveBeenCalledWith(foundationRel('CODE-QUALITY.md')));
+      const shown = (await screen.findByLabelText('CODE-QUALITY.md')) as HTMLTextAreaElement;
+      expect(shown.value).toBe('gates:\n  - npm test\n');
+      // The name of the file, on the one view that is about the file. The summary above it still says
+      // "Quality gates", which is what the card is for.
+      expect(within(cardFor('Quality gates')).getByText('CODE-QUALITY.md')).toBeTruthy();
+    });
+
+    // THE README IS NOT A CONTROL FILE. It lives at the project root, so the listing does not carry it
+    // and Project Control's read cannot open it — the explorer's can, which is the door the file pane
+    // already reads every project file through.
+    it('reads the README through the explorer rather than the control door', async () => {
+      api.readFsFile.mockResolvedValue({
+        kind: 'text',
+        path: 'README.md',
+        name: 'README.md',
+        size: 24,
+        content: '# demo\n\nWhat it is.\n',
+      });
+      filed(SUMMARIES);
+      await screen.findAllByTestId('doc-card');
+
+      fireEvent.click(within(cardFor('The introduction')).getByRole('button', { name: 'Read it all' }));
+
+      await waitFor(() => expect(api.readFsFile).toHaveBeenCalledWith('README.md'));
+      const shown = (await screen.findByLabelText('README.md')) as HTMLTextAreaElement;
+      expect(shown.value).toBe('# demo\n\nWhat it is.\n');
+      expect(api.getControlFile).not.toHaveBeenCalled();
+    });
+
+    // Nothing to read on a card with nothing written: the offer would open an empty box, which reads
+    // as the product failing rather than as a document that does not exist yet.
+    // The opening screen is an OFFER to write, and six cards reading "no summary yet" underneath it
+    // is a list of things that do not exist — the absence only becomes news once the writing has
+    // begun.
+    it('shows no cards at all before anything has been written', async () => {
+      docs();
+
+      await screen.findByText('Let the assistant write the drafts?');
+      expect(screen.queryAllByTestId('doc-card')).toHaveLength(0);
+    });
+
+    // A NAME THIS PRODUCT DOES NOT KNOW GETS NO CARD, and the card it used to get was broken in both
+    // directions: the listing has no path for it, so `Read it all` sits on `Opening…` for ever, and
+    // saying "this one" about it blanks the selector above the chat, because that list is the six.
+    // It can only arrive by hand-editing `wizard.yaml` — the server refuses a résumé filed under any
+    // other name — so what is being refused here is a broken card, not a document.
+    it('renders no card for a name outside the six', async () => {
+      filed({ ...SUMMARIES, 'NOTES.md': 'Typed into the file by hand, under a name setup never writes.' });
+      await screen.findAllByTestId('doc-card');
+
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+      expect(screen.queryByText('Typed into the file by hand, under a name setup never writes.')).toBeNull();
+      expect(screen.queryByText('NOTES.md')).toBeNull();
+      // AND THE SELECTOR AGREES WITH THE CARDS, which is the half that makes this one fault rather
+      // than two: both read `DOC_NAMES`, so neither can offer a subject the other cannot show.
+      expect([...(screen.getByLabelText('Talking about') as HTMLSelectElement).options]).toHaveLength(7);
+    });
+
+    it('offers no reading of a document that has not been written', async () => {
+      filed({ 'README.md': SUMMARIES['README.md'] });
+      await screen.findAllByTestId('doc-card');
+
+      expect(screen.getAllByRole('button', { name: 'Read it all' })).toHaveLength(1);
+    });
+  });
+
+  // THE LOOP ITSELF (W3, decision 78): the summaries down one side, the conversation that wrote them
+  // down the other, and the person deciding when it is done. Plan C advanced the moment the writing
+  // turn settled, which was scaffolding — a machine cannot judge whether a document reads right.
+  describe('the review layout', () => {
+    it('opens when the writing settles, and moves nobody on', async () => {
+      docs();
+      fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
+      await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+      await turn(true);
+      await turn(false);
+
+      expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+      expect(screen.getByLabelText('Talking about')).toBeTruthy();
+      // SIX CARDS WITH NOTHING FILED, which is the one case the writing screen answers the other way:
+      // there, six cards reading "no summary yet" sit under an OFFER to write them and are a list of
+      // things that do not exist. Here the writing has been done, so a document with nothing to show
+      // is the news — and a review with no cards on it reads as a screen that failed to load.
+      expect(screen.getAllByTestId('doc-card')).toHaveLength(6);
+      // The conversation is on the screen rather than in the dock behind it.
+      expect(screen.getByPlaceholderText(COMPOSER)).toBeTruthy();
+      // ONE CONVERSATION AND NOT TWO, said by the only thing that can tell them apart: the kick-off
+      // this STEP sent is in the transcript the PANEL renders, which it can only be if the panel is
+      // the same `useCopilot` instance the step drives. A second instance would be a second copy of
+      // one server-side chat, and this line would be missing from it.
+      expect(
+        within(screen.getByTestId('verbatim-conversation')).getByText(
+          "Please set up this project's documents from my answers.",
+        ),
+      ).toBeTruthy();
+      // AND NOTHING MOVED. The settle used to write the file and change the step; both are the
+      // person's now, so neither the machine nor the file was touched.
+      expect(api.putWizard).not.toHaveBeenCalled();
+      expect(api.getReadiness).not.toHaveBeenCalled();
+      expect(screen.queryByText('That is setup done')).toBeNull();
+      expect(screen.queryByText('One thing to read before anything runs')).toBeNull();
+    });
+
+    // THE PANEL WITHOUT THE DOCK AROUND IT (ruling W11). Each of these is a control the dock carries
+    // and this screen must not: the assistant and the model were chosen two steps ago, the authority
+    // was granted by the question that started the writing, the spend belongs to the dock's own
+    // footer, and the ✕ would hide the conversation on a screen whose whole subject is it. Asserted
+    // here as well as in test/copilot-compact.test.tsx, and the two are different claims: that one is
+    // about the organism's option, this one is about the screen choosing it.
+    it('embeds the conversation with none of the dock’s own controls', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      expect(screen.getByPlaceholderText(COMPOSER)).toBeTruthy();
+      expect(screen.queryByText('Copilot')).toBeNull();
+      expect(screen.queryByLabelText('Backend')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Authorise' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Compact' })).toBeNull();
+      expect(screen.queryByTitle('Hide (session keeps running)')).toBeNull();
+    });
+
+    // ONE FILLED BUTTON AMONG THE WIZARD'S OWN, AND IT IS THE WAY ON. Two primaries on one screen is a
+    // choice between them, and the choice this screen offers is not "continue or try again" — it is
+    // "read this, then continue". SCOPED OUTSIDE `.copilot`: the composer's Send is the panel's own
+    // action, it is disabled until something is typed, and it belongs to the other column.
+    it('offers one filled button, and keeps it that way when the report arrives', async () => {
+      api.getReadiness.mockResolvedValue(
+        readiness({ foundation: { present: ['STACK.md'], missing: ['UX.md'], ok: false } }),
+      );
+      const { container } = filed(SUMMARIES);
+      const filled = () =>
+        [...container.querySelectorAll('.vb-btn-primary')].filter((b) => !b.closest('.copilot'));
+
+      fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+
+      expect(filled().map((b) => b.textContent)).toEqual([ADVANCE]);
+    });
+
+    // ONE CONVERSATION, NOT TWO. The panel on this screen and the dock's are the same `useCopilot`
+    // instance keyed to the tab's socket, so a message typed here goes up the tab's own socket — a
+    // second instance would be a second transcript of one server-side chat.
+    it('sends what is typed beside the cards up the tab’s own socket', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      say('the testing one reads like a list of rules');
+
+      expect(ws.sent).toHaveLength(1);
+      expect(ws.sent[0]).toMatchObject({
+        type: 'copilot:send',
+        text: 'the testing one reads like a list of rules',
+      });
+      // The person's own words reach the transcript on this screen, which is what makes it a
+      // conversation rather than a form that posts.
+      expect(screen.getByText('the testing one reads like a list of rules')).toBeTruthy();
+    });
+
+    // CLICKING A CARD IS SAYING "THIS ONE". The name — never the content — rides the next message,
+    // and the selector above the chat is the same state said out loud, so the person can see what
+    // "it" is about to mean.
+    it('carries the clicked document’s name on the next message, and says which above the chat', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      fireEvent.click(face('Quality gates'));
+
+      expect((screen.getByLabelText('Talking about') as HTMLSelectElement).value).toBe('CODE-QUALITY.md');
+      say('these commands are not the ones I run');
+      expect(ws.sent.at(-1)).toMatchObject({
+        type: 'copilot:send',
+        text: 'these commands are not the ones I run',
+        attach: 'CODE-QUALITY.md',
+      });
+    });
+
+    // THE GESTURE IS A CONTROL, AND THIS IS THE HALF A CLICK TEST CANNOT SEE. It was `onClick` on the
+    // card's box: a mouse could say "this one" and a keyboard could not — no tab stop, no focus ring,
+    // nothing Enter would reach — and the offer to read the document sat INSIDE that click target.
+    //
+    // ASSERTED AS STRUCTURE RATHER THAN AS A KEYPRESS, because jsdom does not implement a button's
+    // activation behaviour: measured here, a keydown of Enter on a focused `<button>` fires no click
+    // at all, so a test that pressed it would prove the opposite of what it claimed. What makes Enter
+    // and Space work is the element being a real button, which is what this pins; the browser harness
+    // then walks the actual tab order and the focus ring on every one of them (check 8).
+    it('puts the “this one” gesture on a real button, with nothing nested inside it', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      const gesture = face('Quality gates');
+      expect(gesture.tagName).toBe('BUTTON');
+      expect(gesture.getAttribute('type')).toBe('button');
+      expect(gesture.hasAttribute('disabled')).toBe(false);
+      // NOTHING INTERACTIVE INSIDE IT, and `Read it all` is its sibling rather than its child — a
+      // control inside a control is a click whose meaning depends on where in it you landed.
+      expect(gesture.querySelector('button, a, input, select, textarea')).toBeNull();
+      expect(cardFor('Quality gates').hasAttribute('onclick')).toBe(false);
+
+      gesture.focus();
+      expect(document.activeElement).toBe(gesture);
+    });
+
+    // AND OPENING A DOCUMENT STILL SAYS IT TOO, which is what the whole-card click was really for:
+    // somebody who has just pressed Read it all is looking at that document by any definition.
+    it('takes “Read it all” as saying this one as well', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+
+      fireEvent.click(within(cardFor('How it feels')).getByRole('button', { name: 'Read it all' }));
+
+      expect((screen.getByLabelText('Talking about') as HTMLSelectElement).value).toBe('UX.md');
+    });
+
+    it('offers the six by name and rides whichever is chosen, until it is changed', async () => {
+      filed(SUMMARIES);
+      const select = (await screen.findByLabelText('Talking about')) as HTMLSelectElement;
+
+      expect([...select.options].map((o) => o.textContent)).toEqual(['Nothing in particular', ...PLAIN]);
+
+      fireEvent.change(select, { target: { value: 'UX.md' } });
+      say('this one is too abstract');
+      expect(ws.sent.at(-1)).toMatchObject({ attach: 'UX.md' });
+
+      // UNTIL IT IS CHANGED, which is the half a single-message test cannot see: a second message
+      // with nothing touched in between still means the same document.
+      say('say it in one sentence instead');
+      expect(ws.sent.at(-1)).toMatchObject({ attach: 'UX.md' });
+    });
+
+    // NOTHING IN PARTICULAR IS A REAL ANSWER — a question about the project rather than about one
+    // document — and it has to be sayable, or the last card clicked follows the person around for
+    // the rest of the conversation.
+    it('carries no document at all once the selector is put back', async () => {
+      filed(SUMMARIES);
+      await screen.findByRole('button', { name: ADVANCE });
+      fireEvent.click(face('Quality gates'));
+
+      fireEvent.change(screen.getByLabelText('Talking about'), { target: { value: '' } });
+      say('is any of this going to change once I start?');
+
+      expect(ws.sent.at(-1)).not.toHaveProperty('attach');
+    });
+
+    // APPROVING A MOVING DOCUMENT. A turn in flight is rewriting the very thing the button says
+    // reads right, so the button is shut while it runs and opens again when it stops.
+    it('will not be pressed while a turn is rewriting the documents', async () => {
+      filed(SUMMARIES);
+      const advance = await screen.findByRole('button', { name: ADVANCE });
+      expect(advance.hasAttribute('disabled')).toBe(false);
+
+      await turn(true);
+      expect(screen.getByRole('button', { name: ADVANCE }).hasAttribute('disabled')).toBe(true);
+      // ONE INDICATOR, NOT TWO. The panel carries its own, with the same Cancel under it, so the
+      // step's — which is the whole of the writing screen's evidence that anything is happening —
+      // stands down once the conversation is on screen to show it.
+      expect(screen.getAllByTestId('thinking')).toHaveLength(1);
+
+      await turn(false);
+      expect(screen.getByRole('button', { name: ADVANCE }).hasAttribute('disabled')).toBe(false);
+    });
+
+    // THREE CLICKS, ONE ADVANCE. The button is `disabled` while an action is in flight and nothing was
+    // raising that flag: the press read the readiness and wrote the file with no `busy` in between, so
+    // an impatient double-click on a slow network asked twice and wrote the step twice. Written as
+    // three clicks in one tick because that is the shape of the fault — the second press lands before
+    // the answer to the first.
+    it('asks and writes once however many times it is pressed', async () => {
+      const asked = deferred<Readiness>();
+      api.getReadiness.mockReturnValue(asked.promise);
+      filed(SUMMARIES);
+      const advance = await screen.findByRole('button', { name: ADVANCE });
+
+      fireEvent.click(advance);
+      fireEvent.click(advance);
+      fireEvent.click(advance);
+      await asked.settle(readiness());
+
+      expect(api.getReadiness).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledTimes(1));
+    });
+
+    // THE PRESS ASKS THE MACHINE AGAIN, because the conversation has been writing documents since the
+    // last answer — and two of the six carry commands the server later runs outside the sandbox, so
+    // whether one of those was rewritten is a question only a fresh read can answer.
+    it('asks the machine again on the press and branches on what it says', async () => {
+      api.getReadiness.mockResolvedValue(readiness({ unreviewedGates: ['CODE-QUALITY.md'] }));
+      filed(SUMMARIES);
+
+      fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
+
+      await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+      expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
+      await waitFor(() =>
+        expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'gates' })),
+      );
     });
   });
 });
@@ -1914,6 +2434,17 @@ describe('the gates step', () => {
 //     it. Both carry a `verbatim-` test handle and this skips them by element; the fixtures below put
 //     jargon INSIDE each, so removing a handle turns this red rather than green.
 //
+// AND `verbatim-conversation` IS NOW THE TRANSCRIPT AND NOT THE PANEL AROUND IT (W11). The review used
+// to skip the whole embedded copilot, which put its composer, its selects and its readout inside an
+// exemption written for the model's own words. The panel renders `compact` there — no header, no
+// pickers, no readout — so what is left beside the transcript is the composer, and that is the wizard's
+// to label.
+//
+// A PLACEHOLDER IS COPY AND `textContent` CANNOT SEE IT, which is how "Message the copilot" sat on the
+// review screen through every run of this sweep. A composer has no label but its placeholder, so the
+// attribute is read here as text: the identity step's three are paths and neither fold nor exemption
+// hides them.
+//
 // The list is every word the product's own code uses constantly, which is exactly why they leak.
 describe('the words on every step (W7)', () => {
   const JARGON = [
@@ -1932,7 +2463,8 @@ describe('the words on every step (W7)', () => {
     const plain = container.cloneNode(true) as HTMLElement;
     for (const fold of plain.querySelectorAll('details')) fold.remove();
     for (const quoted of plain.querySelectorAll('[data-testid^="verbatim"]')) quoted.remove();
-    const text = (plain.textContent ?? '').toLowerCase();
+    const labels = [...plain.querySelectorAll('[placeholder]')].map((el) => el.getAttribute('placeholder'));
+    const text = [plain.textContent ?? '', ...labels].join(' ').toLowerCase();
     // A step that rendered nothing would pass every assertion below it.
     expect(text.length, `${what} rendered almost nothing`).toBeGreaterThan(60);
     for (const word of JARGON) expect(text, `${what}: "${word}"`).not.toContain(word);
@@ -2115,5 +2647,88 @@ describe('the words on every step (W7)', () => {
     expect(await screen.findByTestId('verbatim-tool')).toBeTruthy();
     expect(await screen.findByTestId('verbatim-resume')).toBeTruthy();
     sweep('the documents being written', container);
+  });
+
+  // THE REVIEW LAYOUT, which is the screen this step really is: the summaries down one side and the
+  // conversation down the other. Everything the WIZARD says here is new copy — the selector above the
+  // chat, the composer's own label, the button that ends the loop, the sentence under it — and all of
+  // it is swept. What is exempt is the TRANSCRIPT, because those words are the model's, and the
+  // fixture below is what proves the exemption is load-bearing rather than decorative: the reply is
+  // full of the words this sweeps for, so taking the handle off `verbatim-conversation` turns this red
+  // on every one of them.
+  it('reads the documents beside the conversation in plain words', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        resumes: { 'README.md': 'What the project is, in a paragraph.' },
+      },
+    });
+    const { container } = view({ start: 'docs', snapshot: opened });
+    await screen.findByRole('button', { name: 'It reads right — continue' });
+
+    // THE MODEL'S OWN REPLY, hydrated the way the conversation really arrives: from disk, on connect.
+    // Without it the exemption wraps an empty list and this case proves nothing at all — which is what
+    // it did, silently, the day the handle moved off the panel.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [
+          { kind: 'user', text: "Please set up this project's documents from my answers." },
+          {
+            kind: 'assistant',
+            text: 'All six are written. The stack document names the Docker container the repository builds, and the config is yaml.',
+          },
+        ],
+        stats: { costUsd: 0, turns: 1, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+
+    const quoted = (screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase();
+    for (const word of ['docker', 'container', 'repository', 'config', 'yaml']) {
+      expect(quoted, `the exempt transcript must carry "${word}" or it proves nothing`).toContain(word);
+    }
+    sweep('the review layout', container);
+  });
+
+  // THE DOCUMENT ITSELF, OPENED, which is where the model's words are thicker than any summary: a
+  // CODE-QUALITY.md is a list of commands, and half of them name the things this list sweeps for. A
+  // fourth exemption by element, and the content below is the fixture that proves it — take
+  // `verbatim-document` off the block and this case goes red on the word "docker".
+  it('opens a document in the model’s own words, with plain words around it', async () => {
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'docs',
+        resumes: { 'CODE-QUALITY.md': 'The commands your work has to pass.' },
+      },
+    });
+    api.listControlFiles.mockResolvedValue([
+      {
+        key: 'foundation',
+        label: 'Foundation',
+        creatable: false,
+        files: [
+          {
+            name: 'CODE-QUALITY.md',
+            path: foundationRel('CODE-QUALITY.md'),
+            category: 'foundation',
+            managed: true,
+            deletable: false,
+            renameable: false,
+          },
+        ],
+      },
+    ]);
+    api.getControlFile.mockResolvedValue({
+      content: 'gates:\n  - docker compose config\n  - yamllint .\n\nRun them in the sandbox.\n',
+    });
+    const { container } = view({ start: 'docs', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Read it all' }));
+    await screen.findByLabelText('CODE-QUALITY.md');
+
+    sweep('the document opened in full', container);
   });
 });

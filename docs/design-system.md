@@ -3942,10 +3942,15 @@ Not one of these was found by a passing gate.
 
 ### Where it closes, and what the target now means
 
-**361 → 230.** The ratchet is at 230 with zero slack, proved by plant. 41 sheets. Reinvention and layer
-direction both blocking at zero.
+**361 → 230**, which is what this phase closed at and what the ratchet was set to, over 41 sheets.
+Reinvention and layer direction both blocking at zero.
 
-**230 against a target of 146, and the target is the number to revisit rather than the tree.** It was
+**Today it is 222 over 42 sheets**, and the number here is left as the phase's own measurement rather than
+edited each time the tree moves: every change since has been a single class raised or merged in the commit
+that did it, with the reason written on `CLASS_CEILING` in `tools/check-class-budget.mjs`, and
+`npm run check:class-budget` prints the live figure. Zero slack at whatever it stands at, proved by plant.
+
+**222 against a target of 146, and the target is the number to revisit rather than the tree.** It was
 derived as 76 surface-layout classes with no surface ever built to it. The 30 classes still holding exactly
 one declaration are **not duplicates** — the three waves killed every one of those. What is left is:
 

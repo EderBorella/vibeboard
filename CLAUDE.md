@@ -100,7 +100,7 @@ never up; `npm run check:layers` blocks that at zero.
   A second copy would drift silently, and a workbench showing a cascade the app does not have is
   worse than one showing nothing.
 - **No surface reinvents a primitive.** Raw controls outside the atom layer are a gate failure.
-- **Class budget is a ratchet at 220, zero slack.** The stated target of 146 is the number to
+- **Class budget is a ratchet at 222, zero slack.** The stated target of 146 is the number to
   revisit, not the tree: the 30 remaining single-declaration classes are hover/`:disabled` inks,
   parent-selector anchors and genuine one-offs, and reaching 76 needs a *design ruling* that a
   surface may not have a hover ink of its own — not another merge.

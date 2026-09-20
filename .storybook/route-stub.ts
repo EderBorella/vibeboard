@@ -23,6 +23,10 @@
 // threw on render in all three themes. ANNOTATE the literal — `const x: DiaryEntry[] = …` — wherever a hook
 // reaches into the answer. Every story here does.
 //
+// `EMPTY` ITSELF IS HELD BY tsc NOW, row by row, with a `satisfies` against the type its client declares —
+// see the block above it. That closes the shared default and not the stories: a table a STORY writes is
+// still a `RouteTable`, so its own rows are still checked by nothing until they are annotated.
+//
 // KEYED ON THE PATH AND MATCHED LONGEST-PREFIX-FIRST, because the routes nest: `/api/runs` and
 // `/api/runs/features/C-042` are different answers and the second must not be served by the first. The
 // query string is stripped before matching and handed to the handler, since four routes carry their whole
@@ -49,7 +53,26 @@
 // children's — an effect-time install is exactly one render too late for the thing it exists to catch.
 
 import { createElement, type FunctionComponent, type ReactElement, useEffect, useState } from 'react';
-import type { Accounting } from '../web/src/lib/api';
+import type {
+  Accounting,
+  AppSettings,
+  AutopilotState,
+  ControlFile,
+  ControlGroup,
+  DiaryEntry,
+  DirListing,
+  FileRead,
+  getState,
+  ModelOption,
+  ProjectRef,
+  Readiness,
+  ResourceLink,
+  RunList,
+  SandboxState,
+  SigninState,
+  SkillCatalogue,
+} from '../web/src/lib/api';
+import type { ArchivedCard, ProjectConfig, Suggestion } from '../web/src/lib/shared';
 
 export type StubHandler = (req: { path: string; query: URLSearchParams; init: RequestInit }) => unknown;
 // NOT `StubHandler | unknown`: that union REDUCES to `unknown`, which silently deletes the contextual type
@@ -121,38 +144,114 @@ const emptyAccounting: Accounting = {
   attemptCap: 3,
 };
 
-// THE SHAPES THE APP ASKS FOR ON MOUNT, as the empty-but-valid answer. Each is meant to be the shape its
-// `api/` module's return type declares, so a hook that reads `.cards` or `.skills` gets an array rather
-// than `undefined` — which is the difference between an empty pane and a thrown render. ANNOTATE ANY ROW A
-// HOOK REACHES INTO, on `emptyAccounting`'s precedent; an un-annotated literal here is unchecked.
+// NOTHING IS BLOCKING, WHICH IS THE ONLY HONEST EMPTY FOR THIS ONE. `{ blockers: [] }` was five fields
+// short, and the missing ones are not decoration: setup's own advance reads `readme.ok` and
+// `foundation.missing` off this answer before it moves anybody, so every Review story's "It reads right —
+// continue" threw on `state.readme.ok` and was caught as "the read failed" — a button that did nothing,
+// in a workbench built to show controls doing something.
+const emptyReadiness: Readiness = {
+  ok: true,
+  blockers: [],
+  readme: { ok: true },
+  // Present and missing both empty: a story that wants half a project written says so itself. What must
+  // not happen here is `missing` being absent, which reads as "nothing is missing" to a `.length` and as
+  // a thrown render to anything else.
+  foundation: { present: [], missing: [], ok: true },
+  gates: { ok: true, count: 0 },
+  smoke: { ok: true },
+  phases: { problems: [], count: 0 },
+  unreviewedGates: [],
+};
+
+// A file the control door answers with, whole: the READ carries the listing's own fields as well as the
+// text, so `{ path, content }` was missing four of them and the category is not optional.
+const emptyControlFile: ControlFile & { content: string } = {
+  path: '',
+  name: '',
+  category: 'docs',
+  managed: false,
+  deletable: true,
+  renameable: true,
+  content: '',
+};
+
+// THE SHAPES THE APP ASKS FOR ON MOUNT, as the empty-but-valid answer. Each is the shape its `api/` module
+// DECLARES — so a hook that reads `.cards` or `.skills` gets an array rather than `undefined`, which is the
+// difference between an empty pane and a thrown render.
+//
+// EVERY ROW IS NOW HELD BY tsc, and that is a change of kind rather than of degree. This block used to say
+// "annotate any row a hook reaches into", which leaves the judgement of which rows those are to whoever
+// writes the next one — and the judgement was wrong three times: `/api/state`, `/api/projects` and
+// `/api/autopilot/readiness` were each a shape no route in this product answers, and each was found by a
+// story failing in a browser rather than by a check. Every row carries a `satisfies` now, against the type
+// its client declares, so a wrong shape is a build error. `satisfies` and not `as`: an assertion accepts a
+// literal that is missing required fields whenever the target is assignable to it — `{} as AppSettings`
+// compiles — which is exactly the mistake being guarded against.
+//
+// FOUR ROWS HAVE NO GET CLIENT AT ALL and are typed against what the SERVER route answers, each said on its
+// own line: there is no GET for `/api/cards`, `/api/config`, `/api/explorer/tree` or
+// `/api/copilot/authority` in `web/src/lib/api/`.
 //
 // EMPTY IS THE DEFAULT AND NOT THE INTERESTING CASE. A story that wants a populated organism spreads over
-// this: `{ ...EMPTY, '/api/cards': { cards: [card] } }`. Empty is the default because an empty answer is
-// the one state every one of these surfaces has to render and the one no fixture ever covers.
+// this: `{ ...EMPTY, '/api/log': { entries } }`. Empty is the default because an empty answer is the one
+// state every one of these surfaces has to render and the one no fixture ever covers.
 export const EMPTY: RouteTable = {
-  '/api/state': { project: null, config: null },
-  '/api/config': null,
-  '/api/cards': { cards: [], columns: [] },
-  '/api/archive': { cards: [] },
-  '/api/skills': { skills: [], invalid: [] },
-  '/api/runs': { records: [] },
+  // Off the client's own return type rather than restated here: `getState` declares
+  // `{ open: boolean; snapshot?: ProjectSnapshot }` inline, and a hand-copied version of it would be a
+  // second declaration free to drift. It was `{ project: null, config: null }`, which is neither.
+  '/api/state': { open: false } satisfies Awaited<ReturnType<typeof getState>>,
+  // No GET client in `web/src/lib/api/`; the route answers the open project's config, and `null` is what
+  // a workbench with no project open stands for.
+  '/api/config': null as ProjectConfig | null,
+  // THE ONLY GET UNDER THIS PREFIX IS THE RAW CARD FILE (`/api/cards/:board/:id/raw`), which answers
+  // `{ raw }` — the board's cards arrive on the websocket snapshot and are never fetched. `{ cards,
+  // columns }` was a shape no route here has ever answered.
+  '/api/cards': { raw: '' } satisfies { raw: string },
+  '/api/archive': { cards: [] } satisfies { cards: ArchivedCard[] },
+  '/api/skills': { skills: [], invalid: [] } satisfies SkillCatalogue,
+  // `RunList`, and it was `{ records: [] }`: `listRuns` hands the body straight back, so the Execution
+  // page read `runs` off an object that has no such field.
+  '/api/runs': { runs: [], active: [], queued: [] } satisfies RunList,
   '/api/accounting': emptyAccounting,
-  '/api/log': { entries: [] },
-  '/api/suggestions': { suggestions: [] },
-  '/api/settings': {},
-  '/api/sandbox': { enforced: false },
+  '/api/log': { entries: [] } satisfies { entries: DiaryEntry[] },
+  '/api/suggestions': { suggestions: [] } satisfies { suggestions: Suggestion[] },
+  '/api/settings': { debugLog: false, serverLog: null, autopilotLog: null } satisfies AppSettings,
+  // A HEALTHY MACHINE IS THE EMPTY ANSWER HERE, not a refusal: `{ enforced: false }` named no field this
+  // type has, so `ok` was `undefined` and every surface that asks rendered the failure branch with no
+  // sentence in it — the sandbox panel's worst state, reached by a stub rather than by a fault.
+  '/api/sandbox': {
+    ok: true,
+    backend: 'managed',
+    agentRefusal: null,
+    refusalKind: null,
+  } satisfies SandboxState,
   // `thisDevice` is required by `SigninState` and was missing: null is the admin-token caller, which
   // belongs to no device, and is the honest empty answer.
-  '/api/signin': { pending: [], devices: [], thisDevice: null },
-  '/api/autopilot/state': null,
-  '/api/autopilot/readiness': { blockers: [] },
-  '/api/copilot/authority': { authority: null },
-  '/api/control/files': { groups: [] },
-  '/api/control/resources': { resources: [] },
-  '/api/control/file': { path: '', content: '' },
-  '/api/explorer/tree': { entries: [] },
-  '/api/explorer/list': { entries: [], truncated: false },
-  '/api/explorer/file': { path: '', content: '' },
-  '/api/models': { models: [] },
-  '/api/projects': { projects: [] },
+  '/api/signin': { pending: [], devices: [], thisDevice: null } satisfies SigninState,
+  // The BODY wraps the state — `getAutopilotState` reads `.state` off it — so a bare `null` here was not
+  // an empty answer but a `TypeError` the hook swallowed as a failed read.
+  '/api/autopilot/state': { state: null } satisfies { state: AutopilotState | null },
+  '/api/autopilot/readiness': emptyReadiness,
+  // No GET client; this is what the POST answers.
+  '/api/copilot/authority': { authorised: false } satisfies { authorised: boolean },
+  '/api/control/files': { groups: [] } satisfies { groups: ControlGroup[] },
+  // `links`, not `resources`: `getResources` reads that field and nothing else.
+  '/api/control/resources': { links: [] } satisfies { links: ResourceLink[] },
+  '/api/control/file': emptyControlFile,
+  // No GET: `/api/explorer/tree` is a DELETE and answers `{ ok: true }`. The tree the explorer renders is
+  // `/api/explorer/list`, one directory at a time.
+  '/api/explorer/tree': { ok: true } satisfies { ok: true },
+  '/api/explorer/list': { path: '', parent: null, entries: [] } satisfies DirListing,
+  // `FileRead` is a three-way union and every arm carries `kind`, `name` and `size`; `{ path, content }`
+  // is none of them.
+  '/api/explorer/file': { kind: 'text', path: '', name: '', size: 0, content: '' } satisfies FileRead,
+  // A BARE ARRAY AND NOT `{ models }`. `listModels` returns the body AS the list, so `{ models: [] }` made
+  // `models.find` a TypeError and took the whole story down with it — found, like `/api/accounting` before
+  // it, by the first story to consume the row. It was written up here as "the second row to be wrong",
+  // which was a count of the ones somebody had happened to render: the sweep that followed found fourteen
+  // of the 23 rows wrong. The table is type-held now, so there is no third.
+  '/api/models': [] satisfies ModelOption[],
+  // A bare array for `listProjects`'s reason, and `{ projects }` is why the picker's stories all rendered
+  // "no projects yet" over a list written three rows above them.
+  '/api/projects': [] satisfies ProjectRef[],
 };

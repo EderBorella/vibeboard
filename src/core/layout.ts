@@ -91,6 +91,17 @@ export function foundationRel(name: string): string {
   return `${FOUNDATION_DIR}/${name}`;
 }
 
+// THE SIX DOCUMENTS SETUP WRITES AND THE PERSON REVIEWS: the five above plus the README, which is the
+// one of them that is not a foundation document and does not live under that folder. ONE home because
+// it is a security boundary read from two places, and a second copy is how they drift: the server
+// refuses a résumé filed against any other name (`PUT /api/wizard/resumes/:name`, boards/wizard-routes.ts)
+// and DROPS an attachment naming any other document rather than framing it (copilot/wizard-frame.ts) —
+// so the browser cannot put an arbitrary path in front of a model through either. decision 78.
+export const RESUMABLE_DOCUMENTS: ReadonlySet<string> = new Set([
+  ...FOUNDATION_FILES.map((f) => f.name),
+  'README.md',
+]);
+
 // The two documents that moved inside. Their names are unchanged, so the pointer files' imports read
 // `@.vibeboard/VIBEBOARD.md` — an import may carry a path, which is what makes the move possible.
 export const CONVENTIONS_FILE = `${CONFIG_DIR}/VIBEBOARD.md`;

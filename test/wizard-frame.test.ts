@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { foundationRel } from '../src/core/layout.js';
 import { fixedSandbox } from '../src/server/boxes/sandbox.js';
 import { createCopilotTurns } from '../src/server/copilot/copilot-turns.js';
 import { wizardFrame } from '../src/server/copilot/wizard-frame.js';
@@ -21,7 +22,7 @@ const docs = (over: Partial<WizardState> = {}): WizardState => ({
 
 describe('wizardFrame', () => {
   it('says nothing at all when there is no setup running', () => {
-    expect(wizardFrame(null)).toBeUndefined();
+    expect(wizardFrame(null, undefined)).toBeUndefined();
   });
 
   // THE GATE THAT MAKES THIS SAFE. Every other step is an ordinary conversation — a person asking
@@ -30,22 +31,22 @@ describe('wizardFrame', () => {
   it('says nothing on every step but docs', () => {
     for (const step of WIZARD_STEPS) {
       if (step === 'docs') continue;
-      expect(wizardFrame(docs({ step })), step).toBeUndefined();
+      expect(wizardFrame(docs({ step }), undefined), step).toBeUndefined();
     }
-    expect(wizardFrame(docs())).toBeTypeOf('string');
+    expect(wizardFrame(docs(), undefined)).toBeTypeOf('string');
   });
 
   // W7, which is the whole reason the frame exists: this is the person's first contact with the
   // product, and a wall of text here teaches them the assistant is work to read.
   it('carries the voice contract', () => {
-    const frame = wizardFrame(docs()) ?? '';
+    const frame = wizardFrame(docs(), undefined) ?? '';
     expect(frame).toContain('before anything else, how to speak');
     expect(frame).toContain('under 200 words');
     expect(frame).toContain('plain human language');
   });
 
   it('carries what the person told the form, and the stack they agreed', () => {
-    const frame = wizardFrame(docs()) ?? '';
+    const frame = wizardFrame(docs(), undefined) ?? '';
     expect(frame).toContain('a timeline of releases');
     expect(frame).toContain('my team');
     expect(frame).toContain('the tests pass');
@@ -55,7 +56,7 @@ describe('wizardFrame', () => {
   // An unanswered question is a fact about the project, not a blank to paper over: the model is told
   // it was not answered so it can admit the gap rather than invent one.
   it('says which questions went unanswered rather than leaving a blank', () => {
-    const frame = wizardFrame({ mode: 'greenfield', step: 'docs' }) ?? '';
+    const frame = wizardFrame({ mode: 'greenfield', step: 'docs' }, undefined) ?? '';
     expect(frame).toContain('- What it is: (not answered)');
     expect(frame).toContain('- Who it is for: (not answered)');
     expect(frame).toContain('- What done looks like: (not answered)');
@@ -63,10 +64,65 @@ describe('wizardFrame', () => {
   });
 
   it('asks for the résumé beside every document it writes', () => {
-    const frame = wizardFrame(docs()) ?? '';
+    const frame = wizardFrame(docs(), undefined) ?? '';
     expect(frame).toContain('PUT /api/wizard/resumes/:name');
     expect(frame).toContain('PUT /api/control/foundation/:name');
     expect(frame).toContain("I couldn't work out");
+  });
+});
+
+// WHICH DOCUMENT THE PERSON MEANS, and it is a NAME rather than the document. The model has a Read
+// tool, the person is about to talk about one line of one file, and inlining six documents into every
+// message is tokens spent on nothing — the run-attachments rule. decision 78.
+describe('the attached document', () => {
+  it('names the path and binds the pronouns to it', () => {
+    // The path is asked of `foundationRel` rather than typed out: a fixture spelling out where a
+    // foundation document lives is wrong in exactly the way a second copy of the layout would be.
+    const frame = wizardFrame(docs(), 'STACK.md') ?? '';
+    expect(frame).toContain(`The person is looking at ${foundationRel('STACK.md')}`);
+    expect(frame).toContain('"it" and "this document" mean that file');
+  });
+
+  it('says nothing about a document when none is attached', () => {
+    const frame = wizardFrame(docs(), undefined) ?? '';
+    expect(frame).not.toContain('The person is looking at');
+    expect(frame).not.toContain('mean that file');
+  });
+
+  // The README is the one of the six that is not a foundation document: it lives at the root, and an
+  // attachment that sent the model to `.vibeboard/foundation/README.md` would point it at nothing.
+  it('puts the README at the root rather than under the foundation folder', () => {
+    const frame = wizardFrame(docs(), 'README.md') ?? '';
+    expect(frame).toContain('The person is looking at README.md right now');
+    expect(frame).not.toContain(foundationRel('README.md'));
+  });
+
+  // THE REFUSAL, AND IT IS WHY THE SET IS FIXED. This field arrives from the browser, so anything it
+  // carries is whatever the page said — and a name that is not one of the six résumé-able documents is
+  // DROPPED rather than framed, so no string here can put an arbitrary path in front of the model.
+  it('drops a name outside the résumé-able set rather than framing it', () => {
+    for (const hostile of [
+      '../../etc/passwd',
+      '/etc/passwd',
+      '.vibeboard/credentials.json',
+      // A real file in every project, and still not one of the six.
+      'CLAUDE.md',
+      'stack.md',
+      '',
+    ]) {
+      const frame = wizardFrame(docs(), hostile) ?? '';
+      // The frame itself is there to receive it, so this is a refusal and not an empty screen.
+      expect(frame, hostile).toContain('before anything else, how to speak');
+      expect(frame, hostile).not.toContain('The person is looking at');
+      expect(frame, hostile).not.toContain(hostile === '' ? 'mean that file' : hostile);
+    }
+  });
+
+  // An attachment cannot resurrect the frame outside the documents step: the step gate is read first,
+  // so an ordinary conversation stays one whatever the page attaches to it.
+  it('adds nothing to a conversation that has no frame at all', () => {
+    expect(wizardFrame(docs({ step: 'handoff' }), 'STACK.md')).toBeUndefined();
+    expect(wizardFrame(null, 'STACK.md')).toBeUndefined();
   });
 });
 
@@ -74,7 +130,7 @@ describe('wizardFrame', () => {
 // in as a browser sends it and the fakes are at the edges the turn actually touches, because what is
 // being proved is WHERE the frame is composed, which a unit test of the frame cannot see.
 interface Seam {
-  send: (text: string, root: string) => Promise<void>;
+  send: (text: string, root: string, attach?: string) => Promise<void>;
   // The dock's other button, which sends no words of its own: the CLI's own slash command.
   compact: (root: string) => Promise<void>;
   modelText: () => string;
@@ -128,7 +184,10 @@ function seam(token?: string): Seam {
     await done;
   };
   return {
-    send: (text, root) => drive({ type: 'copilot:send', text, mode: 'bypassPermissions' }, root),
+    // `attach` is the browser's field and rides the frame exactly as the dock sends it — an absent
+    // one is absent from the JSON, which is the case every other test here drives.
+    send: (text, root, attach) =>
+      drive({ type: 'copilot:send', text, mode: 'bypassPermissions', attach }, root),
     // The browser sends no text with this one — the sentinel is the handler's, which is exactly why
     // it has to be driven through `handleMessage` rather than composed here.
     compact: (root) => drive({ type: 'copilot:compact', mode: 'bypassPermissions' }, root),
@@ -185,6 +244,36 @@ describe('the frame at the copilot seam', () => {
     await s.send('hello', root);
 
     expect(s.modelText()).toBe('hello');
+  });
+
+  // THE ATTACHMENT OVER THE WIRE, which the pure test cannot see: the name is a field on the frame the
+  // browser sends, and what has to hold is that it reaches the FRAME and never the transcript — the
+  // person typed a question about a document, not a sentence about where their eyes are.
+  it('carries the document the page attached into the model’s copy, and not into the transcript', async () => {
+    const root = await tempDir();
+    await writeWizardState(root, docs());
+    const s = seam();
+
+    await s.send('make this one shorter', root, 'TESTING.md');
+
+    expect(s.modelText()).toContain(`The person is looking at ${foundationRel('TESTING.md')}`);
+    expect(s.modelText().endsWith('make this one shorter')).toBe(true);
+    expect(s.transcript()).toEqual(['make this one shorter']);
+  });
+
+  // AND THE REFUSAL AT THE DOOR IT WOULD ARRIVE THROUGH. A hostile page can put any string in this
+  // field; what stops it becoming a path in a prompt is the fixed set, and this is the only test that
+  // drives the real wire frame into the real handler to say so.
+  it('drops a name the page invented, with the frame still around it', async () => {
+    const root = await tempDir();
+    await writeWizardState(root, docs());
+    const s = seam();
+
+    await s.send('read this to me', root, '../../../etc/shadow');
+
+    expect(s.modelText()).toContain('before anything else, how to speak');
+    expect(s.modelText()).not.toContain('The person is looking at');
+    expect(s.modelText()).not.toContain('etc/shadow');
   });
 });
 

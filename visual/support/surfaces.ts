@@ -202,10 +202,90 @@ export const SURFACES: Surface[] = [
       await gone(page, '.gate');
       await gone(page, 'main.boards');
     },
-    // 50 elements are measured here. The floor is set close because the failure it has to catch is a
+    // 51 elements are measured here. The floor is set close because the failure it has to catch is a
     // near miss: the waiting screen this step shows while a run is choosing is the same card with a
     // spinner and four fewer controls in it, and a loose floor would record it as a surface.
     floor: { elements: 40, text: 15, contrast: 15, focus: 10 },
+  },
+  {
+    name: 'wizard-review',
+    what: "the setup wizard's review — six summaries beside the conversation that wrote them",
+    // The baseline records a 47px control height here beside --ctl-h's 28px and --mark-h's 16px, and it
+    // is the DOCK'S composer arriving with the embedded panel rather than anything setup declares —
+    // already recorded on `copilot` and on the five whole-document surfaces the dock is open on. Named
+    // here for the reason `wizard-stack`'s 32px is: so the next reader of a baseline diff does not hunt.
+    root: null,
+    open: async (page) => {
+      // A THIRD PROJECT, AND IT RESUMES STRAIGHT INTO THE REVIEW. Its `wizard.yaml` names the documents
+      // step and already carries all six summaries, which is the resume the loop is built around: the
+      // step offers to write nothing, dispatches nothing and raises no confirm when it opens on a
+      // project that has them — so this screen renders from the file alone, which is the only reason a
+      // harness with no agents can measure it. See visual/run.mjs.
+      await page.locator('header.topbar').getByRole('button', { name: 'Switch project' }).click();
+      await page.locator('.gate').waitFor({ state: 'visible' });
+      await page.locator('.gate li').filter({ hasText: 'Drafts to read' }).click();
+      await page.locator('.wizard-card').waitFor({ state: 'visible' });
+      // The cards, not merely the card: the step renders its heading before the summaries land.
+      await page.locator('[data-testid="doc-card"]').first().waitFor({ state: 'visible' });
+    },
+    prove: async (page) => {
+      // THE PERSON'S OWN BUTTON, which is the whole ruling this screen exists for (W3, decision 78):
+      // nothing else advances setup from here. Enabled, because a turn in flight shuts it and there
+      // is no turn.
+      await expect(page.getByRole('button', { name: 'It reads right — continue' })).toBeEnabled();
+      // ALL SIX, AND ONE OF THEM BY ITS PLAIN NAME. The count says the full set is on screen — a
+      // résumé map with gaps renders placeholder cards, which is a different screen — and the name
+      // says these are the WIZARD'S cards and not a filename list (W7).
+      // SCOPED TO THE CARDS, because the selector below offers the same six plain names and a bare
+      // text match resolves to two elements — which is itself the point: the card face and the
+      // `Talking about` options are one vocabulary, so proving the name on a card has to say card.
+      await expect(page.locator('[data-testid="doc-card"]')).toHaveCount(6);
+      await expect(page.locator('[data-testid="doc-card"]').filter({ hasText: 'Quality gates' })).toHaveCount(
+        1,
+      );
+      // SIX SUMMARIES AND NOT SIX CARDS, which the count above cannot tell apart: a card with nothing
+      // filed renders the quiet placeholder and NO `Read it all`, so a fixture that lost its résumés
+      // would still be six cards and would still be a different screen. This is the one assertion here
+      // that distinguishes the review from the writing screen by what is ON the cards.
+      await expect(page.getByRole('button', { name: 'Read it all' })).toHaveCount(6);
+      // The subject selector above the chat, which is the other half of "this document" having a
+      // visible answer.
+      await expect(page.getByLabel('Talking about')).toBeVisible();
+      // THE DOCK'S OWN PANEL, EMBEDDED, AND WEARING NONE OF THE DOCK (ruling W11). The transcript's
+      // handle used to be on a wrapper AROUND the panel and is inside it now — narrowing the
+      // plain-words exemption to the model's own words — so the selector is the other way up. Both
+      // halves are asserted: the conversation is here, and the chrome that belongs to the dock is not.
+      // `.copilot-title` is the header's own class, which is the cheapest thing on the surface that
+      // exists in one mode and not the other.
+      await expect(page.locator('.copilot [data-testid="verbatim-conversation"]')).toBeVisible();
+      await gone(page, '.copilot-title');
+      // THE PROSE KEEPS THE MEASURE THE CARD GAVE UP, and this surface is the only thing in the
+      // repository that can see it: `.wizard-wide` takes the step off `--measure` so the cards have
+      // room, which took the heading and the hint with it — 1198px of hint at this viewport, measured
+      // here before the rule existed. Both halves are asserted because either alone passes on the
+      // fault: a live `max-width` that resolved to the window, or a narrow box with no rule behind it.
+      const prose = await page
+        .locator('.wizard-prose')
+        .evaluate((el) => ({ width: el.clientWidth, max: getComputedStyle(el).maxWidth }));
+      expect(prose.max, 'the prose container is back on the window’s width').not.toBe('none');
+      expect(prose.width, `the heading and hint measure ${prose.width}px`).toBeLessThan(700);
+      // AND NOTHING ASKED ANYTHING. The authorise confirm is what a documents step raises when it is
+      // about to write, and a resume that raised it would be the Plan C fault this step was changed to
+      // remove — measured here because it is also what would make every number below the dialog's.
+      await gone(page, '.vb-modal[data-size="sm"]');
+      await gone(page, '.gate');
+      await gone(page, 'main.boards');
+    },
+    // 95 elements are measured here and the floor is 85. Both numbers moved when the embedded panel
+    // went `compact` (ruling W11) and the re-derivation is the point, because the old floor of 120 was
+    // argued from a conversation that is no longer this size: the dock is 65 elements where the
+    // `copilot` surface measures it, and the panel on THIS surface is 12 — measured, not estimated.
+    //
+    // The near miss is unchanged and is still what sets the number: this step's OTHER screen renders
+    // the same six cards in the same card and differs by the conversation (12), the subject selector
+    // above it with its seven options (~11) and the advance under them (~3), which puts the writing
+    // screen near 69. 85 sits above that and ten under what is measured here.
+    floor: { elements: 85, text: 35, contrast: 35, focus: 25 },
   },
   {
     name: 'card',

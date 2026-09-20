@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Pulse } from '../../atoms/Pulse';
@@ -17,6 +17,7 @@ import {
   listControlFiles,
   patchConfig,
   putWizard,
+  readFsFile,
   runWizardSkill,
   type SandboxState,
   scaffoldProject,
@@ -26,6 +27,7 @@ import {
   type AutopilotConfig,
   BOX_KINDS,
   type BoxKind,
+  DEFAULT_CONTEXT_BUDGET,
   type LifecycleMode,
   type ProjectSnapshot,
   type ScaffoldMode,
@@ -47,9 +49,26 @@ import { Tabs } from '../../molecules/Tabs';
 import { LifecyclePicker } from '../../organisms/autopilot/LifecyclePicker';
 import { useReadiness } from '../../organisms/autopilot/useReadiness';
 import { BackendPicker } from '../../organisms/copilot/BackendPicker';
+import { CopilotPanel } from '../../organisms/copilot/CopilotPanel';
 import { clampToCaps, resolveChoice } from '../../organisms/copilot/choice';
 import { ThinkingIndicator } from '../../organisms/copilot/ThinkingIndicator';
-import { useCopilot } from '../../organisms/copilot/useCopilot';
+
+// EVERYTHING THE EMBEDDED CONVERSATION NEEDS, TAKEN OFF THE ORGANISM rather than restated here. The
+// documents step renders the DOCK'S panel — the same component, on the same `useCopilot` instance —
+// so a hand-written copy of its prop list is a list that goes stale the first time the dock gains a
+// control. The shell passes one set to both. decision 78.
+//
+// EXCEPT THE CONTEXT WINDOW, which is a fact about the PROJECT rather than about the conversation:
+// this screen already has the snapshot and already reads the copilot block off it, and `WorkArea`
+// resolves the same figure the same way for the dock.
+//
+// AND EXCEPT THE TWO THAT ARE THIS SCREEN'S TO DECIDE. `compact` and the composer's placeholder are
+// how the review WEARS the organism, not part of the conversation the shell hands down — and `onClose`
+// is gone from the shell's side altogether, because the compact panel renders no ✕ to hide it with.
+type Conversation = Omit<ComponentProps<typeof CopilotPanel>, 'contextBudget' | 'compact' | 'placeholder'>;
+// What `send` takes, read off the same place for the same reason: the review layout wraps it to add
+// the attached document's name, and a second spelling of the turn options would drift from it.
+type Turn = Parameters<Conversation['copilot']['send']>;
 
 // SETTING A PROJECT UP, AS A SCREEN AND NOT A MODAL. Its later steps hold agent runs that last minutes,
 // and a dialog you cannot leave a run inside is a dialog somebody closes. It is the shell's sixth
@@ -72,6 +91,11 @@ interface Props {
   // step streams a container build off it, and `socketFor` is last-write-wins — so a literal key here
   // would not be a second socket beside the app's, it would silently replace it.
   bump: number;
+  // THE TAB'S ONE CONVERSATION, mounted by the shell and handed down rather than started here. Setup
+  // used to call `useCopilot` again on the documents step, which is a second transcript of one
+  // server-side chat: the dock and this screen would disagree about what was said, and the panel
+  // embedded here would be reading a different copy from the one the step drives. decision 78.
+  copilot: Conversation;
   onOpened: () => void;
   onExit: () => void;
 }
@@ -135,7 +159,7 @@ function ReadFailed({ retry, busy }: { retry: () => void; busy: boolean }) {
   );
 }
 
-export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Props) {
+export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onExit }: Props) {
   const [step, setStep] = useState<WizardStart>(start);
   const { busy, error, run } = useAction();
 
@@ -184,13 +208,15 @@ export function WizardView({ mode, start, snapshot, bump, onOpened, onExit }: Pr
   else if (step === 'stack')
     body = <StackStep mode={mode} snapshot={snapshot} bump={bump} onContinue={leaveStack} />;
   else if (step === 'docs')
-    body = <DocsStep mode={mode} snapshot={snapshot} bump={bump} onContinue={setStep} />;
+    body = <DocsStep mode={mode} snapshot={snapshot} copilot={copilot} onContinue={setStep} />;
   else if (step === 'gates') body = <GatesStep mode={mode} onContinue={leaveGates} />;
   else body = <HandoffStep />;
 
   return (
     <Stack fill scroll justify="center" align="start" pad={[7, 6]}>
-      <Surface variant="raised" className="wizard-card">
+      {/* THE ONE STEP THAT IS WIDER THAN A LINE OF PROSE. Its review is cards beside the dock's own
+          panel, and the card's measure leaves the cards 80px — measured. See `.wizard-wide`. */}
+      <Surface variant="raised" className={step === 'docs' ? 'wizard-card wizard-wide' : 'wizard-card'}>
         {body}
         <Stack gap={4} wrap>
           {/* The way out of every step, quiet and always there. At the end it is the only thing left to
@@ -1041,13 +1067,13 @@ function StackStep({
 // land in the person's own transcript on the way past. decision 77.
 const KICKOFF = "Please set up this project's documents from my answers.";
 
+// How often the summaries are re-read while a turn is writing them. See the effect that uses it.
+const RESUME_POLL_MS = 3_000;
+
 // THE SIX DOCUMENTS, IN WORDS (W7). A filename is the one thing a beginner cannot act on, and this
 // screen is where they first meet these — so the wizard names them the way somebody would say them
 // out loud, and the filename stays on the surfaces that open the file. The order is the order they
 // are written and the order they are listed in.
-// How often the summaries are re-read while a turn is writing them. See the effect that uses it.
-const RESUME_POLL_MS = 3_000;
-
 const DOC_NAMES: Record<string, string> = {
   'README.md': 'The introduction',
   'STACK.md': 'The stack',
@@ -1057,11 +1083,178 @@ const DOC_NAMES: Record<string, string> = {
   'DESIGN.md': 'How it looks',
 };
 
+// WHERE A DOCUMENT'S TEXT COMES FROM, and it is two doors because the six documents live in two
+// places. The five foundation documents are control files, opened by the path the LISTING gives —
+// the server's fact, never a copy of the layout kept in the browser, exactly as the gates step opens
+// them. The README is at the project root and is not a control file at all, so it is read through
+// the explorer, which is the door every other project file is read through.
+async function documentText(name: string, path: string | undefined): Promise<string | null> {
+  if (name === 'README.md') {
+    const file = await readFsFile(name);
+    return file.kind === 'text' ? file.content : null;
+  }
+  return path ? (await getControlFile(path)).content : null;
+}
+
+// ONE DOCUMENT: WHAT IT IS, IN A SENTENCE, AND THE DOCUMENT ITSELF ONE PRESS AWAY (decision 78).
+// A person asked to review six documents they did not write will read none of them, so the summary
+// is the card and the file is the offer — and the filename appears only once the file is open, which
+// is the one view it is a fact about.
+function DocumentCard({
+  name,
+  summary,
+  path,
+  running,
+  onAttach,
+}: {
+  name: string;
+  summary?: string;
+  path?: string;
+  // Whether a turn is writing right now, which is what makes a missing summary a different fact.
+  running: boolean;
+  // Saying "this one" to the conversation beside the cards. Absent on the writing screen, where
+  // there is no conversation on the page to say it to.
+  onAttach?: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { value: text } = useFetched<string | null>(
+    async () => (open ? await documentText(name, path) : null),
+    [open, path],
+    null,
+  );
+  const plain = DOC_NAMES[name] ?? name;
+  // SAYING "THIS ONE" IS A CONTROL, NOT A CLICK ON THE BOX. The whole card carried the handler, which
+  // is reachable by mouse and by nothing else: no tab stop, no focus ring, no Enter — and it put a
+  // click target around the button inside it. The FACE takes it instead, which is the part that names
+  // the document, and `Read it all` stays its sibling rather than its child.
+  //
+  // OPENING STILL SAYS IT TOO, which is what the old whole-card gesture was really for: somebody who
+  // has just pressed Read it all is looking at that document by any definition, and the conversation
+  // beside them should not need telling twice.
+  const attach = onAttach && (() => onAttach(name));
+  return (
+    <Surface variant="inset" data-testid="doc-card">
+      <Stack direction="column" gap={3}>
+        {attach ? (
+          <Button align="start" onClick={attach} title={`Talk about ${plain}`}>
+            {plain}
+          </Button>
+        ) : (
+          <Text ink="strong">{plain}</Text>
+        )}
+        {summary === undefined ? (
+          // AN ABSENCE HAS TO BE ON THE SCREEN. Rendering only what was written turns a six-document
+          // project with three summaries into a three-document project, and the person reviewing it
+          // cannot know what they were never shown.
+          <Text as="p" role="hint">
+            {running ? 'Being written…' : 'No summary yet — ask for one in the chat'}
+          </Text>
+        ) : (
+          <>
+            {/* The model's own words, rendered whole — exempt from the plain-words sweep by element,
+                as the stack proposal is. */}
+            <Text as="p" role="hint" testId="verbatim-resume">
+              {summary}
+            </Text>
+            <Stack gap={4}>
+              <Button
+                onClick={() => {
+                  attach?.();
+                  setOpen(!open);
+                }}
+              >
+                {open ? 'Hide it again' : 'Read it all'}
+              </Button>
+            </Stack>
+          </>
+        )}
+        {open && (
+          <Stack direction="column" gap={3}>
+            {/* THE FILENAME, HERE AND NOWHERE ELSE ON THE CARD: this is the view that is about the
+                file, and somebody who will later go looking for it needs to have met its name once. */}
+            <Text ink="strong">{name}</Text>
+            {/* The document is the model's text too, and thicker than any summary — a CODE-QUALITY.md
+                is a list of commands. Exempt by element for the summary's reason. Read-only and
+                monospaced, as the gates step shows a document: this screen must not invite editing. */}
+            <Stack direction="column" gap={3} testId="verbatim-document">
+              <Control as="textarea" mono readOnly rows={12} aria-label={name} value={text ?? 'Opening…'} />
+            </Stack>
+          </Stack>
+        )}
+      </Stack>
+    </Surface>
+  );
+}
+
+// THE FULL SET, ALWAYS, IN THE ORDER THE DOCUMENTS ARE WRITTEN. A summary that has not been filed is
+// a card that says so rather than a card that is missing.
+//
+// AND THE SET IS `DOC_NAMES`, WHICH IS NOT THE SAME AS "WHATEVER IS IN THE FILE". A name outside it can
+// only arrive by hand-editing `wizard.yaml` — the server refuses a résumé filed against any other name
+// — and the card it used to get was broken in both directions: the listing has no path for it, so
+// `Read it all` opens on `Opening…` for ever, and clicking it sets a subject the selector above the
+// chat has no option for, so the selector goes blank and the person cannot see what "it" now means.
+// A card that cannot be read and cannot be talked about is not a document; showing it said the
+// opposite.
+function DocumentCards({
+  resumes,
+  running,
+  always,
+  onAttach,
+}: {
+  resumes: Record<string, string>;
+  running: boolean;
+  // THE REVIEW SCREEN SHOWS THE SET WHATEVER IS IN IT. The silence below is right under an OFFER to
+  // write — six cards saying "no summary yet" beside a button that would write them is a list of
+  // things that do not exist — and wrong once the writing has been done and the person is reading:
+  // there, a document with nothing to show is the news.
+  always?: boolean;
+  onAttach?: (name: string) => void;
+}) {
+  const { value: groups } = useFetched(listControlFiles, [], NO_GROUPS);
+  const files = groups.find((group) => group.key === 'foundation')?.files ?? [];
+  const names = Object.keys(DOC_NAMES);
+  // NOTHING AT ALL UNTIL THE WRITING HAS BEGUN — a turn running, or something already filed. Six
+  // cards saying "no summary yet" under an offer to write them is a list of things that do not exist.
+  // Asked here rather than at the call site: the step that renders this has a complexity budget, and
+  // "is there anything to show" is a question about the cards.
+  if (!always && !running && names.every((name) => resumes[name] === undefined)) return null;
+  return (
+    <>
+      {names.map((name) => (
+        <DocumentCard
+          key={name}
+          name={name}
+          summary={resumes[name]}
+          path={files.find((file) => file.name === name)?.path}
+          running={running}
+          onAttach={onAttach}
+        />
+      ))}
+    </>
+  );
+}
+
 // WHAT ACTUALLY HAPPENED, when it was not what the heading promised. Counted rather than listed in
 // the sentence and then named in words underneath: the count is the news, the names are what to do
 // about it. Its own component for `GateDocument`'s reason — the step it renders inside has a
 // complexity budget, and this is a self-contained reading of one fact.
-function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; onRetry: () => void }) {
+function Unwritten({
+  names,
+  busy,
+  // WHETHER THE REVIEW IS ON SCREEN, which decides whether this offer may be the filled button. It is
+  // the only way anybody reaches this report now — the press that asks the machine is the review's —
+  // so in practice it always is, and "Try again" as a second primary beside "It reads right — continue"
+  // is two filled buttons offering opposite answers to one question. One primary per screen, and on
+  // this screen it is the way ON.
+  review,
+  onRetry,
+}: {
+  names: string[];
+  busy: boolean;
+  review: boolean;
+  onRetry: () => void;
+}) {
   return (
     <>
       <Notice as="p" tone="warn">
@@ -1071,7 +1264,7 @@ function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; o
       </Notice>
       <Text as="p">{names.map((name) => DOC_NAMES[name] ?? name).join(', ')}</Text>
       <Stack gap={4}>
-        <Button variant="primary" disabled={busy} onClick={onRetry}>
+        <Button variant={review ? 'default' : 'primary'} disabled={busy} onClick={onRetry}>
           Try again
         </Button>
       </Stack>
@@ -1079,23 +1272,122 @@ function Unwritten({ names, busy, onRetry }: { names: string[]; busy: boolean; o
   );
 }
 
-// THE THIRD AGENT MOMENT, AND IT IS THE COPILOT AND NOT A RUN (W3). Writing a README and five guiding
-// documents out of three answers is a conversation — the person is in it, and the next phase puts them
-// side by side with it. What this step is, on its own, is the honest minimum: ask, authorise, send one
-// turn, and show that something is happening until it stops.
+// THE LOOP, AS A SCREEN (W3, decision 78). What was written down one side, the conversation that
+// wrote it down the other, and the person's own button as the only way past — because the ruling is
+// that this runs "until the user judges it ready", and no machine signal expresses that. Plan C's
+// settle-advance was scaffolding standing where this goes.
 //
-// THE CONVERSATION IS THE APP'S, not this screen's: `useCopilot` is keyed to the tab's socket
-// generation, so the turn sent here is the same conversation the dock shows, with the same transcript
-// on the server.
+// ITS OWN COMPONENT, for `GateDocument`'s and `Unwritten`'s reason: the step it renders inside sits on
+// the cognitive-complexity limit, and this is a layout with a state of its own rather than a branch.
+//
+// NO CLASS OF ITS OWN. The split is two `Stack`s — the cards side takes the slack and the conversation
+// keeps the width the dock gives it — and `pages/wizard/` spends one name, on the card these sit in.
+function ReviewLayout({
+  resumes,
+  running,
+  copilot,
+  contextBudget,
+  busy,
+  onContinue,
+}: {
+  resumes: Record<string, string>;
+  running: boolean;
+  copilot: Conversation;
+  // The project's own context window, or nothing until one is set — resolved here rather than at the
+  // call site because the step above is on the cognitive-complexity limit and this is a default, not
+  // a decision. `WorkArea` resolves the same figure the same way for the dock.
+  contextBudget: number | undefined;
+  busy: boolean;
+  onContinue: () => void;
+}) {
+  // WHICH DOCUMENT "IT" MEANS, and the empty string is a real answer rather than a missing one: a
+  // question about the project as a whole is most of what gets asked here, and a card clicked once
+  // would otherwise follow the person around for the rest of the conversation.
+  const [attach, setAttach] = useState('');
+  // THE NAME RIDES EVERY MESSAGE, and it is wrapped here rather than typed into the composer because
+  // the composer is the DOCK'S and knows nothing about this screen. A name and nothing else: the
+  // server appends one context line to the model's copy and drops any name outside the six, so
+  // nothing the page puts in this field can become a path in a prompt.
+  const talking: Conversation = {
+    ...copilot,
+    copilot: {
+      ...copilot.copilot,
+      send: (text: Turn[0], opts: Turn[1]) =>
+        copilot.copilot.send(text, attach === '' ? opts : { ...opts, attach }),
+    },
+  };
+  return (
+    <Stack align="start" gap={5}>
+      {/* WHAT WAS WRITTEN, AND THE VERDICT ON IT. The button is under the documents rather than under
+          the chat: it is an answer about them. */}
+      <Stack direction="column" gap={4} fill>
+        <DocumentCards resumes={resumes} running={running} always onAttach={setAttach} />
+        <Stack gap={4}>
+          {/* SHUT WHILE A TURN RUNS. Approving mid-rewrite is approving a moving document — and the
+              summaries on screen are the ones the turn is in the middle of replacing. */}
+          <Button variant="primary" disabled={running || busy} onClick={onContinue}>
+            It reads right — continue
+          </Button>
+        </Stack>
+        <Text role="hint">You can come back and change any of this later, in Project Control.</Text>
+      </Stack>
+      {/* THE CONVERSATION SIDE, AND `.copilot`'s `flex: 0 1 400px` IS A HEIGHT IN HERE. The dock declares
+          that basis for a ROW — it is the width the panel takes beside the board — and this column
+          reads the same declaration on the other axis, so the panel stands 400px tall here rather than
+          400px wide. Nothing about the dock meant to grant that; it is worth knowing before anybody
+          reaches for a height on this screen, because the number is already being spent. */}
+      <Stack direction="column" gap={4}>
+        {/* SAID OUT LOUD ABOVE THE CHAT, because "this document" needs a visible subject. A card
+            click sets this, and this is what rides the next message — one state, two ways to set it,
+            so the person can always see what the conversation thinks they mean. */}
+        <Field label="Talking about">
+          <Control as="select" value={attach} onChange={(e) => setAttach(e.target.value)}>
+            <option value="">Nothing in particular</option>
+            {Object.entries(DOC_NAMES).map(([name, plain]) => (
+              <option key={name} value={name}>
+                {plain}
+              </option>
+            ))}
+          </Control>
+        </Field>
+        {/* THE DOCK'S ORGANISM WITHOUT THE DOCK (ruling W11). `compact` leaves the transcript, the
+            composer, the thinking indicator and the Cancel under it — and takes away the header, the
+            chat history, the assistant and model pickers, the authority grant, the spend readout and
+            the ✕. Every one of those is either a question setup answered on an earlier screen or a way
+            out of a screen that has one: the way on is the button under the cards.
+            WHICH NARROWS THE PLAIN-WORDS EXEMPTION TO THE TRANSCRIPT (W7). The whole panel used to be
+            skipped by element, so the composer's own label — "Message the copilot" — was inside the
+            exemption and unswept. With the chrome gone the only words here that are not the wizard's
+            are the model's, the handle sits on the transcript list itself, and the placeholder below
+            is this screen's to write. */}
+        <CopilotPanel
+          {...talking}
+          contextBudget={contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+          compact
+          placeholder="Say what you’d change"
+        />
+      </Stack>
+    </Stack>
+  );
+}
+
+// THE THIRD AGENT MOMENT, AND IT IS THE COPILOT AND NOT A RUN (W3). Writing a README and five guiding
+// documents out of three answers is a conversation — and the person is IN it: the turn that settles
+// does not walk them onward, it opens the review, where the summaries sit beside the conversation
+// that wrote them and the person's own press is the only way past. decision 78.
+//
+// THE CONVERSATION IS THE APP'S, not this screen's: one `useCopilot`, mounted by the shell and passed
+// down, so the turn sent here is the same conversation the dock shows with the same transcript on the
+// server — and the panel embedded in the review is that same instance rather than a copy of it.
 function DocsStep({
   mode,
   snapshot,
-  bump,
+  copilot,
   onContinue,
 }: {
   mode: ScaffoldMode;
   snapshot: ProjectSnapshot | null;
-  bump: number;
+  copilot: Conversation;
   // WHICH step is next is this one's to say, because the answer is the readiness the turn just
   // changed. The FILE is this step's to move too, and it is a fresh read that moves it — see
   // `leave` below: the copilot writes its summaries into the file while the turn runs, so the copy
@@ -1104,8 +1396,12 @@ function DocsStep({
 }) {
   const { read, failed: readFailed, retry, saved } = useSaved(mode);
   const { confirm, dialog } = useConfirm();
-  const { items, running, send, cancel, sentAt, lastEventAt } = useCopilot(bump);
+  const { items, running, send, cancel, sentAt, lastEventAt } = copilot.copilot;
   const [sent, setSent] = useState(false);
+  // A WRITING TURN HAS BEGUN AND ENDED ON THIS VISIT, which is what reveals the review. Separate from
+  // `written` below: that one is about what was on disk when the screen opened, and this one is about
+  // what just happened on it.
+  const [settled, setSettled] = useState(false);
   // The summaries as the poll below last saw them. `undefined` is "not read since this screen
   // mounted", which falls back to the file's own — a setup resumed here shows what was written last
   // time rather than an empty list under a heading about writing.
@@ -1135,10 +1431,13 @@ function DocsStep({
   const resumes = polled ?? saved('docs').resumes ?? {};
   // ALREADY WRITTEN FOR, and the question this screen opens with rewrites the README and all five
   // documents. Raising it over a project that has them is an offer to destroy work phrased as an
-  // offer to start, so a resume lands on the summaries instead and asks nothing. Plan D replaces this
-  // holding screen with the review layout — the résumé cards beside the conversation — and the person's
-  // own button becomes the only way past.
+  // offer to start, so a resume lands IN the review and asks nothing — no kick-off, no confirm, the
+  // summaries and the conversation straight away.
   const written = read && Object.keys(saved('docs').resumes ?? {}).length > 0;
+  // THE REVIEW IS WHAT A SETTLE REVEALS, and what a resume with summaries already filed opens on.
+  // Nothing else may raise it: before any writing there is nothing to review, and saying so with six
+  // empty cards beside a chat is a screen about documents that do not exist.
+  const review = written || settled;
 
   const ask = useCallback(async (): Promise<void> => {
     const ok = await confirm({
@@ -1215,39 +1514,57 @@ function DocsStep({
     [onContinue, saved],
   );
 
+  // THROUGH `run`, WHICH IS WHAT MAKES THE SECOND PRESS DO NOTHING. The advance is disabled on `busy`
+  // and nothing was setting it: the press read the readiness and wrote the file with no flag raised in
+  // between, so three clicks while the network was slow asked three times and wrote the step three
+  // times. The button's own `disabled` was answering a question nobody had asked it.
   const finish = useCallback(async (): Promise<void> => {
-    // ONE READ, THREE QUESTIONS, and it used to ask only the third. Writing CODE-QUALITY.md or
-    // TESTING.md as an agent blocks auto-pilot until a person has read it (decision 51), and the
-    // copilot has just been told to write both — but the same response also says whether the README
-    // and the five documents are THERE, and a turn that died four documents in walked the person to
-    // "that is setup done" over a project with none of them.
-    //
-    // A FAILED READ IS NOT EVIDENCE OF A MISSING DOCUMENT, so it hands over rather than accusing: the
-    // question this asks is answerable again on the next screen, and holding somebody here over a
-    // hiccup is the fault the machine check's own failure case names.
-    const state = await getReadiness().catch(() => undefined);
-    if (state) {
-      // THE README IS NOT A FOUNDATION DOCUMENT and is answered by its own field, so a turn that
-      // wrote all five and never touched it is a state `foundation.missing` cannot see. First,
-      // because it is written first and read first.
-      const missing = [...(state.readme.ok ? [] : ['README.md']), ...state.foundation.missing];
-      if (missing.length > 0) {
-        setUnwritten(missing);
-        return;
+    await run(async () => {
+      // ONE READ, THREE QUESTIONS, and it used to ask only the third. Writing CODE-QUALITY.md or
+      // TESTING.md as an agent blocks auto-pilot until a person has read it (decision 51), and the
+      // copilot has just been told to write both — but the same response also says whether the README
+      // and the five documents are THERE, and a turn that died four documents in walked the person to
+      // "that is setup done" over a project with none of them.
+      //
+      // A FAILED READ IS NOT EVIDENCE OF A MISSING DOCUMENT, so it hands over rather than accusing: the
+      // question this asks is answerable again on the next screen, and holding somebody here over a
+      // hiccup is the fault the machine check's own failure case names.
+      const state = await getReadiness().catch(() => undefined);
+      if (state) {
+        // THE README IS NOT A FOUNDATION DOCUMENT and is answered by its own field, so a turn that
+        // wrote all five and never touched it is a state `foundation.missing` cannot see. First,
+        // because it is written first and read first.
+        const missing = [...(state.readme.ok ? [] : ['README.md']), ...state.foundation.missing];
+        if (missing.length > 0) {
+          setUnwritten(missing);
+          return;
+        }
       }
-    }
-    await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
-  }, [leave]);
+      await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
+    });
+  }, [leave, run]);
 
+  // THE SETTLE OPENS THE REVIEW AND DOES NOTHING ELSE. It used to call `finish` — read the readiness,
+  // write the file, change the step — which is a machine deciding that six documents it has never
+  // read are good enough. W3 says the loop runs until the PERSON judges it ready, so all of that
+  // moved behind their press.
   useEffect(() => {
     if (running) {
       ran.current = true;
+      // A NEW TURN IS A NEW WINDOW, and without this the report never went away: `failed` scans from
+      // the mark `ask` set, so the error from a turn that fell over stayed inside the scan for every
+      // turn after it — ask for a rewrite from the composer, watch it succeed, and "something went
+      // wrong while it was writing" is still on the screen underneath it. Moved here rather than into
+      // the composer's path because this is the only place that knows a turn STARTED, whoever sent it.
+      // A turn refused before it began never raises `running`, so the offer it belongs to still sees
+      // its error.
+      mark.current = committed.current;
       return;
     }
     if (!ran.current) return;
     ran.current = false;
-    void finish();
-  }, [running, finish]);
+    setSettled(true);
+  }, [running]);
 
   // A turn refused before it started — no credential, no assistant — arrives as an error and nothing
   // else: the server's own `copilot:state` never goes up, so nothing here would ever settle. The offer
@@ -1257,61 +1574,66 @@ function DocsStep({
   // doing rather than that it is doing something.
   const tool = items.filter((item) => item.kind === 'tool').at(-1)?.toolName;
 
-  // The holding screen, and only until this visit sends a turn of its own: `Carry on writing` is an
-  // ordinary offer once accepted, and the turn it starts belongs on the writing screen.
-  const holding = written && !sent;
-
   return (
     <>
-      <Text as="h2" size="title" ink="strong" family="display">
-        Writing it all down
-      </Text>
-      <Text role="hint">
-        {holding
-          ? 'These are already written. Read them below, ask for more, or carry on — nothing here is changed unless you ask for it.'
-          : 'Your assistant writes the README and five short guiding documents from your answers. Where it has to guess, it says so in the document rather than guessing quietly.'}
-      </Text>
+      {/* THE PROSE KEEPS THE MEASURE THE STEP GAVE UP. `.wizard-wide` takes the card off `--measure`
+          because the review is a workspace — six cards beside a conversation — and the heading and the
+          hint went with it: at 1280 the pair was drawn 1198px wide, which is roughly 200 characters on
+          one line and unreadable by the rule the rest of the product is held to. The container is the
+          two of them and nothing else; the cards below are the part that wants the window. */}
+      <Stack direction="column" gap={5} className="wizard-prose">
+        <Text as="h2" size="title" ink="strong" family="display">
+          Writing it all down
+        </Text>
+        <Text role="hint">
+          {review
+            ? 'Read the short summaries. Anything you want said differently, say so in the chat — click the document first, so it knows which one you mean.'
+            : 'Your assistant writes the README and five short guiding documents from your answers. Where it has to guess, it says so in the document rather than guessing quietly.'}
+        </Text>
+      </Stack>
 
       {readFailed && <ReadFailed retry={retry} busy={busy !== null} />}
-      {running && <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />}
+      {/* NOT ONCE THE REVIEW IS UP: the panel beside the cards carries this same indicator, with the
+          same Cancel under it, so a turn asked for from the chat would put two of them on one screen.
+          On the writing screen there is no panel, and it is the only thing moving. */}
+      {running && !review && (
+        <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />
+      )}
       {/* ONE LINE, THE LATEST, as the build log shows itself on the machine check: what a person needs
           from a turn this long is evidence it is still moving, not the transcript. The word is the
           CLI'S — a tool name, not a sentence this screen wrote — so it is exempt from the plain-words
           sweep by element, exactly as the model's own proposal and summaries are. */}
       {tool && <Readout testId="verbatim-tool">{tool}</Readout>}
-      {/* THE SUMMARIES AS THEY LAND, which is the only part of this a beginner can read while it runs.
-          The words are the model's and are rendered whole, so they are exempt from the plain-words
-          sweep by element exactly as the stack proposal is. */}
-      {Object.entries(resumes).map(([name, summary]) => (
-        <Stack key={name} direction="column" gap={3}>
-          <Text ink="strong">{name}</Text>
-          <Text as="p" role="hint" testId="verbatim-resume">
-            {summary}
-          </Text>
-        </Stack>
-      ))}
+      {/* THE SUMMARIES AS THEY LAND while the first turn writes them, which is the only part of this a
+          beginner can read while it runs — then the review, which is the same cards with the
+          conversation beside them and the way on underneath. Whether there is anything to show yet is
+          the cards' own question, on the writing screen only. */}
+      {review ? (
+        <ReviewLayout
+          resumes={resumes}
+          running={running}
+          copilot={copilot}
+          contextBudget={snapshot?.config.contextBudget}
+          busy={busy !== null}
+          onContinue={() => void finish()}
+        />
+      ) : (
+        <DocumentCards resumes={resumes} running={running} />
+      )}
 
       {failed && (
         <Notice as="p" tone="warn">
           Something went wrong while it was writing — you can ask it to try again.
         </Notice>
       )}
-      {unwritten && <Unwritten names={unwritten} busy={busy !== null} onRetry={() => void ask()} />}
-      {holding && (
-        <Stack gap={4}>
-          {/* The offer, put back deliberately rather than raised on arrival: the person asking for
-              more writing knows what they have, and the effect above does not. */}
-          <Button disabled={busy !== null} onClick={() => void ask()}>
-            Carry on writing
-          </Button>
-          <Button variant="primary" disabled={busy !== null} onClick={() => void finish()}>
-            Continue
-          </Button>
-        </Stack>
+      {unwritten && (
+        <Unwritten names={unwritten} busy={busy !== null} review={review} onRetry={() => void ask()} />
       )}
-      {/* `unwritten` carries its own offer, and two primary buttons saying the same thing on one
-          screen is a choice between them. */}
-      {!holding && !unwritten && !running && (!sent || failed) && (
+      {/* `!unwritten` USED TO BE IN THIS CONDITION AND COULD NEVER FIRE. Only `finish` sets `unwritten`,
+          only the review's button calls `finish`, and the review never closes once open — so `!review`
+          had already answered for it at every reachable state. A term that cannot change an outcome
+          reads as a case somebody tested. */}
+      {!review && !running && (!sent || failed) && (
         <Stack gap={4}>
           <Button variant="primary" disabled={busy !== null} onClick={() => void ask()}>
             Write the drafts

@@ -52,6 +52,7 @@ import { BackendPicker } from '../../organisms/copilot/BackendPicker';
 import { CopilotPanel } from '../../organisms/copilot/CopilotPanel';
 import { clampToCaps, resolveChoice } from '../../organisms/copilot/choice';
 import { ThinkingIndicator } from '../../organisms/copilot/ThinkingIndicator';
+import { List } from '../../organisms/shared/List';
 
 // EVERYTHING THE EMBEDDED CONVERSATION NEEDS, TAKEN OFF THE ORGANISM rather than restated here. The
 // documents step renders the DOCK'S panel — the same component, on the same `useCopilot` instance —
@@ -187,7 +188,15 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
   // it is handed, and an inline arrow would rebuild it on every render.
   const leaveForm = useCallback(() => setStep('stack'), []);
   const leaveStack = useCallback(() => setStep('docs'), []);
-  const leaveGates = useCallback(() => setStep('handoff'), []);
+  const leaveGates = useCallback(() => setStep('import'), []);
+  // WHAT THE IMPORT SAID IT DID, carried to the screen that reports it — the scan notice's pattern and
+  // its reason: the count is the model's own closing sentence, and the step that heard it is unmounted
+  // by the time the closing screen renders. Absent when no turn ran, which is the common journey.
+  const [imported, setImported] = useState<string>();
+  const leaveImport = useCallback((made?: string) => {
+    setImported(made);
+    setStep('ready');
+  }, []);
 
   let body: ReactNode;
   if (step === 'identity')
@@ -210,7 +219,18 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
   else if (step === 'docs')
     body = <DocsStep mode={mode} snapshot={snapshot} copilot={copilot} onContinue={setStep} />;
   else if (step === 'gates') body = <GatesStep mode={mode} onContinue={leaveGates} />;
-  else body = <HandoffStep />;
+  else if (step === 'ready') body = <ReadyStep mode={mode} snapshot={snapshot} imported={imported} />;
+  // `handoff` IS NAMED RATHER THAN LEFT TO THE DEFAULT. It was where setup ended before the journey
+  // had an import and a closing screen; it is retired from the flow, still on the disk of anything set
+  // up under that build, and what it was standing in front of is this step. `wizardFrame` briefs it as
+  // the import for the same reason — the two halves have to name the same pair. decision 79.
+  else if (step === 'import' || step === 'handoff')
+    body = <ImportStep mode={mode} snapshot={snapshot} copilot={copilot} onContinue={leaveImport} />;
+  // AND THE DEFAULT IS THE ENDING, WHICH SPENDS NOTHING. A step this build does not know can only come
+  // off a file written by a later one, and the import was standing here: an unknown step put a paste
+  // box in front of somebody and sent whatever they typed to a credentialed conversation. The closing
+  // screen only reports, so the default must never be an agent step.
+  else body = <ReadyStep mode={mode} snapshot={snapshot} imported={imported} />;
 
   return (
     <Stack fill scroll justify="center" align="start" pad={[7, 6]}>
@@ -221,18 +241,18 @@ export function WizardView({ mode, start, snapshot, bump, copilot, onOpened, onE
         <Stack gap={4} wrap>
           {/* The way out of every step, quiet and always there. At the end it is the only thing left to
               press, so it stops being a skip and ENDS setup rather than leaving it. */}
-          {step === 'handoff' ? (
+          {step === 'ready' ? (
             <Button variant="primary" disabled={busy !== null} onClick={endSetup}>
-              Take me to the board
+              Open the board
             </Button>
           ) : (
             <Button onClick={onExit}>Not now — take me to the board</Button>
           )}
           {/* Only where there is a file to delete AND setup is not already over. Nothing is written until
               the scaffold, so the identity step has nothing to stop offering — and if another project
-              happens to be open, its file is not this setup's to delete. At the handoff step the button
+              happens to be open, its file is not this setup's to delete. At the closing step the button
               above has just done this, and two endings on one screen read as a choice between them. */}
-          {step !== 'identity' && step !== 'handoff' && (
+          {step !== 'identity' && step !== 'ready' && (
             <Button variant="bare" disabled={busy !== null} onClick={endSetup}>
               Stop offering this
             </Button>
@@ -269,7 +289,13 @@ function IdentityStep({ mode, onScaffolded }: { mode: ScaffoldMode; onScaffolded
       // has taken the mode since adoption left the gate, and nothing has asked for it. It is what makes
       // the difference between adding the cockpit beside somebody's work and seeding it with three
       // sample cards.
-      await scaffoldProject(target.path, target.name, mode);
+      //
+      // AND NO SAMPLE CARDS IN EITHER MODE. Setup ends by handing over to Start, which derives a feature
+      // list only from an EMPTY board — so a greenfield journey that seeded three "delete me" cards spent
+      // its first real run building one of them and never reached the review stop. A person who came
+      // through here has just read their own documents or their own imported list; a demo card is noise
+      // beside that. Measured on a live journey, against "Sample engineering card".
+      await scaffoldProject(target.path, target.name, mode, false);
       // Written before the shell is told the project is open, so a project that opens with setup
       // pending is never one whose state file has not landed yet.
       await putWizard({ mode, step: 'backend' });
@@ -1540,7 +1566,7 @@ function DocsStep({
           return;
         }
       }
-      await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'handoff');
+      await leave((state?.unreviewedGates.length ?? 0) > 0 ? 'gates' : 'import');
     });
   }, [leave, run]);
 
@@ -1700,7 +1726,7 @@ function GatesStep({ mode, onContinue }: { mode: ScaffoldMode; onContinue: () =>
     const latest = await getWizard()
       .then((r) => r.state ?? undefined)
       .catch(() => undefined);
-    await putWizard({ ...(latest ?? saved('handoff')), step: 'handoff' }).catch(() => {});
+    await putWizard({ ...(latest ?? saved('import')), step: 'import' }).catch(() => {});
     onContinue();
   }, [onContinue, saved]);
 
@@ -1747,15 +1773,419 @@ function GatesStep({ mode, onContinue }: { mode: ScaffoldMode; onContinue: () =>
   );
 }
 
-function HandoffStep() {
+// HOW MUCH LIST THIS BOX WILL SEND, and it is generous on purpose: a kept todo list is a few hundred
+// lines, and this is well past any of them. It exists because the whole box goes into ONE prompt — a
+// file dropped in by accident is a turn that costs minutes and answers about the wrong thing. The
+// dock's composer has never had a cap and does not need one; a box captioned "Paste your list" is
+// what invites a paste nobody measured.
+const PASTE_CAP = 20_000;
+
+// THE TWO BOXES AND THE PAIR OF BUTTONS UNDER THEM. Its own component for `ReviewLayout`'s reason and
+// measured the same way: the step was over biome's cognitive-complexity limit and this is the block
+// that comes out cleanest, because everything in it is about the paste and nothing in it reads the
+// turn. The way out is passed in rather than built here — it is the same button as the one on the
+// question, and two copies of it are two things to keep saying the same.
+function ListBoxes({
+  list,
+  note,
+  words,
+  busy,
+  onList,
+  onNote,
+  onSend,
+  noDoor,
+}: {
+  list: string;
+  note: string;
+  // WHAT WOULD BE SENT, composed by the step because the step is what sends it. Passed down rather
+  // than recomposed here so the button is shut on exactly the text the turn would carry.
+  words: string;
+  busy: boolean;
+  onList: (value: string) => void;
+  onNote: (value: string) => void;
+  onSend: () => void;
+  noDoor: ReactNode;
+}) {
+  // Measured on the paste alone: the one-liner is a line by construction, and a cap that summed the
+  // two would refuse a list at the limit because somebody explained it.
+  const tooLong = list.length > PASTE_CAP;
+  return (
+    <>
+      <Field label="Paste your list, or say where it lives">
+        <Control as="textarea" rows={8} value={list} onChange={(e) => onList(e.target.value)} />
+      </Field>
+      <Field
+        label="Anything the assistant should know about how you keep it?"
+        hint="One line is plenty — “top section is done, ignore it”, that kind of thing."
+      >
+        <Control value={note} onChange={(e) => onNote(e.target.value)} />
+      </Field>
+      {tooLong && (
+        <Notice as="p" tone="warn">
+          {/* THE NUMBER IS THE CAP ITSELF, for the reason the closing screen's document count is the
+              size of the set it counts: a figure typed into prose beside a constant is a sentence
+              waiting to be wrong. `toLocaleString` is the readout's own grouping. */}
+          {`That is a lot to send in one go. Cut it down to the lines you want as cards — about ${PASTE_CAP.toLocaleString()} characters, which is a few hundred of them — and bring the rest in later.`}
+        </Notice>
+      )}
+      <Stack gap={4}>
+        <Button variant="primary" disabled={busy || words === '' || tooLong} onClick={onSend}>
+          Bring it in
+        </Button>
+        {noDoor}
+      </Stack>
+    </>
+  );
+}
+
+// THE LAST AGENT MOMENT, AND IT IS THE COPILOT UNDER A FRAME RATHER THAN A RUN (decision 79). What
+// confines the turn is NOT the credential: `assist` also writes foundation documents, moves and
+// archives cards on any board, declares the smoke command and installs packages — the full grant is
+// written out in the decision's own row. It is the frame, and the person reading the conversation as
+// it happens, which is why the panel is on this screen while the turn runs rather than a spinner over
+// a conversation nobody can see. It is also how the model asks its one question when it cannot tell
+// where something goes.
+//
+// SKIPPING IS THE COMMON CASE AND IS FIRST-CLASS (W1). Most people setting a project up keep no list
+// anywhere, so the step opens on a question with two doors and the no-door is a whole journey
+// through it — nothing spent, nothing asked for.
+function ImportStep({
+  mode,
+  snapshot,
+  copilot,
+  onContinue,
+}: {
+  mode: ScaffoldMode;
+  snapshot: ProjectSnapshot | null;
+  copilot: Conversation;
+  // WITH WHAT THE ASSISTANT SAID IT DID, where a turn ran. The closing screen reports it and this is
+  // the only place it exists: the sentence is pulled out of a transcript this step has a mark in, and
+  // the mark goes with the step. Absent through the no-door, which reported nothing because nothing ran.
+  onContinue: (made?: string) => void;
+}) {
+  const { saved } = useSaved(mode);
+  const { confirm, dialog } = useConfirm();
+  const { items, running, authorised, send } = copilot.copilot;
+  // The yes-door, which is the only thing that puts the two boxes on screen. Pressed once and it
+  // stays pressed: there is no way back to the QUESTION, and none is needed, because the no-door
+  // stands beside `Bring it in` behind it. This comment used to claim that already — while the
+  // no-door rendered only on the question, so the one thing left to a mis-click was ending setup.
+  const [bringing, setBringing] = useState(false);
+  const [list, setList] = useState('');
+  const [note, setNote] = useState('');
+  const [sent, setSent] = useState(false);
+  const [settled, setSettled] = useState(false);
+  // A TURN THAT WAS REFUSED, which is a different ending from one that finished — see the effect
+  // below. Separate from `sent` because it outlives it: clearing `sent` is what gives the screen back,
+  // and the report has to still be on it when the boxes return.
+  const [failed, setFailed] = useState(false);
+  // AND A TURN THE PERSON STOPPED. The Cancel is the panel's, so this screen only knows because it
+  // sits in front of it — see `watched` below. What it changes is the report: the last thing a
+  // cancelled turn said is mid-thought, and the closing screen would show it as the count of cards.
+  const [cancelled, setCancelled] = useState(false);
+  // A turn that never began cannot have ended: `running` is false before the first frame, and an
+  // ending read off that alone would open the way on the moment the person pressed.
+  const ran = useRef(false);
+  // WHERE THIS TURN BEGINS IN THE TRANSCRIPT, and the transcript is the CONVERSATION'S — it carries
+  // the documents step's turns, so "what it said when it finished" is this import's report only if
+  // the search starts where this turn did. Mirrored through an effect for the docs step's reason:
+  // the grant is asked for before the send, and anything arriving while that question is on screen
+  // belongs to neither turn.
+  const committed = useRef(0);
+  const mark = useRef(0);
+  const { busy, error, run } = useAction();
+
+  // Full-auto, clamped to what this assistant publishes — the docs step's choice and its reason: the
+  // model works unattended for minutes, through the product's own routes.
+  const { mode: turnMode } = clampToCaps(resolveChoice(snapshot?.config.copilot, {}), 'bypassPermissions');
+  // THEIR WORDS AND NOTHING ELSE. Which board, which column, whose words the titles are — all of that
+  // is the FRAME'S, composed on the server at the credential seam, because a brief the browser sends
+  // is one the browser can edit and it would land in the person's own transcript on the way past.
+  const words = [list.trim(), note.trim()].filter(Boolean).join('\n\n');
+
+  // THE PANEL'S CANCEL, WATCHED. The review layout wraps `send` for the same reason and in the same
+  // place: the control belongs to the dock's organism, and the only way a screen embedding it learns
+  // what was pressed is to stand in front of the handler.
+  const watched: Conversation = {
+    ...copilot,
+    copilot: {
+      ...copilot.copilot,
+      cancel: () => {
+        setCancelled(true);
+        copilot.copilot.cancel();
+      },
+    },
+  };
+
+  useEffect(() => {
+    committed.current = items.length;
+  }, [items.length]);
+
+  useEffect(() => {
+    if (running) {
+      ran.current = true;
+      return;
+    }
+    if (!ran.current) return;
+    ran.current = false;
+    setSettled(true);
+  }, [running]);
+
+  // A TURN REFUSED BEFORE IT STARTED — no credential, no assistant — arrives as an error and nothing
+  // else: the server's own `copilot:state` never goes up, so nothing here would ever settle. That left
+  // no way on and no way back, because the panel's own Retry is offered only where the server called
+  // the failure retryable, and an expired sign-in is exactly the failure it does not.
+  //
+  // THE DOCS STEP'S REMEDY, ONE SCREEN ALONG: the offer comes back. Clearing `sent` is what returns
+  // the two boxes, and they still hold what was typed — the paste is the one thing on this screen a
+  // person cannot reasonably be asked to produce twice.
+  const errored = sent && items.slice(mark.current).some((item) => item.kind === 'error');
+  useEffect(() => {
+    if (!errored) return;
+    setFailed(true);
+    setSent(false);
+  }, [errored]);
+
+  // THE FILE MOVES WITH THE SCREEN, from a fresh read — the docs step's `leave` exactly and for its
+  // reason: `putWizard` replaces the file whole, and `wizardFrame` keys on the step, so a file left
+  // at `import` would prefix every later conversation on this project with the import brief.
+  const leave = useCallback(
+    async (made?: string): Promise<void> => {
+      const latest = await getWizard()
+        .then((r) => r.state ?? undefined)
+        .catch(() => undefined);
+      await putWizard({ ...(latest ?? saved('ready')), step: 'ready' }).catch(() => {});
+      onContinue(made);
+    },
+    [onContinue, saved],
+  );
+
+  const bring = useCallback(async (): Promise<void> => {
+    // ASKED ONLY WHERE IT IS NOT ALREADY THERE. The documents step granted this a screen ago, and a
+    // new chat or a project switch is what takes it away — raising the question again over authority
+    // the person can see they gave teaches them the question means nothing.
+    if (!authorised) {
+      const ok = await confirm({
+        title: 'Let the assistant make the cards?',
+        body: 'It will read the list you pasted and create cards from it on your boards — through the product, for this conversation only. Nothing else in the project is touched.',
+        action: 'Let it make them',
+      });
+      if (!ok) return;
+    }
+    await run(async () => {
+      // AWAITED, AND THE ORDER IS THE POINT — the docs step's grant exactly. The credential is minted
+      // per turn from the authority the server holds when the turn arrives, so a turn that overtook
+      // the grant would arrive without one and could not create a single card.
+      if (!authorised) await setAuthority(true);
+      // A NEW TURN IS A NEW WINDOW, the docs step's rule: the report from the attempt that fell over
+      // would otherwise sit under the one the person asked for to fix it.
+      setFailed(false);
+      setCancelled(false);
+      mark.current = committed.current;
+      send(words, { mode: turnMode });
+      setSent(true);
+    });
+  }, [authorised, confirm, run, send, turnMode, words]);
+
+  // NOTHING FROM BEFORE THIS TURN, and the empty list is the half that matters: the transcript is
+  // the TAB'S and the documents step's turns are still in it, so a screen that read it from the start
+  // would stand under the question reporting the last tool that step reached for.
+  const since = sent ? items.slice(mark.current) : [];
+  // The latest tool it reached for, which is the one thing in a long turn that says WHAT it is doing.
+  const tool = since.filter((item) => item.kind === 'tool').at(-1)?.toolName;
+  // WHAT IT SAID WHEN IT FINISHED, pulled out of the transcript and put beside the way on: the frame
+  // told it to state the counts plainly, and that sentence is the answer to "what just happened to my
+  // board". Reading it out of a conversation that is minutes of tool calls is not the same offer.
+  //
+  // NOTHING AT ALL FROM A TURN THAT WAS STOPPED. A cancelled turn's last sentence is whatever it
+  // happened to be saying — a question, half a plan, a tool it was about to reach for — and lifting
+  // that onto the closing screen presents it as the report of what was made. Silence is honest there;
+  // the conversation itself is still in the dock for anybody who wants to read what happened.
+  const made = cancelled ? undefined : since.filter((item) => item.kind === 'assistant').at(-1)?.text;
+
+  // THE WAY OUT OF THE YES-DOOR, and it is on both screens rather than only the first. Pressing Yes
+  // is one click and there was no way back from it: somebody who meant No had to abandon setup to
+  // correct a mis-click. It goes when the turn is away, because from there the ending is `Done`.
+  const noDoor = (
+    <Button disabled={busy !== null} onClick={() => void leave()}>
+      No — finish up
+    </Button>
+  );
+
+  return (
+    <>
+      <Text as="h2" size="title" ink="strong" family="display">
+        {sent ? 'Bringing your list in' : 'Do you track work somewhere today?'}
+      </Text>
+      <Text role="hint">
+        {sent
+          ? 'It is making the cards now. Watch it as it goes, and answer if it asks you something.'
+          : 'A list you already keep — in a spreadsheet, in a notes app, in a text file — can walk in as cards. One card per line, on the board it belongs to, and nothing deeper than that.'}
+      </Text>
+
+      {!sent && !bringing && (
+        <Stack gap={4}>
+          <Button variant="primary" onClick={() => setBringing(true)}>
+            Yes — bring it in
+          </Button>
+          {noDoor}
+        </Stack>
+      )}
+
+      {/* WHY THE BOXES CAME BACK, above them rather than under the button: the words in them are the
+          ones that were just refused, and a person reading top to bottom meets the reason first. */}
+      {failed && (
+        <Notice as="p" tone="warn">
+          Something went wrong while it was making the cards — nothing was lost, and you can try again.
+        </Notice>
+      )}
+
+      {!sent && bringing && (
+        <ListBoxes
+          list={list}
+          note={note}
+          words={words}
+          busy={busy !== null}
+          onList={setList}
+          onNote={setNote}
+          onSend={() => void bring()}
+          noDoor={noDoor}
+        />
+      )}
+
+      {/* ONE LINE, THE LATEST, as the documents step shows the same thing while it writes: what a
+          person needs from a turn this long is evidence it is still moving. The word is the CLI'S — a
+          tool name and not a sentence this screen wrote — so it is exempt from the plain-words sweep
+          by element, exactly as the model's own words below are. */}
+      {tool && <Readout testId="verbatim-tool">{tool}</Readout>}
+      {/* THE CONVERSATION, WATCHED (ruling W11, decision 79). The dock's organism wearing this screen's
+          clothes: `compact` drops the whole of the dock's chrome — the header and its ✕, the chat
+          history, the backend and model pickers, the authority grant, the tool warning and the spend
+          readout — every one of them either a question setup answered on an earlier screen or a way
+          out of a screen that has one. What is left is the transcript, the composer, and the thinking
+          indicator with Cancel under it. The placeholder is this screen's to write, because the dock's
+          own names the dock. `watched` and not `copilot`: the Cancel under the indicator is the only
+          way a turn is stopped here, and this screen has to know it was. */}
+      {sent && (
+        <CopilotPanel
+          {...watched}
+          contextBudget={snapshot?.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+          compact
+          placeholder="Answer it, or say what to change"
+        />
+      )}
+
+      {settled && made && (
+        <Text as="p" testId="verbatim-made">
+          {made}
+        </Text>
+      )}
+      {/* SHUT WHILE A TURN RUNS, for the review's reason: finishing setup over a board being written
+          is finishing over a half-made board. AND GONE WHEN THE TURN WAS REFUSED: the way out of that
+          screen is the no-door beside `Bring it in`, and two endings on one screen read as a choice
+          between them. */}
+      {settled && !failed && (
+        <Stack gap={4}>
+          <Button variant="primary" disabled={running || busy !== null} onClick={() => void leave(made)}>
+            Done — finish up
+          </Button>
+        </Stack>
+      )}
+      {error && <Text role="error">{error}</Text>}
+      {dialog}
+    </>
+  );
+}
+
+// THE END OF SETUP, AND IT IS A REPORT RATHER THAN A CELEBRATION (W1, decision 79). Every sentence is
+// composed from what the wizard ALREADY HOLDS — the file it has been writing since the scaffold and
+// the project's own settings — plus one read of the readiness. Nothing here asks the server what was
+// just set up: a summary that re-derives its own facts is a second opinion about them, and two answers
+// to one question is the state this screen exists to end.
+//
+// ANYTHING UNKNOWN IS LEFT OUT RATHER THAN GUESSED, heading included. A setup resumed at this step
+// knows less than one walked end to end, and a line written to fill the gap would be the only thing
+// here a person has no way to check.
+//
+// AND IT NEVER BLOCKS ON READINESS. The wizard ends at a project ready to hand over; whether auto-pilot
+// could start this second is the board's question, and decision 74's gate is what meets them after
+// Start. An honest gap with the way out still open is the whole of W1.
+function ReadyStep({
+  mode,
+  snapshot,
+  // What the import reported, in the assistant's own words, handed over by the step that watched it.
+  imported,
+}: {
+  mode: ScaffoldMode;
+  snapshot: ProjectSnapshot | null;
+  imported?: string;
+}) {
+  const { saved } = useSaved(mode);
+  // ONCE, ON MOUNT — a constant trigger, because there is nothing on this screen that could change the
+  // answer. Null is "not answered yet" and a read that REJECTED leaves it null too, which is why
+  // neither branch below renders on it: reassurance before the answer lands is a lie for the length of
+  // a round trip, and a gap inferred from a rejection is the same lie the other way up.
+  const { readiness } = useReadiness(0);
+  const state = saved('ready');
+  const kind = snapshot?.config.box?.kind;
+  // ALL SIX OR NOTHING, because the sentence below COUNTS them. The documents step can hand over with
+  // fewer — a readiness read that failed lets it past — and "6 documents written" over five is the
+  // one claim on this screen nobody reading it can check.
+  const documents = Object.keys(DOC_NAMES).every((name) => state.resumes?.[name] !== undefined);
+
   return (
     <>
       <Text as="h2" size="title" ink="strong" family="display">
         That is setup done
       </Text>
-      <Text role="hint">
-        The next part needs the assistant, and it isn't built yet — everything you chose is saved.
-      </Text>
+      <Text role="hint">Everything you chose is saved. Here is what the project has now.</Text>
+
+      {kind && <Text as="p">Set up as: {KIND_LABELS[kind]}</Text>}
+      {/* THE SENTENCE THEY AGREED TO, WHOLE, and it is the model's words or their own rather than this
+          screen's — so it is exempt from the plain-words sweep by element, exactly as it is on the step
+          that proposed it. A summary that reworded the stack would be re-deciding it on the way out. */}
+      {state.stack && (
+        <Text as="p">
+          Built with: <Text testId="verbatim-stack">{state.stack}</Text>
+        </Text>
+      )}
+      {/* THE NUMBER IS DERIVED FROM THE SET IT COUNTS. It was the word "Six" beside a check over
+          `DOC_NAMES`, so a seventh document would have left this line quietly saying six — the one
+          claim on this screen nobody reading it can check. */}
+      {documents && (
+        <Text as="p">
+          {`${Object.keys(DOC_NAMES).length} documents written — read them any time in Project Control`}
+        </Text>
+      )}
+      {/* WHAT THE IMPORT SAID IT MADE, exempt for the same reason: the frame asked the model to state
+          the counts plainly, and nothing in the browser knows how many cards were created.
+          ATTRIBUTED, WHICH THE STACK LINE ABOVE ALREADY WAS. The sentence was standing on its own
+          among this screen's own plain statements, so a model that ended its turn with a QUESTION —
+          "shall I put the rest on product?" — read as something the wizard had checked. Naming whose
+          words they are costs four words and is the difference between a report and a claim. */}
+      {imported && (
+        <Text as="p">
+          What the assistant said when it finished: <Text testId="verbatim-imported">{imported}</Text>
+        </Text>
+      )}
+
+      {readiness?.ok && <Text as="p">Everything auto-pilot needs is here.</Text>}
+      {readiness && !readiness.ok && (
+        <>
+          {/* THE SERVER'S OWN SENTENCES, LISTED AND NOT REWRITTEN. Each names the file or the block
+              that clears it, and a wizard that reworded them would send somebody to fix what is not
+              broken — the probe refusal's argument on the backend step, and the same exemption by
+              element. No class: `ul.vb-list` already cancels the marker and the gap is the atom's. */}
+          <List as="ul" gap={2} testId="verbatim-blockers">
+            {readiness.blockers.map((blocker) => (
+              <li key={blocker}>
+                <Text>{blocker}</Text>
+              </li>
+            ))}
+          </List>
+          <Text as="p">You can fix these from the board — nothing is lost.</Text>
+        </>
+      )}
     </>
   );
 }

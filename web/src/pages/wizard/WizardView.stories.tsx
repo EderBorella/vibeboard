@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ComponentProps } from 'react';
+import { config, snapshot } from '../../../../.storybook/fixtures';
 import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
-import type { ControlFile, ControlGroup, FileRead } from '../../lib/api';
-import type { WizardState } from '../../lib/shared';
+import type { ControlFile, ControlGroup, FileRead, Readiness } from '../../lib/api';
+import type { ProjectSnapshot, WizardState } from '../../lib/shared';
 import { WizardView } from './WizardView';
 
 // SETTING A PROJECT UP, AS A WHOLE SCREEN. Both stories are the identity step, which is the one that runs
@@ -210,3 +211,77 @@ const review: Story = {
 export const ReviewAt900: Story = { ...review, globals: { viewport: { value: 'w900' } } };
 export const ReviewAt1200: Story = { ...review, globals: { viewport: { value: 'w1200' } } };
 export const ReviewAt1440: Story = { ...review, globals: { viewport: { value: 'w1440' } } };
+
+// ---------- The journey's last two steps ----------
+//
+// BOTH RENDER FROM THE FILE AND THE PROJECT'S OWN SETTINGS, which is the only reason a workbench with
+// no server can show them: the import asks the network for nothing until `Bring it in` is pressed, and
+// the ending reads the file, the config and one readiness answer. The tables below stand in for all
+// three, and `EMPTY`'s readiness is the honest empty — nothing blocking.
+
+// A PROJECT WITH A KIND. The shared snapshot's config carries no box block, and the ending says what
+// kind of project this is — so without one that line is omitted, which is the state a resumed setup
+// shows rather than the one these stories are about. Typed, for the reason every table here is.
+const kinded: ProjectSnapshot = { ...snapshot, config: { ...config, box: { kind: 'web' } } };
+
+// THE FILE AS IT STANDS ONCE THE DOCUMENTS ARE DONE, carried whole into both steps because that is
+// what is on disk at each of them: the three answers, the stack as agreed, all six summaries. Spread
+// off the review's own state rather than written a second time — a story that trimmed it would be
+// describing a setup that cannot have reached these screens.
+const importing: { state: WizardState } = { state: { ...reviewed.state, step: 'import' } };
+const ending: { state: WizardState } = { state: { ...reviewed.state, step: 'ready' } };
+
+// THE QUESTION AND ITS TWO DOORS. The yes-side — the list box and the one-liner — opens on a press,
+// which a story cannot make; what is here is the screen every person meets, and the one most of them
+// leave through the no-door (W1).
+const importStep: Story = {
+  args: { start: 'import', snapshot: kinded },
+  decorators: [withRoutes({ ...EMPTY, '/api/wizard': importing })],
+};
+
+export const ImportAt900: Story = { ...importStep, globals: { viewport: { value: 'w900' } } };
+export const ImportAt1200: Story = { ...importStep, globals: { viewport: { value: 'w1200' } } };
+export const ImportAt1440: Story = { ...importStep, globals: { viewport: { value: 'w1440' } } };
+
+// THE ENDING: what was set up, whether anything is still missing, and the one thing left to press.
+// The import's own closing sentence is absent here for the reason it is absent from the browser
+// harness — it is the model's, and it lives in the step that heard it rather than on disk.
+const ready: Story = {
+  args: { start: 'ready', snapshot: kinded },
+  decorators: [withRoutes({ ...EMPTY, '/api/wizard': ending })],
+};
+
+export const ReadyAt900: Story = { ...ready, globals: { viewport: { value: 'w900' } } };
+export const ReadyAt1200: Story = { ...ready, globals: { viewport: { value: 'w1200' } } };
+export const ReadyAt1440: Story = { ...ready, globals: { viewport: { value: 'w1440' } } };
+
+// THE SAME ENDING WITH SOMETHING STILL MISSING, and this is the ONLY place a person can look at that
+// list. The browser harness measures the ending on a fixture whose readiness is `ok` — it asserts the
+// blocker list is absent, deliberately — and the unit suite reads the sentences out of a DOM with no
+// layout engine. So the one screen in setup that reports bad news has never been seen set.
+//
+// THE SENTENCES ARE THE SERVER'S, VERBATIM from `blockersFrom` in src/server/autopilot/routes.ts.
+// They are what the wizard renders unreworded (each names the file or the block that clears it), so a
+// story that invented plainer ones would be showing a screen this product cannot produce.
+//
+// ANNOTATED, like every row in this file: a `RouteTable` value is `object`, and the ending reads
+// `ok` and `blockers` off this one — an un-annotated literal is checked by nothing at all.
+const blocked: Readiness = {
+  ok: false,
+  blockers: [
+    'foundation/UX.md has not been written yet.',
+    'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
+  ],
+  readme: { ok: true },
+  foundation: { present: [], missing: ['UX.md'], ok: false },
+  gates: { ok: true, count: 1 },
+  smoke: { ok: true },
+  phases: { problems: [], count: 6 },
+  unreviewedGates: [],
+};
+
+export const ReadyWithBlockers: Story = {
+  args: { start: 'ready', snapshot: kinded },
+  decorators: [withRoutes({ ...EMPTY, '/api/wizard': ending, '/api/autopilot/readiness': blocked })],
+  globals: { viewport: { value: 'w1200' } },
+};

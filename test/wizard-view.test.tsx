@@ -64,12 +64,18 @@ const ws = vi.hoisted(() => {
     state?: string | { running: boolean };
     line?: string;
     record?: { run: string; status: string; outcome?: string };
-    event?: { kind: string; name?: string; text?: string };
+    // `retryable` is set on error events only and is DECIDED ON THE SERVER (src/core/copilot-errors.ts).
+    // Carried by the fake because it gates the panel's Retry: an expired sign-in is `false`, and a
+    // screen whose only way forward was that button is a screen with no way forward at all.
+    event?: { kind: string; name?: string; text?: string; retryable?: boolean };
     // A REPLAYED TRANSCRIPT, which is how the dock's conversation arrives on connect: the copilot
     // channel replaces the client's items wholesale from what is on disk. Carried here because the
     // docs step's reading of "did this turn fail" is a question about WHICH items, and a fake that
     // could only append live ones could not put an old one in front of it.
     items?: { kind: string; text: string; toolName?: string }[];
+    // The authority as the server reports it — pushed on connect and on every change, and the only
+    // thing the browser knows about it.
+    authorised?: boolean;
     chats?: unknown[];
     stats?: { costUsd: number; turns: number; lastDurationMs: number; contextTokens: number };
   };
@@ -301,7 +307,15 @@ describe('the identity step, with no project yet', () => {
     expect(screen.getByText('/data/projects/calculator')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Create the project' }));
 
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/data/projects/calculator', 'calculator', 'greenfield');
+    // `false` IS THE SAMPLE CARDS DECLINED, and it is the whole of the wizard's hand-off: the bootstrap
+    // derives a feature list only from an empty board, so three seeded "delete me" cards are what Start
+    // would spend its first real run on instead of reaching `decision 74`'s review stop.
+    expect(api.scaffoldProject).toHaveBeenCalledWith(
+      '/data/projects/calculator',
+      'calculator',
+      'greenfield',
+      false,
+    );
     // The file is written before the shell is told, so a project that opens with a wizard pending is
     // never a project whose wizard file has not landed yet.
     await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'backend' }));
@@ -331,7 +345,7 @@ describe('the identity step, bringing in a repository', () => {
 
     // The path is the folder AS TYPED with its trailing slash dropped — never rebuilt from the slug,
     // which for a folder whose name is not already one would name a directory that does not exist.
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'my-repo', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'my-repo', 'brownfield', false);
     await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'brownfield', step: 'backend' }));
   });
 
@@ -353,7 +367,7 @@ describe('the identity step, bringing in a repository', () => {
 
     expect(bring.disabled).toBe(false);
     fireEvent.click(bring);
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/日本語', 'meter-reader', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/日本語', 'meter-reader', 'brownfield', false);
   });
 
   it('shows the name it derived from the folder, and lets it be changed', () => {
@@ -367,7 +381,7 @@ describe('the identity step, bringing in a repository', () => {
     type(/^name/i, 'meters');
     fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
 
-    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'meters', 'brownfield');
+    expect(api.scaffoldProject).toHaveBeenCalledWith('/work/My Repo', 'meters', 'brownfield', false);
   });
 
   it('will not bring in a relative path either', () => {
@@ -407,9 +421,9 @@ describe('the two ways out', () => {
   // state file is deleted on finish or abandon, so a finish that deleted nothing left the wizard being
   // offered for ever to somebody who had completed it.
   it('finishing deletes the file BEFORE it leaves, exactly as abandoning does', async () => {
-    view({ start: 'handoff', snapshot: opened });
+    view({ start: 'ready', snapshot: opened });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open the board' }));
 
     await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
     expect(api.clearWizard).toHaveBeenCalledTimes(1);
@@ -419,10 +433,10 @@ describe('the two ways out', () => {
   it('offers no second ending at the last step', () => {
     // Completion IS the ending here, so `Stop offering this` would be a second button promising what
     // the first one has already done — and the two would read as a choice between them.
-    view({ start: 'handoff', snapshot: opened });
+    view({ start: 'ready', snapshot: opened });
 
     expect(screen.queryByRole('button', { name: 'Stop offering this' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Take me to the board' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open the board' })).toBeTruthy();
   });
 
   it('does not offer to stop before there is anything to stop', () => {
@@ -561,7 +575,7 @@ describe('the offer to finish setup', () => {
   // wall then believes, and the bug this pins lived exactly between them — finishing deleted nothing, so
   // a completed setup was offered again on every open for ever.
   it('stops being offered once setup is finished', async () => {
-    let file: WizardState | null = { mode: 'greenfield', step: 'handoff' };
+    let file: WizardState | null = { mode: 'greenfield', step: 'ready' };
     api.getWizard.mockImplementation(async () => ({ state: file }));
     api.clearWizard.mockImplementation(async () => {
       file = null;
@@ -571,8 +585,8 @@ describe('the offer to finish setup', () => {
 
     // Wired the way the shell wires it: the wizard's only report of leaving is `onExit`, and the shell's
     // handler is `setup.leave()`.
-    view({ start: 'handoff', snapshot: opened, onExit: () => result.current.leave() });
-    fireEvent.click(screen.getByRole('button', { name: 'Take me to the board' }));
+    view({ start: 'ready', snapshot: opened, onExit: () => result.current.leave() });
+    fireEvent.click(screen.getByRole('button', { name: 'Open the board' }));
 
     await waitFor(() => expect(result.current.pending).toBe(false));
     act(() => result.current.resume());
@@ -1700,7 +1714,7 @@ describe('the docs step', () => {
     // The review is what a settle reveals now rather than the next step, so this is the assertion
     // that says the settle was not believed: no layout, and nothing asked of the machine.
     expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
-    expect(screen.queryByText('That is setup done')).toBeNull();
+    expect(screen.queryByText('Do you track work somewhere today?')).toBeNull();
     expect(api.getReadiness).not.toHaveBeenCalled();
   });
 
@@ -1721,7 +1735,7 @@ describe('the docs step', () => {
     expect(await screen.findByText('One thing to read before anything runs')).toBeTruthy();
   });
 
-  it('goes straight to the end when none was', async () => {
+  it('goes straight to the import when none was', async () => {
     docs();
     fireEvent.click(await screen.findByRole('button', { name: 'Let it write' }));
     await waitFor(() => expect(ws.sent).toHaveLength(1));
@@ -1730,7 +1744,7 @@ describe('the docs step', () => {
     await turn(false);
     fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // "DONE" HAS TO MEAN SOMETHING WAS WRITTEN. The step read the readiness and looked at one field of
@@ -1830,7 +1844,7 @@ describe('the docs step', () => {
     await waitFor(() =>
       expect(api.putWizard).toHaveBeenCalledWith({
         mode: 'greenfield',
-        step: 'handoff',
+        step: 'import',
         answers: { what: 'a tool for reading meters' },
         resumes: { 'README.md': 'What the project is, in a paragraph.' },
       }),
@@ -1905,9 +1919,9 @@ describe('the docs step', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: ADVANCE }));
 
-      expect(await screen.findByText('That is setup done')).toBeTruthy();
+      expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
       expect(ws.sent).toHaveLength(0);
-      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
+      await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'import' }));
     });
   });
 
@@ -2380,7 +2394,7 @@ describe('the gates step', () => {
     fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
 
     await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // AND THE FILE MOVES WITH IT. This step wrote nothing, so a setup finished through the reading step
@@ -2402,8 +2416,8 @@ describe('the gates step', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: "I've read them — carry on" }));
 
-    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'handoff' }));
-    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ ...written, step: 'import' }));
+    expect(await screen.findByText('Do you track work somewhere today?')).toBeTruthy();
   });
 
   // ADVANCED BY THE ANSWER AND NOT BY THE PRESS. A screen that moved on before the server agreed would
@@ -2416,6 +2430,538 @@ describe('the gates step', () => {
     await waitFor(() => expect(api.getReadiness).toHaveBeenCalledTimes(2));
     expect(screen.queryByText('That is setup done')).toBeNull();
     expect(screen.getByText('One thing to read before anything runs')).toBeTruthy();
+  });
+});
+
+// THE LAST AGENT MOMENT (decision 79). Whatever the person already tracks work with walks in as cards
+// — the copilot under the import frame, watched: the panel is on the screen while it happens, because
+// a person reading the conversation IS the safety argument for the scope it runs under.
+describe('the import step', () => {
+  beforeEach(() => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+  });
+
+  const importing = () => view({ start: 'import', snapshot: opened });
+
+  const QUESTION = 'Do you track work somewhere today?';
+  const BRING = 'Bring it in';
+  const ADVANCE = 'Done — finish up';
+  const GRANT = 'Let it make them';
+
+  // The copilot's own state frame, as the server broadcasts it — the only thing that says a turn has
+  // begun or ended. The docs step's helper exactly, and for its reason.
+  const turn = async (running: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running } });
+    });
+  };
+
+  // What the model said, arriving the way an answer really does.
+  const said = async (text: string): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text } });
+    });
+  };
+
+  // The authority as the SERVER reports it: pushed on connect and on every change, which is the only
+  // thing the browser knows about it. A new chat or a project switch revokes it, and this is how the
+  // screen finds out.
+  const granted = async (authorised: boolean): Promise<void> => {
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised });
+    });
+  };
+
+  const fill = async (list: string, note?: string): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    type(/paste your list/i, list);
+    if (note !== undefined) type(/anything the assistant/i, note);
+  };
+
+  // SKIPPING IS FIRST-CLASS (W1): most people setting a project up do not keep a list anywhere, and
+  // the no-door is their whole journey through this step. Nothing is spent and nothing is asked.
+  it('takes the no-door to the end without spending a turn', async () => {
+    importing();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'No — finish up' }));
+
+    // THE FILE MOVES WITH THE SCREEN, from a fresh read: `wizardFrame` keys on the step, so a file
+    // left at `import` would prefix every later conversation on the project with the import brief.
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'ready' }));
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+  });
+
+  // A MIS-CLICK ON THE YES-DOOR HAS A CHEAP EXIT. The no-door used to go with the question, so one
+  // click put a person in front of two boxes with no way back — and the only things left on the
+  // screen ended setup rather than this step. It stands behind the yes-door now, and it still does
+  // exactly what it says: no turn, no grant, straight to the ending.
+  it('keeps the way out standing behind the yes-door, and it still spends nothing', async () => {
+    importing();
+    await granted(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    // The premise: this really is the screen behind the yes-door and not the question.
+    expect(screen.getByLabelText(/paste your list/i)).toBeTruthy();
+    type(/paste your list/i, 'Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: 'No — finish up' }));
+
+    await waitFor(() => expect(api.putWizard).toHaveBeenCalledWith({ mode: 'greenfield', step: 'ready' }));
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+  });
+
+  // THE GRANT COMES FIRST, AND IT IS ASKED FOR RATHER THAN ASSUMED. The credential is minted per turn
+  // from the authority the server holds when the turn arrives, so a turn that overtook the grant would
+  // arrive without one and could not create a single card.
+  it('asks before it makes anything when the authority has lapsed, and has it before the turn', async () => {
+    const grant = deferred<{ authorised: boolean }>();
+    api.setAuthority.mockReturnValue(grant.promise);
+    importing();
+    await fill('Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    expect(await screen.findByText('Let the assistant make the cards?')).toBeTruthy();
+    expect(ws.sent).toHaveLength(0);
+    expect(api.setAuthority).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: GRANT }));
+
+    await waitFor(() => expect(api.setAuthority).toHaveBeenCalledWith(true));
+    expect(ws.sent).toHaveLength(0);
+
+    await grant.settle({ authorised: true });
+
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  // AND IT IS NOT ASKED WHEN IT IS ALREADY THERE — the other half, without which the case above only
+  // proves the question is always raised. The documents step granted it a screen ago; asking a second
+  // time for something the person can see they already gave teaches them the question means nothing.
+  it('asks nothing when the authority is still live', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    expect(screen.queryByText('Let the assistant make the cards?')).toBeNull();
+    expect(api.setAuthority).not.toHaveBeenCalled();
+  });
+
+  // ONE TURN, AND EVERY WORD IN IT IS THEIRS. The rules — the boards, the first column, no invented
+  // bodies — are the FRAME's, composed on the server at the credential seam: a brief the browser sends
+  // is one the browser can edit, and it would land in the person's own transcript on the way past.
+  //
+  // AND NO `attach`. That field names one of the six documents the review step talks about; an import
+  // is about a list the product has no copy of, and a name on this turn would put a document's path in
+  // front of a model that was asked about a todo list.
+  it('sends the paste and the one-liner as one turn, attached to nothing', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta\nFix the login bug', 'The top section is done, ignore it.');
+
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // Exact, not a substring: what the browser composes IS the person's words and a blank line, and a
+    // sentence of the page's own invented between them would be invisible to a `toContain`.
+    expect(ws.sent[0]).toEqual({
+      type: 'copilot:send',
+      text: 'Ship the beta\nFix the login bug\n\nThe top section is done, ignore it.',
+      mode: 'bypassPermissions',
+    });
+    expect(ws.sent[0]).not.toHaveProperty('attach');
+  });
+
+  // A CAP ON THE PASTE, AND THE FIXTURE IS ONE CHARACTER EITHER SIDE OF IT. The whole box goes into
+  // one prompt, so a file dropped in by accident is minutes of turn about the wrong thing — and the
+  // dock's composer has no cap because nothing about it says "paste". The sentence is the wizard's
+  // own and the send is shut while it is on screen; at the cap exactly, neither is true.
+  it('refuses a paste past the cap, in plain words, and takes one at it', async () => {
+    importing();
+    await granted(true);
+    await fill('x'.repeat(20_001));
+
+    expect(screen.getByText(/That is a lot to send in one go/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: BRING }) as HTMLButtonElement).disabled).toBe(true);
+
+    type(/paste your list/i, 'x'.repeat(20_000));
+
+    expect(screen.queryByText(/That is a lot to send in one go/)).toBeNull();
+    expect((screen.getByRole('button', { name: BRING }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // THE WAY ON WAITS FOR THE CARDS. A turn that creates a dozen cards runs for minutes, and an advance
+  // standing there while it works is an invitation to finish setup over a half-made board.
+  it('opens the way on only once the turn has settled, and says what the assistant said', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    // AND BOTH DOORS ARE GONE, which is the other end of the no-door standing behind the yes-door:
+    // from here the ending is `Done — finish up`, and a second way out beside it would read as a
+    // choice between them.
+    expect(screen.queryByRole('button', { name: 'No — finish up' })).toBeNull();
+
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+    await turn(true);
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+
+    await said('I made 4 cards on features and 1 on engineering.');
+    await turn(false);
+
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    // The count is the news, and it is the model's own sentence rather than a number this screen
+    // counted — nothing in the browser knows how many cards were made.
+    expect(screen.getByTestId('verbatim-made').textContent).toBe(
+      'I made 4 cards on features and 1 on engineering.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: ADVANCE }));
+
+    await waitFor(() =>
+      expect(api.putWizard).toHaveBeenCalledWith(expect.objectContaining({ step: 'ready' })),
+    );
+  });
+
+  // A REFUSED TURN GIVES THE SCREEN BACK, which is the documents step's remedy exactly. A turn that
+  // never began raises no `copilot:state`, so nothing settles: there was no Done, and the panel's own
+  // Retry is offered only on a failure the server called retryable — so an expired sign-in left the
+  // person on a screen with the two doors gone and nothing on it that did anything.
+  //
+  // THEIR WORDS SURVIVE IT. The boxes come back filled: the paste is the one thing on this screen the
+  // person cannot be asked to produce twice.
+  it('gives the boxes back, with their words, when the turn is refused outright', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta\nFix the login bug', 'The top section is done, ignore it.');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // The premise: the boxes really are gone once the turn is away, or what is asserted below is a
+    // screen that never changed.
+    expect(screen.queryByLabelText(/paste your list/i)).toBeNull();
+
+    // VERBATIM FROM THE `auth` ROW of src/core/copilot-errors.ts, `retryable: false` included: that
+    // pair is the non-retryable class, and a sentence invented here would be a fixture that cannot
+    // reach the state this case is about.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:event',
+        event: {
+          kind: 'error',
+          text: 'The backend rejected the credentials. Sign in again with the CLI, then start a new chat.',
+          retryable: false,
+        },
+      });
+    });
+
+    // NOTHING SETTLED, so the way on never appeared — and the panel goes back with `sent`, taking
+    // the transcript with it. That is the cost of giving the boxes back and it is deliberate: the
+    // conversation is the TAB'S, so the model's own words about the failure are still in the dock,
+    // and what stands here is this screen's own sentence.
+    expect(screen.queryByRole('button', { name: ADVANCE })).toBeNull();
+    expect(screen.queryByTestId('verbatim-conversation')).toBeNull();
+
+    expect(
+      screen.getByText(
+        'Something went wrong while it was making the cards — nothing was lost, and you can try again.',
+      ),
+    ).toBeTruthy();
+    expect((screen.getByLabelText(/paste your list/i) as HTMLTextAreaElement).value).toBe(
+      'Ship the beta\nFix the login bug',
+    );
+    expect((screen.getByLabelText(/anything the assistant/i) as HTMLInputElement).value).toBe(
+      'The top section is done, ignore it.',
+    );
+
+    // AND THE SECOND PRESS REALLY SENDS AGAIN, with the report from the first attempt taken down: a
+    // new turn is a new window, the documents step's rule and its reason.
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+
+    await waitFor(() => expect(ws.sent).toHaveLength(2));
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
+  // AND THE OTHER HALF, without which the case above only proves a sentence can appear: a turn that
+  // goes through says nothing went wrong, keeps the boxes away, and opens the way on.
+  it('says nothing went wrong when the turn goes through', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    await turn(true);
+    await said('I made 2 cards on features.');
+    await turn(false);
+
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+    expect(screen.queryByLabelText(/paste your list/i)).toBeNull();
+  });
+
+  // A STOPPED TURN HAS NO REPORT. The Stop is the panel's, under the composer, and what a cancelled
+  // turn last said is whatever it happened to be saying — here a question about where to put the
+  // rest. Lifted onto the way on, and then onto the closing screen, that question reads as the count
+  // of what was made: the one sentence on that screen nobody can check.
+  it('reports nothing of a turn the person stopped', async () => {
+    importing();
+    await granted(true);
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await said('I have made 2 on features. Shall I put the rest on product?');
+
+    // THE PANEL'S OWN CONTROL, pressed as a person presses it: the composer swaps Send for Stop while
+    // the turn runs, which is the only Cancel on this screen.
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await turn(false);
+
+    // The way on is open — the turn ended — and it carries nothing.
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-made')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: ADVANCE }));
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
+  });
+
+  // AND THE OTHER HALF IS THE SETTLE CASE ABOVE, which shows the same sentence surviving a turn that
+  // was left alone — so this is about the cancel and not about a report that never appears.
+
+  // THE TRANSCRIPT IS THE TAB'S, and the documents step's turns are still in it when this screen
+  // mounts. Reading it from the start would stand under the question reporting what THAT turn was
+  // last doing — a tool name and a closing sentence about six documents, presented as this import's.
+  //
+  // THE TURN HAS TO RUN FOR THIS TO CONSTRAIN ANYTHING, which is the correction: this case used to
+  // assert the two readouts were absent on a screen that had sent nothing, and nothing is rendered
+  // there whatever window is read — so `items.slice(0)` in place of `items.slice(mark.current)`
+  // passed it. Here the import really is sent and really does settle, having said nothing of its
+  // own: the readouts stay empty because the mark holds, and only because the mark holds.
+  it('reports nothing of the conversation it inherited', async () => {
+    importing();
+    await granted(true);
+    await act(async () => {
+      ws.push({
+        type: 'copilot:history',
+        chats: [],
+        items: [
+          { kind: 'tool', text: '', toolName: 'Write' },
+          { kind: 'assistant', text: 'All six documents are written.' },
+        ],
+        stats: { costUsd: 0, turns: 1, lastDurationMs: 0, contextTokens: 0 },
+      });
+    });
+
+    await fill('Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: BRING }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    await turn(true);
+    await turn(false);
+
+    // The premise: the turn really ran and really ended, so the way on is open — the readouts are
+    // silent because everything in the transcript is older than this turn, not because the screen
+    // is still standing under the question.
+    expect(await screen.findByRole('button', { name: ADVANCE })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-tool')).toBeNull();
+    expect(screen.queryByTestId('verbatim-made')).toBeNull();
+  });
+
+  // A FILE FROM THE BUILD BEFORE THIS ONE. `handoff` was where setup ended and is retired from the
+  // flow; the step stays in the union so a setup parked there still reads, and this is where it lands.
+  // decision 79.
+  it('opens the import on a file left at the step that used to end setup', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'handoff' } });
+
+    view({ start: 'handoff', snapshot: opened });
+
+    expect(await screen.findByText(QUESTION)).toBeTruthy();
+  });
+
+  // AND A STEP THIS BUILD HAS NEVER HEARD OF LANDS ON THE ENDING, not here. The router's default used
+  // to be this step, so a file written by a later build — the only way to arrive with a step outside
+  // the union — put a paste box in front of somebody and sent what they typed to a credentialed
+  // conversation. The cast is the point: nothing in the type system can produce this state, and a file
+  // on disk can. The closing screen spends nothing, which is why the default must never be an agent
+  // step.
+  it('lands an unknown step on the ending rather than on an agent step', async () => {
+    const start = 'a-step-from-the-future' as ComponentProps<typeof WizardView>['start'];
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'ready' } });
+
+    view({ start, snapshot: opened });
+
+    expect(await screen.findByText('That is setup done')).toBeTruthy();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Yes — bring it in' })).toBeNull();
+  });
+});
+
+// THE END OF SETUP, WHICH IS A REPORT AND NOT A CELEBRATION (W1, decision 79). It says what is now in
+// place in plain sentences, says honestly whether auto-pilot could start, and does not hold anybody
+// here over the answer: the wizard ends at "project ready to hand over", and a gap that is left is the
+// board's to show.
+//
+// EVERY SENTENCE COMES FROM WHAT THE WIZARD ALREADY HOLDS — the file and the snapshot — plus one read
+// of the readiness. Nothing here asks the server what it set up, because a summary that re-derives its
+// own facts is a second opinion about them.
+describe('the ready screen', () => {
+  const FINISH = 'Open the board';
+  const ALL_SIX = Object.fromEntries(
+    ['README.md', 'STACK.md', 'CODE-QUALITY.md', 'TESTING.md', 'UX.md', 'DESIGN.md'].map((name) => [
+      name,
+      `What ${name} says, in a sentence.`,
+    ]),
+  );
+  // COUNTED FROM THE FIXTURE, as the screen counts it from `DOC_NAMES`: the sentence states a number,
+  // and a hand-typed word here would go stale in exactly the way the screen's own used to.
+  const DOCUMENTS = `${Object.keys(ALL_SIX).length} documents written — read them any time in Project Control`;
+
+  const finished = (state: Partial<WizardState> = {}) => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'ready', ...state } });
+    return view({ start: 'ready', snapshot: opened });
+  };
+
+  it('says what was set up, one plain sentence at a time', async () => {
+    const stack = 'A small web app in TypeScript, with React for the screens and Vitest for the tests.';
+    finished({ stack, resumes: ALL_SIX });
+
+    expect(await screen.findByText(DOCUMENTS)).toBeTruthy();
+    // The kind is the config's — the form wrote it there — and the plain name is the one the form
+    // offered, not the slug the image is built from.
+    expect(screen.getByText('Set up as: Web App')).toBeTruthy();
+    // The sentence is the model's or the person's own, whole: it is what the box will be built
+    // against, and a wizard that reworded it here would be re-deciding it on the way out.
+    expect(screen.getByTestId('verbatim-stack').textContent).toBe(stack);
+    expect(screen.getByRole('button', { name: FINISH })).toBeTruthy();
+  });
+
+  // ANYTHING UNKNOWN IS OMITTED RATHER THAN GUESSED, and a heading over nothing is the failure this
+  // pins: a setup that skipped the stack and the documents has nothing to say about either, and
+  // "6 documents written" over a project with none is the one sentence this screen must never say.
+  it('omits what it cannot say, and still ends setup', async () => {
+    finished();
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByText(DOCUMENTS)).toBeNull();
+    expect(screen.queryByTestId('verbatim-stack')).toBeNull();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
+  });
+
+  // A PART-WRITTEN SET IS NOT SIX. The sentence counts, so it is said when the count is what it says
+  // — the documents step can end with fewer, and a line that rounded five up to six would be the
+  // screen lying about the one thing a person cannot check from here.
+  it('does not call five documents six', async () => {
+    const five = Object.fromEntries(Object.entries(ALL_SIX).filter(([name]) => name !== 'DESIGN.md'));
+    finished({ resumes: five });
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByText(DOCUMENTS)).toBeNull();
+  });
+
+  // READINESS, HONESTLY, AND IT NEVER STANDS IN THE WAY (W1). Setup ends at a project ready to hand
+  // over; whether auto-pilot could start this second is the board's question, and holding somebody
+  // inside the wizard over it would make the last screen a second gate on top of decision 74's.
+  it('lists what is still missing without blocking the way out', async () => {
+    // BOTH SENTENCES VERBATIM FROM `blockersFrom` in src/server/autopilot/routes.ts, which is where
+    // the endpoint composes them. The empty-board one was written here as "There is no card on any
+    // board." — a sentence this product has never answered with: the real one names the remedy, and
+    // a fixture that trims it is a screen tested against words nobody will ever read. (The short
+    // version does exist, as the LOOP's own `no-op` stop sentence in src/core/lifecycle/tick.ts,
+    // which is a different surface entirely.)
+    const missing = 'foundation/UX.md has not been written yet.';
+    const empty =
+      'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.';
+    api.getReadiness.mockResolvedValue(readiness({ ok: false, blockers: [missing, empty] }));
+    finished();
+
+    expect(await screen.findByText(missing)).toBeTruthy();
+    expect(screen.getByText(empty)).toBeTruthy();
+    expect(screen.getByText('You can fix these from the board — nothing is lost.')).toBeTruthy();
+    expect(screen.queryByText('Everything auto-pilot needs is here.')).toBeNull();
+
+    const finish = screen.getByRole('button', { name: FINISH }) as HTMLButtonElement;
+    expect(finish.disabled).toBe(false);
+    fireEvent.click(finish);
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1));
+  });
+
+  it('says so when there is nothing missing', async () => {
+    finished();
+
+    expect(await screen.findByText('Everything auto-pilot needs is here.')).toBeTruthy();
+    expect(screen.queryByText('You can fix these from the board — nothing is lost.')).toBeNull();
+  });
+
+  // A READ THAT FAILED IS NOT AN ANSWER. Reassurance over a question that could not be asked is the
+  // lie `useReadiness` exists to prevent, and a blocker list invented from a rejection is the other
+  // one — so a failed read says neither, and the board asks again.
+  it('promises nothing when the readiness could not be read', async () => {
+    api.getReadiness.mockRejectedValue(new Error('no'));
+    finished({ stack: 'TypeScript and React.' });
+
+    expect(await screen.findByTestId('verbatim-stack')).toBeTruthy();
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    await act(async () => {});
+    expect(screen.queryByText('Everything auto-pilot needs is here.')).toBeNull();
+    expect(screen.queryByText('You can fix these from the board — nothing is lost.')).toBeNull();
+    expect((screen.getByRole('button', { name: FINISH }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // WHAT THE IMPORT DID, CARRIED FORWARD BY THE SCREEN THAT SAW IT. The count is the model's own
+  // closing sentence and lives in the step that ran the turn; the ready screen is mounted after that
+  // step is gone, so it is handed over on the way — the scan step's notice exactly.
+  it('repeats what the import reported, in the assistant’s own words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    type(/paste your list/i, 'Ship the beta');
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const made = 'I made 6 cards on features and 2 on engineering.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: made } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Done — finish up' }));
+
+    expect(await screen.findByTestId('verbatim-imported')).toBeTruthy();
+    expect(screen.getByTestId('verbatim-imported').textContent).toBe(made);
+    // ATTRIBUTED, AND THAT IS THE POINT OF THE LINE. The model's closing sentence can be a question,
+    // and among this screen's own plain statements an unattributed one reads as a fact the wizard
+    // checked. The label is what makes it the assistant's words.
+    expect(screen.getByText(/What the assistant said when it finished:/)).toBeTruthy();
+  });
+
+  // AND THE OTHER HALF, without which the case above only proves a sentence can appear: the no-door
+  // is the common journey (W1), and a screen reporting an import over a person who never ran one
+  // would be the summary inventing the one fact on it that cost money.
+  it('says nothing about an import that never ran', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    view({ start: 'import', snapshot: opened });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'No — finish up' }));
+
+    expect(await screen.findByRole('button', { name: FINISH })).toBeTruthy();
+    expect(screen.queryByTestId('verbatim-imported')).toBeNull();
   });
 });
 
@@ -2598,7 +3144,10 @@ describe('the words on every step (W7)', () => {
     sweep('the questions', form.container);
     cleanup();
 
-    sweep('the hand-off', view({ start: 'handoff', snapshot: opened }).container);
+    // `the hand-off` until the journey grew an ending: this is the CLOSING SCREEN, and the hand-off
+    // is what happens after it — Start, the derivation, decision 74's gate. A label that names the
+    // wrong screen is what a failure message here would send somebody to read.
+    sweep('the closing screen', view({ start: 'ready', snapshot: opened }).container);
   });
 
   // THE QUESTIONS WITH THE SCAN'S NEWS ON THEM, which is a different screen from the one above and
@@ -2690,6 +3239,151 @@ describe('the words on every step (W7)', () => {
       expect(quoted, `the exempt transcript must carry "${word}" or it proves nothing`).toContain(word);
     }
     sweep('the review layout', container);
+  });
+
+  // THE IMPORT, WHICH IS THREE SCREENS IN ONE and every word on all three is the wizard's: the
+  // question, the two fields under the yes-door, and what is left standing once the turn has run.
+  // What is exempt there is the model's — the transcript and the closing sentence pulled out of it —
+  // and the reply below is full of the words this sweeps for, so taking either handle off turns this
+  // red rather than green.
+  it('brings a list in, and reads out the assistant’s own words, in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    await screen.findByRole('button', { name: 'Yes — bring it in' });
+    sweep('the two doors', container);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yes — bring it in' }));
+    expect(screen.getByLabelText(/paste your list/i)).toBeTruthy();
+    sweep('the list and the one-liner', container);
+
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const reply =
+      'I made 4 cards. The docker container and the yaml config in your repository went to engineering, and the backend one too.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: reply } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+
+    // The premise, both halves: the exempt elements really do carry the words, or their handles
+    // prove nothing at all.
+    expect(screen.getByTestId('verbatim-made').textContent).toBe(reply);
+    expect((screen.getByTestId('verbatim-conversation').textContent ?? '').toLowerCase()).toContain('docker');
+    sweep('the import once it has run', container);
+  });
+
+  // THE TWO STATES THE IMPORT REACHES WHEN SOMETHING IS WRONG, and every word on both is the
+  // wizard's own: the sentence over a paste too big to send, and the report on a turn that was
+  // refused. Neither is on any screen the case above walks through, so neither was swept.
+  //
+  // THE PANEL IS GONE BY THE SECOND SWEEP, which is the point of the state: a refused turn gives the
+  // two boxes back, and the model's own words go with the transcript. Nothing exempt is left on the
+  // screen — what is read here is entirely this wizard's copy.
+  it('says a list too big and a list refused in plain words', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'x'.repeat(20_001) } });
+
+    // The premise: the sentence really is on the screen being swept.
+    expect(screen.getByText(/That is a lot to send in one go/)).toBeTruthy();
+    sweep('a paste too big to send', container);
+
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+    // VERBATIM FROM THE `auth` ROW of src/core/copilot-errors.ts — the non-retryable class, which is
+    // the one the panel offers nothing for.
+    await act(async () => {
+      ws.push({
+        type: 'copilot:event',
+        event: {
+          kind: 'error',
+          text: 'The backend rejected the credentials. Sign in again with the CLI, then start a new chat.',
+          retryable: false,
+        },
+      });
+    });
+
+    expect(screen.getByText(/Something went wrong while it was making the cards/)).toBeTruthy();
+    sweep('the list that was refused', container);
+  });
+
+  // THE LAST SCREEN, WHERE THREE VOICES MEET AND ONLY ONE OF THEM IS THIS WIZARD'S. What it says about
+  // the kind, the documents and the way out is its own copy and is swept. The agreed stack and the
+  // import's count are the MODEL'S — shown because they were agreed and reported, not written here —
+  // and the blockers are the SERVER'S, which name the file or the block that clears them and would
+  // send somebody to fix the wrong thing if this screen reworded them. All three exempt elements carry
+  // a fixture full of the words this sweeps for, so taking any one handle off turns this red.
+  it('ends setup in plain words, around three sets of words that are not its own', async () => {
+    api.getWizard.mockResolvedValue({ state: { mode: 'greenfield', step: 'import' } });
+    api.setAuthority.mockResolvedValue({ authorised: true });
+    api.getReadiness.mockResolvedValue(
+      readiness({
+        ok: false,
+        // Verbatim from `coverageProblems` in src/core/autopilot-cover.ts, which is where this
+        // sentence is composed: a blocker invented here would be plain in exactly the way the real
+        // ones are not.
+        blockers: ['This project has no autopilot block in config.yaml, so there is no lifecycle to run.'],
+      }),
+    );
+    const { container } = view({ start: 'import', snapshot: opened });
+    await act(async () => {
+      ws.push({ type: 'copilot:authority', authorised: true });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Yes — bring it in' }));
+    fireEvent.change(screen.getByLabelText(/paste your list/i), { target: { value: 'Ship the beta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it in' }));
+    await waitFor(() => expect(ws.sent).toHaveLength(1));
+
+    const made = 'I made 4 cards. The docker container and the yaml config went to engineering.';
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: true } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:event', event: { kind: 'text', text: made } });
+    });
+    await act(async () => {
+      ws.push({ type: 'copilot:state', state: { running: false } });
+    });
+
+    // The file as the closing screen reads it, with the stack the person agreed to in the model's
+    // own sentence — the step writes and re-reads, so the answer has to be in place before the press.
+    api.getWizard.mockResolvedValue({
+      state: {
+        mode: 'greenfield',
+        step: 'ready',
+        stack: 'A Node repository, its config in yaml, run in a Docker container',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done — finish up' }));
+    await screen.findByRole('button', { name: 'Open the board' });
+
+    // The premises, all three: the exempt elements really do carry the words, or their handles prove
+    // nothing at all.
+    expect(await screen.findByTestId('verbatim-stack')).toBeTruthy();
+    expect((screen.getByTestId('verbatim-stack').textContent ?? '').toLowerCase()).toContain('docker');
+    expect(screen.getByTestId('verbatim-imported').textContent).toBe(made);
+    expect((screen.getByTestId('verbatim-blockers').textContent ?? '').toLowerCase()).toContain('yaml');
+    sweep('the end of setup', container);
   });
 
   // THE DOCUMENT ITSELF, OPENED, which is where the model's words are thicker than any summary: a

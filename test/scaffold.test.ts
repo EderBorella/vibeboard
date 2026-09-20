@@ -175,6 +175,38 @@ describe('scaffoldProject', () => {
     expect(await readFile(join(root, 'README.md'), 'utf8')).toBe('# My real repo\n');
   });
 
+  // THE WIZARD'S GREENFIELD, and the reason the caller gets a say rather than the mode deciding alone:
+  // the bootstrap derives a feature list only from an EMPTY board, so three "delete me" cards are what
+  // auto-pilot spends its first real run on and `decision 74`'s review stop is never reached. A person
+  // who came through setup has just read a derived or imported board; demo cards are noise beside it.
+  it('greenfield: writes no sample cards when the caller asks for none, and everything else anyway', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY, samples: false });
+
+    const config = await readConfig(root);
+    for (const board of ['features', 'product', 'engineering'] as const) {
+      expect(await readBoard(root, board, config), board).toEqual([]);
+    }
+    // The flag is about demo content and nothing else: what makes the folder a project is still written.
+    await expect(access(join(root, boardRel('product', 'todo')))).resolves.toBeUndefined();
+    await expect(access(join(root, CONVENTIONS_FILE))).resolves.toBeUndefined();
+    await expect(access(join(root, PROJECT_LOG_FILE))).resolves.toBeUndefined();
+    await expect(access(join(root, '.git'))).resolves.toBeUndefined();
+  });
+
+  // The flag narrows greenfield; it cannot widen adoption. Somebody's real repository gets no "delete
+  // me" cards whatever the caller passes, which is the half a boolean makes newly worth asserting.
+  it('brownfield: takes no sample cards from the flag, in either position', async () => {
+    for (const samples of [true, false]) {
+      const root = await tempDir();
+      await scaffoldProject(root, { name: 'Adopted', mode: 'brownfield', today: TODAY, samples });
+      const config = await readConfig(root);
+      for (const board of ['features', 'product', 'engineering'] as const) {
+        expect(await readBoard(root, board, config), `${board}, samples: ${samples}`).toEqual([]);
+      }
+    }
+  });
+
   it('brownfield: does not duplicate the pointer on re-run', async () => {
     const root = await tempDir();
     await writeFile(join(root, CLAUDE_MD), '# X\n', 'utf8');

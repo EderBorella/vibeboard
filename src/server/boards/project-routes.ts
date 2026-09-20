@@ -91,15 +91,28 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
   });
 
   api.post('/project/scaffold', async (req, reply) => {
-    const { path, name, mode } = req.body as { path: string; name: string; mode: ScaffoldMode };
+    const { path, name, mode, samples } = req.body as {
+      path: string;
+      name: string;
+      mode: ScaffoldMode;
+      samples?: boolean;
+    };
     // FIRST, because this one writes: `scaffoldProject` creates the folder, the board and the git repo,
     // and a request refused after that leaves a real project the user has been told does not exist.
     const badPath = notAbsolute(path);
     if (badPath) return reply.code(400).send({ error: badPath });
+    // BOOLEAN OR ABSENT, and checked rather than coerced: `'false'` is what a hand-built request carries
+    // and it is truthy, so a pass-through would seed the exact board the caller asked to leave empty.
+    // Refused here, beside the path guard, for the same reason — after the write it is too late.
+    if (samples !== undefined && typeof samples !== 'boolean') {
+      return reply.code(400).send({ error: 'Expected `samples` to be true, false, or absent.' });
+    }
     // Before anything is written: scaffolding creates a project AND opens it, so it is a switch.
     const refusal = await switchRefusal();
     if (refusal) return reply.code(409).send({ error: refusal });
-    await scaffoldProject(path, { name, mode, today: today() });
+    // `samples` absent means the scaffolder's own default, which is to write them: the wizard is the
+    // only caller that declines, and every other greenfield door keeps the board it has always had.
+    await scaffoldProject(path, { name, mode, today: today(), samples });
     // The box is part of what creating a project PRODUCES, alongside its `.vibeboard/` folder —
     // ruled 2026-08-09. A project and the container its agents run in are one object, so there is no
     // state where one exists and the other was never made.

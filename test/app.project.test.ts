@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, join, relative as relative_ } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import { ProjectSession } from '../src/server/boards/session.js';
@@ -9,6 +9,7 @@ import { projectStateDir } from '../src/server/boxes/copilot-env.js';
 import { rememberProject } from '../src/server/settings/app-state.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
+import { stubBrowser } from './browser-stubs.js';
 import { openTestProject, tempDir, testApp } from './helpers.js';
 
 let bare: ProjectSession | undefined;
@@ -20,6 +21,8 @@ const originalStateFile = process.env.VIBEBOARD_STATE_FILE;
 afterEach(async () => {
   await bare?.close();
   bare = undefined;
+  // The one test below stubs `fetch` and the browser globals; nothing after it should inherit either.
+  vi.unstubAllGlobals();
   if (originalRoot === undefined) delete process.env.VIBEBOARD_ROOT;
   else process.env.VIBEBOARD_ROOT = originalRoot;
   if (originalStateFile === undefined) delete process.env.VIBEBOARD_STATE_FILE;
@@ -193,6 +196,98 @@ describe('POST /api/project/scaffold, when the project it wrote will not open', 
     expect(res.json()).toEqual({ error: 'Not a VibeBoard project' });
     // And it really did get as far as writing one, or this would be a test of the guard above it.
     expect(existsSync(join(path, CONFIG_DIR, CONFIG_FILE))).toBe(true);
+  });
+});
+
+// THE SAMPLE CARDS ARE THE CALLER'S TO DECLINE, and the wizard is the caller that does. A greenfield
+// board seeded with three "delete me" cards is not empty, and an empty board is the only thing that
+// makes the bootstrap derive a feature list — so a wizard journey that scaffolded the samples handed
+// auto-pilot "Sample engineering card" to build and never reached `decision 74`'s review stop.
+describe('POST /api/project/scaffold and the sample cards', () => {
+  const boards = (res: { json: () => { snapshot: { boards: Record<string, unknown[]> } } }) =>
+    res.json().snapshot.boards;
+
+  it('seeds them when nothing is said, because that is what greenfield meant before the flag existed', async () => {
+    const path = join(await tempDir(), 'seeded');
+
+    const res = await (await app()).inject({
+      method: 'POST',
+      url: '/api/project/scaffold',
+      payload: { path, name: 'seeded', mode: 'greenfield' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(boards(res).features).toHaveLength(1);
+    expect(boards(res).product).toHaveLength(1);
+    expect(boards(res).engineering).toHaveLength(1);
+  });
+
+  it('leaves the board empty when the body asks for no samples', async () => {
+    const path = join(await tempDir(), 'bare');
+
+    const res = await (await app()).inject({
+      method: 'POST',
+      url: '/api/project/scaffold',
+      payload: { path, name: 'bare', mode: 'greenfield', samples: false },
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Opened, and open on a real project — the flag drops the demo cards, not the scaffolding.
+    expect(res.json().snapshot.name).toBe('bare');
+    expect(existsSync(join(path, CONFIG_DIR, CONFIG_FILE))).toBe(true);
+    for (const board of ['features', 'product', 'engineering']) {
+      expect(boards(res)[board], board).toEqual([]);
+    }
+  });
+
+  // NEITHER END FAKED, and that is the whole reason this case exists beside the two above. The view
+  // test asserts the wizard CALLS the client with `false` against a `vi.fn()`, and the cases above
+  // hand-build the body the client is supposed to send — so a client that dropped `samples` from the
+  // JSON would satisfy both while the wizard scaffolded three demo cards. Here the real browser
+  // function talks to the real route: `fetch` is pointed at this app rather than replaced by an answer.
+  it('carries the flag from the browser function to the board, with nothing stubbed between them', async () => {
+    const a = await app();
+    const base = await tempDir();
+    stubBrowser();
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      const res = await a.inject({
+        method: (init.method ?? 'GET') as 'POST',
+        url,
+        payload: init.body === undefined ? undefined : JSON.parse(init.body as string),
+        headers: init.headers as Record<string, string>,
+      });
+      return new Response(res.body, {
+        status: res.statusCode,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    const { scaffoldProject: fromTheBrowser } = await import('../web/src/lib/api/project.js');
+
+    const emptyBoard = join(base, 'browser-bare');
+    const seededBoard = join(base, 'browser-seeded');
+    const declined = await fromTheBrowser(emptyBoard, 'browser-bare', 'greenfield', false);
+    const kept = await fromTheBrowser(seededBoard, 'browser-seeded', 'greenfield');
+
+    // What the wizard sends, and what every other greenfield door still gets by saying nothing.
+    expect(declined.snapshot.boards.features).toEqual([]);
+    expect(kept.snapshot.boards.features).toHaveLength(1);
+  });
+
+  // A STRING IS NOT A FLAG, and `'false'` is the one a hand-built request arrives with: truthy, so a
+  // pass-through would seed the very board the caller asked to leave empty. Refused before the write,
+  // with the path guard, because a request answered 400 after scaffolding leaves a real project behind.
+  it('refuses a samples that is not a boolean, and writes nothing', async () => {
+    const path = join(await tempDir(), 'not-a-boolean');
+
+    const res = await (await app()).inject({
+      method: 'POST',
+      url: '/api/project/scaffold',
+      payload: { path, name: 'not-a-boolean', mode: 'greenfield', samples: 'false' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/samples/i);
+    expect(existsSync(path)).toBe(false);
   });
 });
 

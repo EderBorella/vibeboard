@@ -67,6 +67,9 @@ export const input = (over: Partial<TickInput> = {}): TickInput => ({
   // A GATE AND A SMOKE COMMAND THAT DIFFER, which is the ordinary project and the only fixture under which
   // `complete` is reachable at all (ruling 66). Every test about the collision names its own pair.
   commands: DISTINCT_COMMANDS,
+  // NOTHING THE LOOP COULD NOT WRITE DOWN, which is every tick but the one decision 82 is about. Empty and
+  // not absent, because the field is required for exactly that reason.
+  unrecordedSendBacks: [],
   ...over,
 });
 

@@ -720,6 +720,13 @@ describe('the review contract', () => {
     expect(reviewing()).toContain('You are judging ONE run: **RUN-2**');
   });
 
+  // `story-review` KEEPS THE CHECKUP'S AUTHORITY TO WRITE SIBLING STORIES (decision 80), and its skill body
+  // asks it to list what it created — which this frontmatter gave it no field for, so `ActiveReport` showed
+  // no created cards for the one judging phase allowed to create any.
+  it('gives a review somewhere to name the cards it created', () => {
+    expect(reviewing()).toContain('created: [P-041]');
+  });
+
   // DECISION 51'S TWO STEPS, and the reviewer has to be told the first one happened: a judge that does not
   // know the suite is already green spends its turn running it again.
   it('tells the review run the gates have already passed', () => {

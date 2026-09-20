@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TickAction } from '../src/core/actions.js';
 import type { RunRecord } from '../src/core/runs.js';
-import { performAction } from '../src/service/act.js';
+import { type ActDeps, performAction } from '../src/service/act.js';
 import {
   BOOTSTRAP,
   BREAKDOWN,
@@ -95,8 +95,9 @@ describe('a run that produced nothing', () => {
     expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
   });
 
-  // THE WORST CASE THE CLAUSE NAMES: a checkup's `exitPass` is `done`, so a dead `checkup-feature` closed the
-  // feature and a dead `checkup-story` closed the story.
+  // THE WORST CASE THE CLAUSE NAMES HERE: a checkup's `exitPass` is `done`, so a dead `checkup-feature`
+  // closed the feature. The story's judgement has the same exit and no longer comes through `afterCardRun`
+  // at all — `reviewStory` asserts the clause for itself, and test/service-act-review.test.ts pins it there.
   it('does not let a dead checkup close its feature', async () => {
     const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: [] };
     const r = recorder({
@@ -112,18 +113,28 @@ describe('a run that produced nothing', () => {
     expect(r.moves).toEqual([]);
   });
 
-  it('does not let a dead checkup close its story', async () => {
+  // AND THE STORY'S, WHICH TAKES THE OTHER PATH SINCE DECISION 80. `reviewStory` bypasses `afterCardRun`
+  // entirely, so this clause has to be asserted against it separately — and the fixture is the hard case
+  // rather than the easy one: a run the clock killed AFTER it wrote its report has a verdict, so a branch
+  // reading only `verdict` would close the story on a dead run.
+  it('does not let a dead judgement close its story', async () => {
     const story = { ...CARD('P-001', 'product'), columnSlug: 'in-progress', links: [] };
     const r = recorder({
-      settle: [empty({ card: 'P-001', board: 'product', filesChanged: 1 })],
+      settle: [record({ card: 'P-001', board: 'product', status: 'failed', verdict: 'done' })],
       boardCards: [story],
     });
     await performAction(
-      deps(r.client),
-      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      deps(r.client, {
+        verify: {
+          gates: async () => ({ mode: 'gates' as const, passed: true, at: 'T' }),
+          smoke: async () => ({ mode: 'smoke' as const, passed: true, at: 'T' }),
+        } as unknown as ActDeps['verify'],
+      }),
+      { kind: 'dispatch', phase: 'story-review', skill: 'review-story', card: story, previous: 'W-1' },
       context,
     );
     expect(r.moves).toEqual([]);
+    expect(r.verdicts).toEqual([]);
   });
 });
 
@@ -156,16 +167,18 @@ describe('a creating run that created nothing', () => {
 
   it('does not apply to a checkup, whose ordinary case is creating nothing', async () => {
     // FINDING B, folded into decision 43: a checkup's product is a REPORT. Applied to them this rule would
-    // refuse every close.
+    // refuse every close. The FEATURE's is the one that still takes this path — the story's judgement is
+    // never asked whether the board grew at all (`reviewStory`), which is the same rule by construction.
+    const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: ['P-001'] };
     const story = CARD('P-001', 'product');
-    const r = recorder({ boardBefore: [story], boardCards: [story] });
+    const r = recorder({ boardBefore: [feature, story], boardCards: [feature, story] });
     await performAction(
       deps(r.client),
-      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      { kind: 'dispatch', phase: 'feature-checkup', skill: 'checkup-feature', card: feature },
       context,
     );
     expect(r.verdicts).toEqual([]);
-    expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
   });
 
   it('advances the card when the board could not be read back, rather than failing on no evidence', async () => {
@@ -227,13 +240,25 @@ describe('a feature checkup that created work', () => {
     expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
   });
 
-  it('closes a STORY checkup that created siblings, because closing and creating are one act', async () => {
+  it('closes a STORY that its judgement gave siblings, because closing and creating are one act', async () => {
     // Ruling 54: leaving the story open while its new siblings are worked would mean two open stories, which
-    // is the one invariant the derived position cannot survive.
-    const r = recorder({ boardBefore: [story], boardCards: [story, CARD('P-002', 'product')] });
+    // is the one invariant the derived position cannot survive. Since decision 80 the story's judgement does
+    // not take this path at all and is never asked whether the board grew — so the rule holds by
+    // construction, and this asserts it where the behaviour now lives.
+    const open = { ...story, columnSlug: 'in-progress' };
+    const r = recorder({
+      settle: [record({ card: 'P-001', board: 'product', verdict: 'done' })],
+      boardBefore: [open],
+      boardCards: [open, CARD('P-002', 'product')],
+    });
     await performAction(
-      deps(r.client),
-      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      deps(r.client, {
+        verify: {
+          gates: async () => ({ mode: 'gates' as const, passed: true, at: 'T' }),
+          smoke: async () => ({ mode: 'smoke' as const, passed: true, at: 'T' }),
+        } as unknown as ActDeps['verify'],
+      }),
+      { kind: 'dispatch', phase: 'story-review', skill: 'review-story', card: open, previous: 'W-1' },
       context,
     );
     expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);

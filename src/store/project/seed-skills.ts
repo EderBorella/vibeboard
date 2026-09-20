@@ -45,44 +45,6 @@ on it without repeating the search.
 `,
   },
   {
-    // REWRITTEN from a general critique skill into the lifecycle's judge (decision 51's second step). It is
-    // asked for the one thing a command's exit code cannot express: a gate proves the suite passes, and cannot
-    // prove the suite tests the criterion the card states.
-    slug: 'review',
-    content: `---
-name: Review
-description: Judge one run against the card that asked for it
-boards: [engineering]
----
-Judge ONE run against the card below.
-
-The run you are judging is named in this prompt, with how it ended, what VibeBoard
-noted about it and how many files it changed. Judge what THAT run did. An earlier
-run on this card may have succeeded; its work is not this run's work and does not
-count for it.
-
-**This prompt tells you what the gates did** — whether they passed, whether there
-were none to run because this card is the one that installs them, or whether
-nobody ran them at all. Do not assume; read it. Your question is the one no
-command can answer: **does this do what the card asked?** Not "is it good", not
-"is it what I would have built".
-
-Change nothing. Not the code, not the card, not where it sits — your credential
-grants you nothing on the board, and a judge that fixes what it is judging is
-grading its own work.
-
-Answer with a verdict: \`done\`, or \`sent-back\` with your findings. A report with
-no verdict cannot pass anything, so answer even when the answer is sent-back.
-
-Work that does MORE than the card asked still passes. Say so rather than marking
-it down: failing a card for over-delivery throws away working code and spends one
-of the card's attempts rebuilding it.
-
-Your findings are what a \`fix\` run will be handed, so be specific enough that
-someone could disagree with them.
-`,
-  },
-  {
     slug: 'derive-features',
     content: `---
 name: Derive features
@@ -211,11 +173,18 @@ finishes, and your credential grants nothing that could.
 `,
   },
   {
+    // `boards: [engineering, product]` SINCE DECISION 80, and an existing project's `fix.md` still says
+    // `[engineering]`: `seedSkills` writes only into a project whose skills folder is absent, so nothing
+    // rewrites it. Readiness is silent about that on purpose. `boards` decides which skills the CARD's
+    // hand-dispatch menu offers (`skillsForCard`) and nothing else — `POST /api/runs` does not consult it —
+    // so a stale list narrows a menu on a product card and cannot stop the loop, which is the bar
+    // `phaseSkillProblems` is set at. The `review-story` migration it does name is a skill that does not
+    // EXIST, where the dispatch 404s and the card can never advance.
     slug: 'fix',
     content: `---
 name: Fix
 description: Address the findings that sent this card back
-boards: [engineering]
+boards: [engineering, product]
 ---
 Fix what sent the card below back.
 
@@ -238,29 +207,59 @@ that first.
 `,
   },
   {
-    slug: 'checkup-story',
+    // THE STORY'S ONE JUDGEMENT (decision 80), and it is two retired skills in one: `review`, which judged a
+    // single task's run, and `checkup-story`, which asked whether the tasks composed. At story granularity
+    // those are the same question, and asking both paid two cold starts for one answer.
+    slug: 'review-story',
     content: `---
-name: Story checkup
-description: Decide whether the tasks under this story compose into it
+name: Review the story
+description: Judge whether the work under this story delivers it
 boards: [product]
 ---
-Decide whether the tasks under the card below compose into the story it describes.
+Judge the card below: does the work under this story deliver what the story asks
+for?
 
 Everything you need is in this prompt: every task under this story with the column
 it is in and how its last run ended, the blocked ones named, and the open
 suggestions. You cannot fetch any of it and do not need to — your credential does
 not reach those endpoints, and auto-pilot already holds every one of those facts.
 
-Three tasks can each pass their own gates and the story they compose not work.
-That is the question here, and it is the only one no command can answer.
+**This prompt tells you what the gates did** — whether they passed, whether there
+were none to run because this story is the one that installs them, or whether
+nobody ran them at all. Do not assume; read it, and do not run them again where it
+says auto-pilot already has.
 
-A blocked task is **settled**, not outstanding. If every task of this story is
-done or blocked, the story is finished: **say so in your report** and name the
-blocked ones. Do not create work to get past a blocked task —
+Your question is the one no command can answer, and it has two halves:
+
+- does the work do what the card asked? Not "is it good", not "is it what I would
+  have built";
+- do the tasks COMPOSE? Three tasks can each pass their own gates and the story
+  they make not work, and nothing mechanical can see that the third undid the
+  first.
+
+Change nothing. Not the code, not the cards, not where they sit — your credential
+grants you nothing on the board, and a judge that fixes what it is judging is
+grading its own work. You do not move or archive any card; auto-pilot stamps the
+column when this run finishes.
+
+Answer with a verdict: \`done\`, or \`sent-back\` with your findings. A report with
+no verdict cannot pass anything, so answer even when the answer is sent-back.
+
+Work that does MORE than the card asked still passes. Say so rather than marking
+it down: failing a story for over-delivery throws away working code and spends one
+of its attempts rebuilding it.
+
+Your findings are what a \`fix\` run will be handed, so be specific enough that
+someone could disagree with them.
+
+A blocked task is **settled**, not outstanding.
+Do not create work to get past a blocked task —
 it has already had every attempt it is allowed, and it is waiting for a person.
+Name it and judge the rest.
 
 So: create work for what was MISSED, never for what was attempted and blocked.
-**Read the board first**, and create through \`POST /api/cards\`,
+If this story needs something no task under it ever attempted,
+**read the board first** and create a sibling story with \`POST /api/cards\`,
 one card per call. You get ONE round of creating: anything you still believe is
 missing afterwards goes to \`POST /api/suggestions\`.
 
@@ -270,10 +269,7 @@ card. Anything under it that neither asks for is over-scope, and **naming it in
 your report is the whole of what you do about it** — your one creating round is for
 what was MISSED, never for work nobody asked for.
 
-You do not move or archive any card. Auto-pilot stamps the column when this run
-finishes.
-
-Report what you found, list by id any cards you created, and name every blocked
+Report what you judged, list by id any cards you created, and name every blocked
 task you left behind.
 `,
   },

@@ -59,9 +59,12 @@ export const CONTRACT_LINES = [
 // The card advanced on a run that exited 1, wrote no report and changed no files — the failure decision 3
 // exists to prevent, arriving through the judge rather than through the agent.
 //
-// Absent for a review a person dispatches from the card, where there is no run under judgement and the
-// subject really is the card's current state. Named as `undefined` rather than defaulted, because a
-// sentence naming a run that was never passed would be worse than the general one.
+// ABSENT FOR THE LOOP'S OWN JUDGEMENT since decision 80, which is the whole of what changed here: the
+// subject is a STORY and everything settled beneath it, not one agent's turn, so `reviewStory` sends no
+// `previous` and this section does not render. What still reaches it is a review a person dispatched by
+// hand naming a run — where "judge that one" is exactly what they asked for — and one dispatched with no
+// run at all, where the subject really is the card's current state. Named as `undefined` rather than
+// defaulted, because a sentence naming a run that was never passed would be worse than the general one.
 //
 // The verdict a run that left nothing behind earns is written straight in now. It was a parameter while
 // there were two judging contracts wording it differently — a score of 0, or a `sent-back` — and the
@@ -119,6 +122,13 @@ function gateEvidence(review: NonNullable<PromptInputs['review']>): string[] {
 // A REVIEW's contract: `done` or `sent back with findings`, and no number anywhere. Decision 51 puts a model
 // here for exactly one question — does this do what the card asked — because a gate proves the suite passes
 // and cannot prove the suite tests the criterion the card states.
+//
+// AND `created`, which this frontmatter did not have. `story-review` keeps the checkup's authority to write
+// sibling stories (decision 80) and its skill body asks it to "list by id any cards you created" — an
+// obligation the contract gave it no field to discharge, so the run pane showed no created cards for the one
+// phase authorised to create them (`ActiveReport` filters on `record.created`). The BOUND never depended on
+// it and must not: `creatingRoundSpent` reads `Card.createdBy`, stamped by the endpoint, because a run's own
+// list is the agent's claim about itself (ruling 58).
 export function reviewLines(
   review: NonNullable<PromptInputs['review']>,
   judged: PromptInputs['previous'],
@@ -141,6 +151,7 @@ export function reviewLines(
     'outcome: success        # or: attention, if you could not judge it at all',
     'verdict: done           # or: sent-back',
     'summary: "one line saying why it got that verdict"   # quote it: a bare colon breaks the YAML',
+    'created: [P-041]        # ids of any cards you created; leave it out if you created none',
     '---',
     '## What I judged',
     '',

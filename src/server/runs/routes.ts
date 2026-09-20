@@ -82,7 +82,7 @@ function reviewFor(
   slug: string,
   given: unknown,
 ): { review?: { gatesPassed: boolean; setupSubtree: boolean } } {
-  if (slug !== phase('task-review').skill) return {};
+  if (slug !== phase('story-review').skill) return {};
   return { review: reviewFacts(given) };
 }
 

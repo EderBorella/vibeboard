@@ -113,15 +113,15 @@ describe('lifecycle coverage', () => {
 // check left here, the routing table's six having retired with the table itself.
 describe('the skill every phase needs', () => {
   it('blocks when a project has no skill for a phase', () => {
-    const problems = phaseSkillProblems(['implement', 'review']);
-    expect(problems.join(' ')).toContain('fix');
-    expect(problems.join(' ')).toContain('checkup-story');
+    const problems = phaseSkillProblems(['implement', 'fix']);
+    expect(problems.join(' ')).toContain('review-story');
+    expect(problems.join(' ')).toContain('checkup-feature');
     // Every refusal names the action that fixes it: `seedSkills` writes only into a project with NO
     // skills folder, so a project that lost one cannot get it back by reopening.
     expect(problems.join(' ')).toContain('Skills tab');
   });
 
-  it('passes a project that has all seven', () => {
+  it('passes a project that has every one of them', () => {
     expect(phaseSkillProblems([...LIFECYCLE_SKILLS])).toEqual([]);
   });
 

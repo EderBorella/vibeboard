@@ -21,9 +21,13 @@ import { smokeRanLine } from './sentences.js';
 
 export type CheckupEvidence = NonNullable<DispatchRequest['checkup']>;
 
-// THE TWO CHECKUP PHASES, and only the feature's has a smoke command: the one `foundation/TESTING.md` declares
-// exercises the whole feature, and there is no per-story equivalent to run.
-export const CHECKUP_PHASES: readonly PhaseName[] = ['story-checkup', 'feature-checkup'];
+// THE TWO PHASES TOLD WHAT IS UNDER THEIR CARD, and only the feature's has a smoke command: the one
+// `foundation/TESTING.md` declares exercises the whole feature, and there is no per-story equivalent to run.
+//
+// ONE LIST READ BY BOTH PATHS. The feature's takes the ordinary dispatch path and `act/index.ts` gathers from
+// here; the story's judgement runs its gates first (decision 51) and so asks for this itself, in `review.ts`.
+// A second list would be a story judged with no idea what is under it, and nothing to say so.
+export const CHECKUP_PHASES: readonly PhaseName[] = ['story-review', 'feature-checkup'];
 
 // EVERYTHING A CHECKUP IS TOLD, gathered here because it cannot fetch any of it (ruling 60). Every card run is
 // minted `work` scope: `GET /api/runs` is `service`-only, `GET /api/suggestions` is not `work`'s, and the diary
@@ -65,7 +69,13 @@ export async function checkupEvidence(
   // WHETHER THE SMOKE RESULT MAY REFUSE THIS FEATURE'S CLOSE (decision 69, scoped). Computed here because
   // this is where the board has already been read, and returned beside the evidence rather than inside it:
   // it is not something the checkup is told, it is something the machine decides afterwards.
-  const lastFeature = isLastOpenFeature(ap, cards, card);
+  //
+  // ASKED ONLY OF A FEATURE, which it was not: since decision 80 this function also gathers for the STORY's
+  // judgement, and `isLastOpenFeature` is written about a feature throughout — handed a story it compares a
+  // product id to the focus and counts every live feature as "other". It answers false for a story either
+  // way, so nothing was wrong; the phase test is the same one the `feature` flag below already uses, and for
+  // the reason stated there — this reads the fact rather than an invariant held two modules away.
+  const lastFeature = action.phase === 'feature-checkup' && isLastOpenFeature(ap, cards, card);
   return {
     lastFeature,
     evidence: {

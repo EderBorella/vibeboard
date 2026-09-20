@@ -78,6 +78,14 @@ export interface ActResult {
   // board of freshly-derived features looks exactly like one derived last week — see the decision row for
   // what that costs as well as what it buys.
   stop?: { reason: StopReason; detail?: string };
+  // A SEND-BACK THIS ACTION HAD NOWHERE TO RECORD, by card id (decision 82). A story's gates failed and the
+  // card carries no run of any kind — no work run, because it arrived with its tasks, and no review run,
+  // because the gates run before the judge is dispatched. Nothing on disk says it happened, so the loop
+  // carries it to the next `decideTick`, which routes the story to its fix on it.
+  //
+  // NOT a decision: `act` reports what it did and could not do, exactly as `dispatches` does. Which row the
+  // machine is in is still the tick's answer.
+  unrecordedSendBack?: string;
 }
 
 // Why the loop ended. Returned rather than thrown so the caller — a process whose exit code nobody reads —
@@ -106,10 +114,16 @@ interface Progress {
   iterations: number;
   // Consecutive ticks that dispatched nothing — see MAX_IDLE_TICKS.
   idle: number;
+  // The send-backs `act` had nowhere to write down — see `unrecordedSendBacks` on `TickInput`. IN MEMORY AND
+  // NOWHERE ELSE, deliberately: it is true of exactly one tick, because the fix it buys is itself a record
+  // and every judgement after that lands on one. A loop restarted inside that window re-runs the gates once
+  // and arrives at the same place, which is the cost of not inventing a state file for a fact with a
+  // one-tick life (decision 39's rule about not storing the position, one size down).
+  unrecorded: Set<string>;
 }
 
 export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
-  const progress: Progress = { iterations: 0, idle: 0 };
+  const progress: Progress = { iterations: 0, idle: 0, unrecorded: new Set() };
 
   for (;;) {
     // RULE 1. Every tick, before anything else: another process may have written a stop since the last one.
@@ -119,7 +133,7 @@ export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
       return { reason: state.reason ?? 'stopped', detail: state.detail, iterations: progress.iterations };
     }
 
-    const world = await gather(deps);
+    const world = await gather(deps, progress.unrecorded);
     if ('failed' in world) {
       const ended = await afterFailedRead(deps, world.failed, progress);
       if (ended) return ended;
@@ -166,6 +180,10 @@ async function carryOut(
   progress: Progress,
 ): Promise<LoopEnded | undefined> {
   const result = await deps.act(action, { iteration: state.iteration, columns });
+  // UNCONDITIONALLY, before the branch below reads `dispatches`: what act could not write down is true
+  // whatever the action spent, and hanging it off either branch would tie it to a number it has nothing to
+  // do with.
+  if (result.unrecordedSendBack !== undefined) progress.unrecorded.add(result.unrecordedSendBack);
   if (result.dispatches > 0) {
     progress.iterations += result.dispatches;
     progress.idle = 0;
@@ -202,6 +220,9 @@ async function carryOut(
 // what the setup barrier's honesty depends on.
 async function gather(
   deps: LoopDeps,
+  // Carried in rather than read here, because it is the only thing the tick is told that came from the loop
+  // itself rather than from the world — see `Progress.unrecorded`.
+  unrecorded: ReadonlySet<string>,
 ): Promise<{ input: Omit<Parameters<typeof decideTick>[0], 'state'> } | { failed: Failed }> {
   const board = await deps.client.board();
   if (!board.ok) return { failed: board };
@@ -231,6 +252,7 @@ async function gather(
       // Read in the same gather as the board, so the commands the tick compares are the ones declared while
       // this board was true.
       commands: await deps.commands(),
+      unrecordedSendBacks: [...unrecorded],
     },
   };
 }

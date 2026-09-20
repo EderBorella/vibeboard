@@ -24,9 +24,9 @@ import {
 // them applies is decided here and nowhere else, so the order the questions are asked in is the behaviour.
 
 // THE THREE PHASES WHOSE ONLY PRODUCT IS CARDS (decision 43). Named here rather than derived from `creates`,
-// because the two checkups declare a `creates` too and this rule must not touch them: a checkup's product is a
-// REPORT, creating is optional, and a checkup that creates nothing is the ordinary closing case (decision 47) —
-// applied to them, this would refuse every close.
+// because the feature checkup and the story's judgement declare one too and this rule must not touch them:
+// a judging run's product is a VERDICT, creating is optional, and one that creates nothing is the ordinary
+// closing case (decision 47) — applied to them, this would refuse every close.
 const CREATING_PHASES: readonly PhaseName[] = ['bootstrap', 'feature-breakdown', 'story-breakdown'];
 
 // AND THE PHASE WHOSE TWO EXITS DIFFER BY THE SAME COMPARISON. A feature checkup that created stories has
@@ -122,8 +122,10 @@ export async function afterCardRun(
   // AND A `failed` RUN NEVER ADVANCES ITS CARD — decision 40's third clause, asserted on its own because
   // `producedNothing` does not cover it. A run killed by the clock after touching one file HAS changed a file,
   // and one whose report claimed success before the clock got it HAS an `outcome`, so neither of that
-  // predicate's other two clauses holds and both reached the exit stamp. The worst case is a checkup, whose
-  // `exitPass` is `done`: a dead run must not be able to close a story or a feature.
+  // predicate's other two clauses holds and both reached the exit stamp. The worst case reaching HERE is the
+  // feature checkup, whose `exitPass` is `done`: a dead run must not be able to close a feature. The story's
+  // judgement has the same exit and does not come through this function at all since decision 80 — its
+  // gates-first path bypasses it, so `judge` in review.ts asserts the clause again for itself.
   //
   // No verdict, deliberately. The attempt is burned by the record (accounting.ts) and the card retries its OWN
   // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending

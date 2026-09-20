@@ -1,6 +1,6 @@
 // Carrying one action out, split into `act/` by subject: the orchestrator and its two paths (index), what a
 // checkup is told (checkup), what a settled card run earned (outcomes), the tail of the one run with no card
-// (bootstrap), the deterministic-gates-then-model review (review), every sentence a person reads afterwards
+// (bootstrap), the deterministic-gates-then-model story judgement (review), every sentence a person reads afterwards
 // (sentences), and the two things every path needs — how it waits (settle) and how it reports a refusal
 // (refusals).
 //
@@ -12,4 +12,4 @@
 // missing here is invisible to every existing caller, which is the one failure mode this file has.
 
 export { type ActDeps, commitTail, performAction } from './act/index.js';
-export { reviewTask } from './act/review.js';
+export { reviewStory } from './act/review.js';

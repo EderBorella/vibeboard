@@ -59,6 +59,10 @@ export function defaultConfig(name: string): ProjectConfig {
     // written back, so a shared reference would let one project's edit reach the next project's
     // defaults inside the same process.
     autopilot: structuredClone(DEFAULT_AUTOPILOT),
+    // Explicitly web, so a project created before the wizard exists keeps the one behaviour every
+    // project had until now — a checkup that can open a page. Old projects get NO backfill: absence
+    // reads as the default image (containers.ts imageForKind), which is what they always ran on.
+    box: { kind: 'web' },
     copilot: { backend: DEFAULT_BACKEND, backends: defaultBackendMap() },
   };
 }

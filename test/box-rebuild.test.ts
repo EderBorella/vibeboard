@@ -7,7 +7,7 @@ import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
-import { rebuildRefusal } from '../src/server/boxes/box-routes.js';
+import { buildFrames, rebuildRefusal } from '../src/server/boxes/box-routes.js';
 import { BoxService } from '../src/server/boxes/box-service.js';
 import { boxName, type DockerRun } from '../src/server/boxes/containers.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
@@ -223,5 +223,44 @@ describe('the refusal sentence', () => {
 
   it('puts auto-pilot first, because stopping the runs would not stop it dispatching more', () => {
     expect(rebuildRefusal({ runs: 3, autopilot: 'running' })).toContain('Auto-pilot');
+  });
+});
+
+// THE FRAMES A BUILD SENDS, and the one that must not be sent. Named rather than inlined for the same
+// reason the refusal above is: the whole of the behaviour is which frames come out and in what order,
+// and asserting that through a websocket would need a browser to watch it.
+describe('the frames a build broadcasts', () => {
+  const recorder = () => {
+    const sent: { state?: string; line?: string }[] = [];
+    return { sent, frames: buildFrames((f) => sent.push(f as { state?: string; line?: string })) };
+  };
+
+  it('says nothing at all when both images were already there', () => {
+    // The route is idempotent and a person may press the button on a machine with nothing to do. A
+    // start followed instantly by a done put every open browser's build log into "running" and out
+    // again for a build that never happened — a progress report for no progress.
+    const { sent, frames } = recorder();
+    frames.finish('present');
+    expect(sent).toEqual([]);
+  });
+
+  it('opens on the first line of output rather than before it', () => {
+    const { sent, frames } = recorder();
+    frames.onLine('Building the agent image vibeboard-agent:base.');
+    frames.onLine('Step 1/9 : FROM node:22-slim');
+    frames.finish('built');
+    expect(sent).toEqual([
+      { type: 'box:build', state: 'start' },
+      { type: 'box:build', line: 'Building the agent image vibeboard-agent:base.' },
+      { type: 'box:build', line: 'Step 1/9 : FROM node:22-slim' },
+      { type: 'box:build', state: 'done' },
+    ]);
+  });
+
+  it('closes a build that streamed and then failed as failed', () => {
+    const { sent, frames } = recorder();
+    frames.onLine('Could not build vibeboard-agent:base: E: Unable to locate package curl');
+    frames.finish('failed');
+    expect(sent.at(-1)).toEqual({ type: 'box:build', state: 'failed' });
   });
 });

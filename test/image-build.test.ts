@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { agentBuildContext, buildArgs, ensureAgentImage } from '../src/server/boxes/image-build.js';
+import { BASE_IMAGE } from '../src/server/boxes/containers.js';
+import { agentBuildContext, buildArgs, ensureAgentImages } from '../src/server/boxes/image-build.js';
 
 // BUILDING THE AGENT IMAGE FROM INSIDE THE PRODUCT.
 //
@@ -11,12 +12,14 @@ import { agentBuildContext, buildArgs, ensureAgentImage } from '../src/server/bo
 // dependency only worked inside a git clone, and on any other machine the app was bricked.
 
 describe('the build context', () => {
-  // THE CLAIM THAT MAKES IT SHIPPABLE. The Dockerfile copies three files, all of them from this
-  // directory, so the context was never the repository root — that was just what the npm script passed.
-  // Narrowing it is what lets the build run from an installed tree.
+  // THE CLAIM THAT MAKES IT SHIPPABLE. The base copies three files, all of them from this directory,
+  // so the context was never the repository root — that was just what the npm script passed. Narrowing
+  // it is what lets the build run from an installed tree. BOTH Dockerfiles, since the split: the build
+  // points `-f` at each in turn out of this same context, so a base missing from an installed tree is a
+  // build that fails on the image every other one is FROM. decision 75.
   it('is a real directory holding everything the Dockerfile copies', () => {
     const context = agentBuildContext();
-    for (const file of ['Dockerfile.agent', 'relay.mjs', 'entrypoint.sh', 'vb-install']) {
+    for (const file of ['Dockerfile.base', 'Dockerfile.agent', 'relay.mjs', 'entrypoint.sh', 'vb-install']) {
       expect(existsSync(join(context, file))).toBe(true);
     }
   });
@@ -52,9 +55,9 @@ describe('building only when the image is what is missing', () => {
 
   it('does nothing at all when the image is already there', async () => {
     const lines: string[] = [];
-    const result = await ensureAgentImage(probing({ ok: true }), (l) => lines.push(l));
+    const result = await ensureAgentImages(probing({ ok: true }), (l) => lines.push(l));
     expect(result).toBe('present');
-    expect(lines).toEqual([]); // an ordinary start says nothing and costs one inspect
+    expect(lines).toEqual([]); // an ordinary start says nothing and costs one inspect per image
   });
 
   // A MISSING DAEMON IS NOT A MISSING IMAGE, and `probe` names which precisely so this can tell them
@@ -62,11 +65,42 @@ describe('building only when the image is what is missing', () => {
   // what the probe already said.
   it('does not try to build when docker itself is not there', async () => {
     const lines: string[] = [];
-    const result = await ensureAgentImage(
+    const result = await ensureAgentImages(
       probing({ ok: false, reason: 'Docker is not available — no daemon', missing: 'daemon' }),
       (l) => lines.push(l),
     );
     expect(result).toBe('no-docker');
     expect(lines).toEqual([]);
+  });
+});
+
+describe('building both images', () => {
+  it('buildArgs can point at the base Dockerfile', () => {
+    const args = buildArgs(BASE_IMAGE, '/ctx', 'Dockerfile.base');
+    expect(args).toEqual(['build', '-f', '/ctx/Dockerfile.base', '-t', BASE_IMAGE, '/ctx']);
+  });
+
+  it('ensures the base before the web layer, because FROM names it', async () => {
+    const probed: string[] = [];
+    // Base missing, web present: only the base may be built, and it must be asked about first.
+    const service = {
+      probe: async (image?: string) => {
+        probed.push(image ?? '');
+        return image === BASE_IMAGE
+          ? ({ ok: false, reason: 'absent', missing: 'image' } as const)
+          : ({ ok: true } as const);
+      },
+    };
+    // The build itself is docker; here only the decision order is under test, so stub the builder.
+    const built: string[] = [];
+    const result = await ensureAgentImages(service, () => {}, {
+      build: async (_onLine, image) => {
+        built.push(image ?? '');
+        return { ok: true, last: '' };
+      },
+    });
+    expect(probed[0]).toBe(BASE_IMAGE);
+    expect(built).toEqual([BASE_IMAGE]);
+    expect(result).toBe('built');
   });
 });

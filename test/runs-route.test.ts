@@ -1318,6 +1318,39 @@ describe('POST /api/runs — the loop’s own evidence', () => {
   }, 30000);
 });
 
+// AND THE KIND REACHES THE PROMPT THROUGH THE APP, which is the other half of the same argument: the unit
+// test on `boxSection` proves the two wordings exist, and nothing in it can see that `dispatchFrame` reads
+// the project's config at all. Without this, the browserless variant could be unreachable and every test
+// would still pass — the run would be told about a browser its box was never built with.
+describe('POST /api/runs — a research project is not told it has a browser', () => {
+  it('reads the kind off the project config and drops the claim from the prompt', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    // Through the route that a person's Settings save goes through, not by writing the file underneath
+    // the open session: the config the dispatch reads is the session's, and this is what refreshes it.
+    const patched = await project.app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { box: { kind: 'research' } },
+    });
+    expect(patched.statusCode).toBe(200);
+
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain('No browser is installed in this container');
+    expect(prompt).not.toContain('Chromium for Playwright');
+  }, 30000);
+});
+
 // AND THE VERDICT REACHES THE PROMPT THROUGH THE APP, which is the half a unit test on `buildRunPrompt` cannot
 // prove: the record already carries `verification` — the verdict path wrote it — so this is a render rather than
 // a new fact, and what had to be shown is that nothing between the record and the prompt drops it.

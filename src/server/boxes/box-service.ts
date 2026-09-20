@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { BOX_KINDS, type BoxKind, isBoxKind } from '../../core/box-kinds.js';
+import { readConfig } from '../../store/project/config.js';
 import { apiSocketDir } from './api-socket.js';
 import { BoxManager, boxPathsFor, type ProbeResult } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
@@ -7,6 +9,9 @@ import {
   AGENT_WRITABLE_PATHS,
   boxEnvFor,
   DEFAULT_IMAGE,
+  FIX_PACKAGES,
+  imageForKind,
+  isPackageName,
   SOCKET_DIR,
   STATE_DIR,
   WORK_DIR,
@@ -122,21 +127,96 @@ function boxShape(backend: BoxBackend): { publishPort?: number; command: string[
   return { command: ['sleep', 'infinity'] };
 }
 
+// What the project's config says about its box. ONE SOURCE, resolved here and never passed by
+// callers — the `boxShape` lesson directly above: two callers asking for the same box two ways evicted
+// each other's container, alternating, for ever. Absent config (mid-scaffold, or a root that is not a
+// project yet) reads as no kind and no packages: the default image, exactly as before kinds.
+// decision 75.
+type BoxSettings = { kind?: unknown; packages?: unknown };
+
+// ONLY AN ABSENT FILE IS ABSENT SETTINGS. The bare `catch` here answered "no box settings" to every
+// possible fault, which folded three different situations into one and silenced two of them: a project
+// mid-scaffold is genuinely the default, but a config that will not parse is a file whose contents were
+// ignored — the box comes up on the default image with no packages, which is not what the file asks for
+// and says nothing about why. The `mode` precedent again (decision 72): never default past a fault the
+// person can fix.
+async function boxSettingsFor(projectRoot: string): Promise<BoxSettings> {
+  let config: { box?: unknown } | null;
+  try {
+    config = (await readConfig(projectRoot)) as { box?: unknown } | null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw new Error(`the project's config could not be read: ${(err as Error).message}`);
+  }
+  const box = config?.box;
+  // `null` is an empty `box:` key, which is an empty block and holds no claim to misread. Anything else
+  // that is not a map — `box: web`, a list of names — is a person putting the value where the block goes,
+  // and defaulting it would run the box on the shape they were trying to leave.
+  if (box === undefined || box === null) return {};
+  if (typeof box !== 'object' || Array.isArray(box)) {
+    throw new Error("the project's box block must be a map — fix .vibeboard/config.yaml");
+  }
+  return box as BoxSettings;
+}
+
+// Refusals with names, because config is a hand-editable file: a mistyped kind or a shell-shaped
+// package name is a person's typo, and the fix is the message. Defaulting either would run the box on
+// a shape the person was trying to leave (the `mode` precedent, decision 72).
+function resolveBox(settings: BoxSettings): { kind: BoxKind | undefined; packages: string[] } {
+  return { kind: kindOf(settings.kind), packages: packagesOf(settings.packages) };
+}
+
+function kindOf(kind: unknown): BoxKind | undefined {
+  if (kind === undefined) return undefined;
+  if (isBoxKind(kind)) return kind;
+  throw new Error(
+    `the project's box kind '${String(kind)}' is not one of ${BOX_KINDS.join(', ')} — fix .vibeboard/config.yaml`,
+  );
+}
+
+// NO COUNT CAP HERE, unlike `POST /api/toolchain/install`: that cap exists because an AGENT can paste a
+// dependency list into it, and this list has only ever one author — an admin through PATCH /api/config
+// or a person with a text editor, `.vibeboard` being read-only inside every box.
+//
+// Both refusals name the file and the key, because that author is looking for WHERE as much as what.
+function packagesOf(packages: unknown): string[] {
+  if (packages === undefined) return [];
+  if (!Array.isArray(packages))
+    throw new Error(`the project's box.packages must be a list of names${FIX_PACKAGES}`);
+  const bad = packages.filter((p) => typeof p !== 'string' || !isPackageName(p));
+  // DELIBERATELY NOT the manager's wording for the same fault. That one answers an agent asking for an
+  // install over the API, where there is no config file to fix and naming one sends it somewhere it
+  // cannot read; this one answers the person whose file it is.
+  if (bad.length > 0) {
+    throw new Error(
+      `not a package name in the project's own list: ${bad.map(String).join(', ')}${FIX_PACKAGES}`,
+    );
+  }
+  return packages as string[];
+}
+
 export class BoxService {
   #manager: BoxManager;
   #image: string;
+  // Injectable ONLY so a test can drive the resolution without a config file on disk; production has
+  // one reader, and there is no parameter for a caller to disagree through.
+  #settings: (projectRoot: string) => Promise<BoxSettings>;
 
-  constructor(opts: { manager?: BoxManager; image?: string } = {}) {
+  constructor(opts: { manager?: BoxManager; image?: string; settings?: typeof boxSettingsFor } = {}) {
     this.#manager = opts.manager ?? new BoxManager();
     this.#image = opts.image ?? DEFAULT_IMAGE;
+    this.#settings = opts.settings ?? boxSettingsFor;
   }
 
   get manager(): BoxManager {
     return this.#manager;
   }
 
-  async probe(): Promise<ProbeResult> {
-    return this.#manager.probe(this.#image);
+  // The argument matters now: the image ensurer asks about the base and the web layer separately, and
+  // a probe that silently answered for the default image would report the base present on a machine
+  // that has never built it. decision 75.
+  async probe(image: string = this.#image): Promise<ProbeResult> {
+    return this.#manager.probe(image);
   }
 
   // Called before every agent turn, not only at project creation. Creation is when a box is normally
@@ -148,6 +228,9 @@ export class BoxService {
   // the same box in two different ways — which they did, and which evicted each other's container.
   async ensure(projectRoot: string, backend: BoxBackend): Promise<EnsuredBox> {
     const shape = boxShape(backend);
+    // BEFORE the paths, so a refused kind does not leave a scaffolded directory behind for a box that
+    // was never going to exist.
+    const box = resolveBox(await this.#settings(projectRoot));
     // `boxPathsForBackend` creates the state directory as a side effect, which is deliberate: docker
     // would otherwise create a missing bind source itself, root-owned, on the host.
     return this.#manager.ensure({
@@ -155,7 +238,8 @@ export class BoxService {
       backend,
       paths: boxPathsForBackend(projectRoot, backend),
       env: boxEnvFor(backend),
-      image: this.#image,
+      image: imageForKind(box.kind, this.#image),
+      packages: box.packages,
       ...(shape.publishPort ? { publishPort: shape.publishPort } : {}),
       command: shape.command,
     });

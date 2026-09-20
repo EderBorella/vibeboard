@@ -5,6 +5,7 @@ import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
+import { isBoxKind } from '../../core/box-kinds.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { findCard } from '../../core/find.js';
@@ -29,6 +30,7 @@ import {
 } from '../../store/run-store.js';
 import type { Backend } from '../agent-turn.js';
 import type { Scope } from '../auth/credentials.js';
+import { BASE_IMAGE, imageForKind } from '../boxes/containers.js';
 import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
 import { agentRefusal } from '../boxes/sandbox.js';
 import { errorText } from '../errors.js';
@@ -218,6 +220,7 @@ async function dispatchFrame(
     | 'mode'
     | 'attachments'
     | 'express'
+    | 'browser'
   >
 > {
   // A dispatch may name any of backend/model/effort, or none: the project's saved selection fills
@@ -238,6 +241,7 @@ async function dispatchFrame(
   const codeQuality = (await readGates(root)).ok
     ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
     : undefined;
+  const kind = config.box?.kind;
   return {
     boardColumns: everyBoardColumns(config),
     // COMPUTED HERE rather than accepted on the body, which is ruling 63's precedent and the same call
@@ -246,6 +250,12 @@ async function dispatchFrame(
     // rather than `false` on a standard project — `exactOptionalPropertyTypes`, and the prompt renders on
     // presence.
     ...(config.autopilot?.mode === 'express' ? { express: true as const } : {}),
+    // WHETHER THE PROMPT MAY CLAIM A BROWSER, read off the IMAGE the kind selects rather than off the
+    // kind itself: the browser is what the web layer adds, so "is this box the base?" IS the question,
+    // and the box and the sentence describing it cannot then disagree. A kind that is absent — or that
+    // is not a kind at all, because config is hand-editable YAML — reads as the default image, which is
+    // exactly what `imageForKind` does with it. decision 75.
+    browser: imageForKind(isBoxKind(kind) ? kind : undefined) !== BASE_IMAGE,
     links: await readResources(root),
     attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],
     foundation: {

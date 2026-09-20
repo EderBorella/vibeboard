@@ -134,6 +134,11 @@ export interface PromptInputs {
   // `reviewFor` computes the judging contract: a caller that could ask for standard prompts on an express
   // project would be a second answer to a question the config already answers.
   express?: true;
+  // Whether this project's box has a browser in it — the web layer, which `game` and `research` boxes
+  // are not built from. REQUIRED rather than optional with a default, because the honest answer lives
+  // where the image is chosen: a caller that forgot to work it out would otherwise silently claim a
+  // browser, which is the exact sentence this exists to stop. decision 75.
+  browser: boolean;
   reportPath: string;
   // The run's own id, asked for INSIDE the report as well as being in the path it writes to. A report
   // that does not know which run it belongs to is not folded in — see `checkReportIdentity` in
@@ -191,7 +196,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   // WHAT THE MACHINE IT IS STANDING IN ALREADY HAS, beside the columns for the same reason: this is the
   // frame, not the work. Placed before the foundation rather than after because a run that is going to
   // fetch a browser decides to early, while it is still working out how to approach the card at all.
-  parts.push(section('What this container already has', boxSection()));
+  parts.push(section('What this container already has', boxSection(input.browser)));
 
   // Immediately after the columns and before the card's own links: the stack and the gates are the
   // frame everything else is read inside, and a decision an agent meets after the work is described

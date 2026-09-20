@@ -6,10 +6,11 @@ import { installBreakGlass, signinBanner } from './auth/signin-terminal.js';
 import { ProjectSession } from './boards/session.js';
 import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { backendCheck } from './boxes/backend-liveness.js';
+import { BoxManager } from './boxes/box-manager.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
 import { credentialCheck } from './boxes/credential-freshness.js';
-import { ensureAgentImage } from './boxes/image-build.js';
+import { ensureAgentImages } from './boxes/image-build.js';
 import { knownOpencodeUrl, stopOpencodeServer } from './boxes/opencode-server.js';
 import { liveSandbox, probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
@@ -45,24 +46,36 @@ const admin = await adminToken();
 const devices = await DeviceStore.load();
 // Every agent box this server makes or adopts. One service, because a box is keyed by project and
 // backend and outlives any single request.
-const boxes = new BoxService();
+//
+// AND IT SAYS WHEN IT THROWS ONE AWAY. The manager has had the hook since boxes existed and nothing
+// was listening, which was affordable while a rebuild meant a mount set had genuinely changed.
+// Decision 75 added the packages and the image to the spec digest, so every box on every existing
+// project is replaced ONCE on the upgrade — deliberately, and silently until now. A container being
+// destroyed under somebody's project is worth a line in the log it happens in.
+const boxes = new BoxService({
+  manager: new BoxManager({
+    onRebuild: (name, was, now) =>
+      process.stderr.write(`replacing agent box ${name}: its spec is ${was}, this VibeBoard wants ${now}\n`),
+  }),
+});
 // Probed once, here, because the answer cannot change while the process runs and every agent this
 // server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
 // see the state of is a sandbox nobody trusts.
 // THE IMAGE IS BUILT HERE IF IT IS MISSING, and this is the primary path — ruled 2026-09-01. Not a
-// separate command anybody has to know about, and idempotent: it probes first and builds only when the
-// image is genuinely absent, so an ordinary start costs one `docker image inspect`.
+// separate command anybody has to know about, and idempotent: it probes first and builds only when an
+// image is genuinely absent, so an ordinary start costs two `docker image inspect`s — one for the base
+// and one for the web layer that stands on it.
 //
 // THE OBJECTION THIS ANSWERS. Building at startup was argued against, on the grounds that a server which
 // stalls for minutes fetching packages is a worse failure than the one it fixes, and a silent one. The
 // difference is where it is: `npm start` has a TERMINAL, and the build streams into it line by line — a
 // visible multi-minute step, not a hang. The route in box-routes.ts is the same build for a browser that
-// has already been refused, and the two share `buildAgentImage`.
+// has already been refused, and the two share `ensureAgentImages`.
 //
 // A FAILED BUILD DOES NOT STOP THE SERVER. The board, the explorer and settings all work without agents;
 // refusing to boot would take a working product away over a prerequisite the user can be told about, and
 // the banner below already says agents are disabled and why.
-await ensureAgentImage(boxes, (line) => process.stderr.write(`${line}\n`));
+await ensureAgentImages(boxes, (line) => process.stderr.write(`${line}\n`));
 
 // One shot for the BANNER, which is a statement about this moment and is printed once.
 const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);

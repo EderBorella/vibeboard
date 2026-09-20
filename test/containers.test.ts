@@ -704,8 +704,10 @@ describe('the spec digest', () => {
       command: ['sleep', 'infinity'],
     });
 
+  // Last moved by decision 75, which put the project's own package list in the hashed shape: one
+  // deliberate rebuild of every box that exists, and the reason this pin is a literal.
   it('is stable for an unchanged container shape', () => {
-    expect(digestOf()).toBe('99d6a0697e379b5a');
+    expect(digestOf()).toBe('72f76a4dbc92cd4c');
   });
 
   it('changes when anything the box is made of changes', () => {
@@ -718,5 +720,104 @@ describe('the spec digest', () => {
       command: ['sleep', 'infinity'],
     });
     expect(other).not.toBe(digestOf());
+  });
+});
+
+describe('the spec digest and the package list', () => {
+  const spec = { image: 'i', mounts: [], env: {}, publish: undefined, command: undefined };
+  it('a changed package list is a different box', () => {
+    const bare = specDigest({ ...spec, packages: [] });
+    const withJq = specDigest({ ...spec, packages: ['jq'] });
+    expect(withJq).not.toBe(bare);
+  });
+  it('order does not matter, so a reordered config does not rebuild anything', () => {
+    expect(specDigest({ ...spec, packages: ['a', 'b'] })).toBe(specDigest({ ...spec, packages: ['b', 'a'] }));
+  });
+});
+
+// A BIRTH EVENT, NOT A TURN EVENT. The project's own packages are replayed into a box when it is
+// created and never again, which is only safe because the list is in the spec digest above: change it
+// and the box is replaced, so the box that exists always holds the list it was made for.
+describe('a project’s own packages', () => {
+  const opts = {
+    projectRoot: PROJECT,
+    backend: 'claude-code' as const,
+    paths: PATHS,
+    packages: ['jq', 'ripgrep'],
+  };
+
+  // REMEMBERS WHAT IT CREATED, because the claim here is the difference between creating a box and
+  // adopting one — a fake that always answers "no such object" cannot tell those apart, and would pass
+  // against a manager that reinstalled on every ensure.
+  function daemon(calls: string[][], behaviour: { failInstall?: boolean } = {}): DockerRun {
+    const SPEC = 'io.vibeboard.spec=';
+    const ok: DockerResult = { code: 0, stdout: '', stderr: '' };
+    let present: string | undefined;
+
+    const inspect = (args: string[]): DockerResult => {
+      // The v6 read, which must answer nothing rather than fall through to the state read's digest.
+      if (args[1] === '--format') return ok;
+      return present === undefined
+        ? { code: 1, stdout: '', stderr: 'No such object' }
+        : { code: 0, stdout: `true|${present}\n`, stderr: '' };
+    };
+
+    const create = (args: string[]): DockerResult => {
+      present = args.find((a) => a.startsWith(SPEC))?.slice(SPEC.length) ?? '';
+      return ok;
+    };
+
+    // apt's own wording and apt's own exit code. A fixture invented from the documentation is wrong in
+    // exactly the way the code under it is wrong — the Go-template lesson.
+    const exec = (args: string[]): DockerResult =>
+      behaviour.failInstall && args.includes(INSTALL_HELPER)
+        ? { code: 100, stdout: '', stderr: 'E: Unable to locate package jq' }
+        : ok;
+
+    return async (args) => {
+      calls.push(args);
+      if (args[0] === 'inspect') return inspect(args);
+      if (args[0] === 'run' && args[1] === '-d') return create(args);
+      if (args[0] === 'exec') return exec(args);
+      if (args[0] === 'rm') {
+        present = undefined;
+        return ok;
+      }
+      return ok;
+    };
+  }
+
+  const installs = (calls: string[][]): string[][] =>
+    calls.filter((a) => a[0] === 'exec' && a.includes(INSTALL_HELPER));
+
+  it('replays them into a box at creation, and not into one it adopts', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({ docker: daemon(calls), user: '1000:1000' });
+
+    await mgr.ensure(opts);
+
+    expect(installs(calls)).toHaveLength(1);
+    expect(installs(calls)[0]).toContain('jq');
+    // Second ensure adopts (same digest): no second install — replay is a birth event, not a turn event.
+    await mgr.ensure(opts);
+    expect(installs(calls)).toHaveLength(1);
+  });
+
+  it('removes the box when the replay fails, so a half-provisioned box is never adopted', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: daemon(calls, { failInstall: true }),
+      user: '1000:1000',
+    });
+
+    await expect(
+      mgr.ensure({ projectRoot: PROJECT, backend: 'claude-code', paths: PATHS, packages: ['jq'] }),
+      // apt's line AND the key that produced it: the failure is almost always a name that does not
+      // exist in this distribution, and the list it came from is the thing to edit.
+    ).rejects.toThrow(
+      "could not install the project's own packages: E: Unable to locate package jq — fix box.packages in .vibeboard/config.yaml",
+    );
+
+    expect(calls.some((a) => a[0] === 'rm' && a.includes('-f'))).toBe(true);
   });
 });

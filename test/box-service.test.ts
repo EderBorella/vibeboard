@@ -4,8 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
 import { BoxService, boxPathsForBackend } from '../src/server/boxes/box-service.js';
-import { boxMounts, type DockerResult, type DockerRun, WORK_DIR } from '../src/server/boxes/containers.js';
+import {
+  boxMounts,
+  type DockerResult,
+  type DockerRun,
+  INSTALL_HELPER,
+  WORK_DIR,
+} from '../src/server/boxes/containers.js';
 import { boxCredentialPath, opencodeBoxCredentialPath } from '../src/server/boxes/copilot-env.js';
+import { defaultConfig, writeConfig } from '../src/store/project/config.js';
 import { tempDir, testTmp } from './helpers.js';
 
 // What a box gets FOR a project and backend. The mount set is the containment boundary, and two of its
@@ -256,5 +263,136 @@ describe('a box is the same box whoever asks for it', () => {
     expect(box.hostPort).toBeUndefined();
     expect(created[0].slice(-2)).toEqual(['sleep', 'infinity']);
     expect(created[0]).not.toContain('-p');
+  });
+});
+
+// WHICH IMAGE, AND WHOSE PACKAGES — read from the project's config HERE, by one reader, and never
+// passed in by a caller. The block above is the whole reason: two callers describing the same box two
+// different ways evicted each other's container, alternating, for ever. A kind passed as a parameter
+// would be that bug a second time, so the only way in is the project's own config.
+describe('the kind decides the image, resolved in one place', () => {
+  // Answers as a daemon holding no box: every test here creates one, and what is asserted is the argv.
+  const recording =
+    (calls: string[][]): DockerRun =>
+    async (args) => {
+      calls.push(args);
+      // The state read, and the only call whose failure means "no such box" — the v6 read below it
+      // must answer empty rather than absent.
+      if (args[0] === 'inspect' && args[1] === '-f') {
+        return { code: 1, stdout: '', stderr: 'No such object' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+
+  const service = (calls: string[][], settings: Record<string, unknown>) =>
+    new BoxService({
+      manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }),
+      settings: async () => settings,
+    });
+
+  const project = async (): Promise<string> => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    return root;
+  };
+
+  const createArgv = (calls: string[][]): string[] | undefined =>
+    calls.find((a) => a[0] === 'run' && a.includes('-d'));
+
+  it('a research project gets the base image, and its packages travel to the manager', async () => {
+    const calls: string[][] = [];
+    await service(calls, { kind: 'research', packages: ['jq'] }).ensure(await project(), 'claude-code');
+    expect(createArgv(calls)).toContain('vibeboard-agent:base');
+    expect(calls.some((a) => a.includes(INSTALL_HELPER) && a.includes('jq'))).toBe(true);
+  });
+
+  it('no kind at all is the default image — an old project changes in nothing', async () => {
+    const calls: string[][] = [];
+    await service(calls, {}).ensure(await project(), 'claude-code');
+    expect(createArgv(calls)).toContain('vibeboard-agent:latest');
+  });
+
+  it('refuses a mistyped kind by name rather than defaulting it', async () => {
+    await expect(service([], { kind: 'webb' }).ensure(await project(), 'claude-code')).rejects.toThrow(
+      /'webb' is not one of web, game, research/,
+    );
+  });
+
+  // THE REFUSAL NAMES THE FILE AND THE KEY, because the author of this list is a person with a text
+  // editor — `box.packages` is written by hand or by an admin PATCH, never by an agent. A message that
+  // only says what is wrong leaves them looking for where, and the config is the only place to look.
+  it('refuses a package list it could never install, and says which key to fix', async () => {
+    await expect(
+      service([], { packages: ['jq;rm -rf /'] }).ensure(await project(), 'claude-code'),
+    ).rejects.toThrow(
+      "not a package name in the project's own list: jq;rm -rf / — fix box.packages in .vibeboard/config.yaml",
+    );
+  });
+
+  // DISTINCT FROM THE MANAGER'S, deliberately: that one answers an AGENT asking for an install through
+  // the API, where there is no config file to fix and saying so would send it to a file it cannot read.
+  it('does not hand the agent’s wording to the person editing the config', async () => {
+    const res = await new BoxManager({ docker: recording([]), user: '1000:1000' }).install('box', [
+      'jq;rm -rf /',
+    ]);
+    expect(res.stderr).toBe('not a package name: jq;rm -rf /');
+    expect(res.stderr).not.toContain('config.yaml');
+  });
+
+  it('refuses a packages value that is not a list at all', async () => {
+    await expect(service([], { packages: 'jq' }).ensure(await project(), 'claude-code')).rejects.toThrow(
+      "the project's box.packages must be a list of names — fix box.packages in .vibeboard/config.yaml",
+    );
+  });
+
+  // WHAT THE READER DOES WITH A CONFIG IT CANNOT USE, which used to be one bare `catch` answering
+  // "no box settings" to every possible fault. Three different situations were one, and two of them
+  // are silent: a project mid-scaffold, a config that will not parse, and a `box:` that is not a map.
+  describe('the config reader', () => {
+    // No `settings` injected, deliberately: the reader is the subject here, so it must be the real one.
+    const boxes = (calls: string[][] = []) =>
+      new BoxService({ manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }) });
+
+    it('reads a project with no config file at all as no box settings', async () => {
+      // Mid-scaffold, or a root that is not a project yet. The only fault that is genuinely absence.
+      const root = await project();
+      const calls: string[][] = [];
+      await boxes(calls).ensure(root, 'claude-code');
+      expect(createArgv(calls)).toContain('vibeboard-agent:latest');
+    });
+
+    it('refuses a config it cannot read rather than pretending there were no settings', async () => {
+      // The silent one: a hand edit that breaks the YAML gave the project the default image and an
+      // empty package list, which is a box that is not the one the file asks for.
+      const root = await project();
+      writeFileSync(join(root, CONFIG_DIR, 'config.yaml'), 'box: {kind: web\npackages: [\n');
+      await expect(boxes().ensure(root, 'claude-code')).rejects.toThrow(
+        /the project's config could not be read: /,
+      );
+    });
+
+    it('refuses a box block that is not a map, by name', async () => {
+      const root = await project();
+      writeFileSync(join(root, CONFIG_DIR, 'config.yaml'), 'name: p\nbox: web\n');
+      await expect(boxes().ensure(root, 'claude-code')).rejects.toThrow(
+        "the project's box block must be a map — fix .vibeboard/config.yaml",
+      );
+    });
+  });
+
+  // AND THE READER ITSELF, on a config file written by the real writer. Every test above injects
+  // `settings`, so between them they prove only that the resolver agrees with a fake — the seam where
+  // the config is actually read would be unexercised, which is how a mock comes to agree with itself.
+  it('reads the kind off a real config file when nothing is injected', async () => {
+    const root = await project();
+    await writeConfig(root, { ...defaultConfig('p'), box: { kind: 'research', packages: ['jq'] } });
+    const calls: string[][] = [];
+
+    await new BoxService({
+      manager: new BoxManager({ docker: recording(calls), user: '1000:1000' }),
+    }).ensure(root, 'claude-code');
+
+    expect(createArgv(calls)).toContain('vibeboard-agent:base');
+    expect(calls.some((a) => a.includes(INSTALL_HELPER) && a.includes('jq'))).toBe(true);
   });
 });

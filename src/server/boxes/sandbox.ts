@@ -1,4 +1,4 @@
-import { dockerBin, execArgs } from './containers.js';
+import { BASE_IMAGE, dockerBin, execArgs } from './containers.js';
 
 // The agent sandbox: a Docker container per (project, backend), and the only place an agent runs.
 //
@@ -51,7 +51,9 @@ export type SandboxStatus =
 export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested', kind: 'docker' };
 
 interface SandboxProbe {
-  probe(): Promise<{ ok: true } | { ok: false; reason: string; missing?: 'daemon' | 'image' }>;
+  // The image is a parameter because there are two of them: the web layer a box's kind may select, and
+  // the shared base every other kind is built from. Optional, so the default answers for the default.
+  probe(image?: string): Promise<{ ok: true } | { ok: false; reason: string; missing?: 'daemon' | 'image' }>;
 }
 
 // Whether the box is holding the credential the host currently has. Injected as a bare thunk rather
@@ -133,19 +135,30 @@ export async function probeSandbox(
   credential?: CredentialCheck,
   backend?: BackendCheck,
 ): Promise<SandboxStatus> {
-  const res = await service.probe();
+  // BOTH IMAGES, because a box is built from EITHER of them. `imageForKind` sends a `game` or `research`
+  // project to the shared base, so a machine whose `:latest` predates the split — every machine that
+  // upgrades into kinds — has a green light and no box for those projects, discovered at dispatch as a
+  // raw docker error. That is the exact confusion this module's opening comment says the probe exists to
+  // prevent, so the probe has to ask about the thing it stopped being able to see. decision 75.
+  const web = await service.probe();
+  // A DEAD DAEMON IS ONE QUESTION, NOT TWO. The second probe would spend another pair of docker calls to
+  // be told the same thing, and it would be told it about an image — which is not what is wrong, and not
+  // the sentence that helps.
+  if (!web.ok && web.missing !== 'image') return { ok: false, reason: web.reason, kind: 'docker' };
+  const base = await service.probe(BASE_IMAGE);
+  if (!base.ok && base.missing !== 'image') return { ok: false, reason: base.reason, kind: 'docker' };
+  // The base first, because that is the order they are built in: a machine missing both is about to be
+  // told what it is missing in the order it will get it.
+  const absent: string[] = [];
+  if (!base.ok) absent.push(base.reason);
+  if (!web.ok) absent.push(web.reason);
   // ORDER IS THE BEHAVIOUR, and only the docker answer decides whether the second question is even
   // asked. A missing daemon or a missing image is the more fundamental fault — the credential check
   // cannot run without docker anyway, and if it could, "rebuild the agent boxes" is useless advice to
   // someone whose image was never built. The first message is the one that helps, so it is the one
   // that survives; the credential fault is still there and is reported the moment docker is.
-  if (!res.ok) {
-    return {
-      ok: false,
-      reason: res.reason,
-      kind: 'docker',
-      ...(res.missing === 'image' ? { buildable: true as const } : {}),
-    };
+  if (absent.length > 0) {
+    return { ok: false, reason: absent.join('; '), kind: 'docker', buildable: true as const };
   }
   const cred = await credential?.();
   if (cred && !cred.fresh) return { ok: false, reason: cred.reason, kind: 'credential' };

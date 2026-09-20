@@ -113,6 +113,10 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
         // The project's own config is not loaded until it is opened, a line below, so this is the
         // product default. A project configured for the other backend simply builds that box on its
         // first turn instead — one container start, once.
+        //
+        // THE BACKEND IS THE ONLY THING GUESSED HERE. The box's SHAPE is not: `BoxService.ensure` reads
+        // this project's config off disk itself, so the kind and the packages the scaffolder just wrote
+        // are honoured on this first box rather than on the second. decision 75.
         await ctx.boxes.ensure(path, DEFAULT_BACKEND as BoxBackend);
       } catch (err) {
         req.log.warn({ err, path }, 'the project was created but its agent box was not');

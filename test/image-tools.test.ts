@@ -28,3 +28,22 @@ describe('what the prompt tells agents the box has', () => {
     expect(line?.[1]?.trim()).toBe(BOX_PLAYWRIGHT_VERSION);
   });
 });
+
+// THE SPLIT ITSELF, pinned the same way and for the same reason: nothing at runtime reads either
+// Dockerfile, so a base that grew the browser back — or a web layer that stopped standing on the base —
+// would be found by a multi-minute build rather than by a test. decision 75.
+const BASE_DOCKERFILE = new URL('../tools/docker/Dockerfile.base', import.meta.url);
+
+describe('the image splits into a base and a web layer', () => {
+  it('the web layer stands on the shared base, and the base ships no browser', async () => {
+    const web = await readFile(DOCKERFILE, 'utf8');
+    const base = await readFile(BASE_DOCKERFILE, 'utf8');
+    expect(web).toMatch(/^FROM vibeboard-agent:base$/m);
+    // The whole point of the split: the base must never grow the browser back.
+    expect(base).not.toContain('playwright');
+    // Both halves assert the absent escalation route — install-deps runs apt, so the web layer must
+    // re-check what the base already proved.
+    expect(base).toContain('! command -v sudo');
+    expect(web).toContain('! command -v sudo');
+  });
+});

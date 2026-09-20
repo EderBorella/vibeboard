@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProbeResult } from './box-manager.js';
-import { DEFAULT_IMAGE, dockerBin } from './containers.js';
+import { BASE_IMAGE, DEFAULT_IMAGE, dockerBin } from './containers.js';
 
 // BUILDING THE AGENT IMAGE, from inside the product rather than from a developer's terminal.
 //
@@ -26,10 +26,16 @@ export function agentBuildContext(): string {
 
 // Exported for its own test: the argv is the whole of what this does, and a wrong flag here fails as a
 // multi-minute build that produces the wrong thing.
-export function buildArgs(image: string = DEFAULT_IMAGE, context = agentBuildContext()): string[] {
+export function buildArgs(
+  image: string = DEFAULT_IMAGE,
+  context = agentBuildContext(),
+  // Named, because there are two of them now — the base and the web layer that stands on it. The
+  // default is the web layer, so every caller that predates the split asks for what it always did.
+  file = 'Dockerfile.agent',
+): string[] {
   // `-f` as well as the context, because the file is not named `Dockerfile`. Both are inside the context
   // directory, which is what lets the whole thing travel with the package.
-  return ['build', '-f', join(context, 'Dockerfile.agent'), '-t', image, context];
+  return ['build', '-f', join(context, file), '-t', image, context];
 }
 
 export interface BuildResult {
@@ -47,9 +53,12 @@ export interface BuildResult {
 export function buildAgentImage(
   onLine: (line: string) => void,
   image: string = DEFAULT_IMAGE,
+  file = 'Dockerfile.agent',
 ): Promise<BuildResult> {
   return new Promise((settle) => {
-    const child = spawn(dockerBin(), buildArgs(image), { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(dockerBin(), buildArgs(image, agentBuildContext(), file), {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let last = '';
     // One buffer per stream: interleaving two partial lines into a single buffer splices them.
     const reader = (): ((chunk: Buffer) => void) => {
@@ -73,26 +82,48 @@ export function buildAgentImage(
   });
 }
 
-// BUILD IT IF IT IS NOT THERE, and do nothing at all if it is. The idempotent half of the ruling: this
-// runs on every start, so the ordinary cost has to be one `docker image inspect`.
+type Prober = { probe(image?: string): Promise<ProbeResult> };
+type Builder = (onLine: (line: string) => void, image?: string, file?: string) => Promise<BuildResult>;
+
+// BUILD IT IF IT IS NOT THERE, and do nothing at all if it is.
 //
 // A MISSING DAEMON IS NOT A MISSING IMAGE. `probe()` answers both as "not ok", and building against a
 // daemon that is not running would spend a failed `docker build` to discover what the probe already
 // knew — so this asks specifically whether the image is the thing that is absent.
-export async function ensureAgentImage(
-  service: { probe(image?: string): Promise<ProbeResult> },
+async function ensureOneImage(
+  service: Prober,
   onLine: (line: string) => void,
-  image: string = DEFAULT_IMAGE,
+  image: string,
+  file: string,
+  build: Builder,
 ): Promise<'present' | 'built' | 'failed' | 'no-docker'> {
   const before = await service.probe(image);
   if (before.ok) return 'present';
   if (before.missing !== 'image') return 'no-docker';
   onLine(`Building the agent image ${image}. This takes a few minutes the first time.`);
-  const result = await buildAgentImage(onLine, image);
+  const result = await build(onLine, image, file);
   if (result.ok) {
     onLine(`Built ${image}.`);
     return 'built';
   }
   onLine(`Could not build ${image}: ${result.last}`);
   return 'failed';
+}
+
+// BASE FIRST, because the web layer's FROM names it — built the other way round, the web build fails
+// on a fresh machine with "pull access denied", which reads like a registry problem rather than an
+// ordering one. Idempotent for the same reason the one-image version was: an ordinary start costs two
+// `docker image inspect`s. The builder is injectable ONLY so the ordering is testable without a
+// daemon; production callers never pass it. decision 75.
+export async function ensureAgentImages(
+  service: Prober,
+  onLine: (line: string) => void,
+  opts: { build?: Builder } = {},
+): Promise<'present' | 'built' | 'failed' | 'no-docker'> {
+  const build = opts.build ?? buildAgentImage;
+  const base = await ensureOneImage(service, onLine, BASE_IMAGE, 'Dockerfile.base', build);
+  if (base === 'failed' || base === 'no-docker') return base;
+  const web = await ensureOneImage(service, onLine, DEFAULT_IMAGE, 'Dockerfile.agent', build);
+  if (web === 'present' && base === 'built') return 'built';
+  return web;
 }

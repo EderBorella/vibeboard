@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { WORK_DIR } from '../src/server/boxes/containers.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { BASE_IMAGE, DEFAULT_IMAGE, WORK_DIR } from '../src/server/boxes/containers.js';
 import {
   agentRefusal,
   liveSandbox,
@@ -69,6 +70,72 @@ describe('probeSandbox', () => {
   });
 });
 
+// THERE ARE TWO IMAGES NOW, AND A MISSING BASE IS A BROKEN MACHINE. `imageForKind` sends a `game` or
+// `research` project's box to `vibeboard-agent:base`, so a machine whose `:latest` predates the split has
+// a green light and no box for those projects — the probe asked about one image and answered for both.
+//
+// THE REAL MANAGER, with only docker faked. The sentence under test is the manager's own per-image
+// wording, so a stub that spelled it here would be a mock agreeing with itself about the one thing this
+// is for. decision 75.
+describe('both images are probed, because a box is built from either', () => {
+  const holding = (images: readonly string[]): BoxManager =>
+    new BoxManager({
+      docker: async (args) => {
+        if (args[0] === 'version') return { code: 0, stdout: '29.0.0\n', stderr: '' };
+        if (args[0] === 'image') {
+          const wanted = String(args.at(-1));
+          return images.includes(wanted)
+            ? { code: 0, stdout: 'sha256:abc\n', stderr: '' }
+            : { code: 1, stdout: '', stderr: `Error: No such image: ${wanted}` };
+        }
+        return { code: 0, stdout: '', stderr: '' };
+      },
+    });
+
+  it('is ok only when both of them are there', async () => {
+    const status = await probeSandbox(holding([DEFAULT_IMAGE, BASE_IMAGE]), DEFAULT_IMAGE);
+    expect(status).toEqual({ ok: true, image: DEFAULT_IMAGE });
+  });
+
+  it('refuses a machine that has the web layer and not the base, naming the base', async () => {
+    const status = await probeSandbox(holding([DEFAULT_IMAGE]), DEFAULT_IMAGE);
+    expect(status.ok).toBe(false);
+    expect(status.ok === false && status.kind).toBe('docker');
+    // Buildable, because the missing thing is an image and the build is the remedy — the same
+    // discriminator the Settings button reads.
+    expect(status.ok === false && status.buildable).toBe(true);
+    expect(status.ok === false && status.reason).toContain(BASE_IMAGE);
+  });
+
+  it('names both when a machine has neither', async () => {
+    const status = await probeSandbox(holding([]), DEFAULT_IMAGE);
+    expect(status.ok === false && status.reason).toContain(BASE_IMAGE);
+    expect(status.ok === false && status.reason).toContain(DEFAULT_IMAGE);
+    expect(status.ok === false && status.buildable).toBe(true);
+  });
+
+  it('asks about the base only once it knows there is a daemon to ask', async () => {
+    // A dead daemon answers both probes identically, and the second pair of docker calls would buy
+    // nothing — while "the image is not built" is not what is wrong and not what should be shown.
+    const asked: string[] = [];
+    const status = await probeSandbox(
+      {
+        probe: async (img?: string) => {
+          asked.push(img ?? DEFAULT_IMAGE);
+          return {
+            ok: false as const,
+            reason: 'Docker is not available — no daemon',
+            missing: 'daemon' as const,
+          };
+        },
+      },
+      DEFAULT_IMAGE,
+    );
+    expect(asked).toEqual([DEFAULT_IMAGE]);
+    expect(status.ok === false && status.buildable).toBeUndefined();
+  });
+});
+
 // A STALE CREDENTIAL IS A NOT-OK SANDBOX, and that is the whole mechanism. It could have been a fourth
 // gate with its own call sites; folding it into the status means the dispatch gate, the auto-pilot
 // gate, the copilot gate and the route all refuse it without any of them being told about it, and the
@@ -118,6 +185,8 @@ describe('a box holding a replaced credential', () => {
 
   // ONE cache, not two. A second TTL for the credential would let the two halves of one status disagree
   // for up to a second at a time, and the counts are the only thing that can tell that apart.
+  //
+  // The docker count is even because one probe asks about both images now — the web layer and the base.
   it('caches both answers under the one TTL, and a burst makes one probe of each', async () => {
     let clock = 0;
     let docker = 0;
@@ -142,16 +211,16 @@ describe('a box holding a replaced credential', () => {
 
     const burst = await Promise.all([sandbox(), sandbox(), sandbox(), sandbox()]);
     expect(burst.every((s) => !s.ok)).toBe(true);
-    expect([docker, credential]).toEqual([1, 1]);
+    expect([docker, credential]).toEqual([2, 1]);
 
     clock += 999;
     await sandbox();
-    expect([docker, credential]).toEqual([1, 1]);
+    expect([docker, credential]).toEqual([2, 1]);
 
     // And they expire together, because there is only one thing to expire.
     clock += 2;
     await sandbox();
-    expect([docker, credential]).toEqual([2, 2]);
+    expect([docker, credential]).toEqual([4, 2]);
   });
 });
 

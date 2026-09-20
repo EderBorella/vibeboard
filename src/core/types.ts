@@ -1,4 +1,5 @@
 import type { AutopilotConfig } from './autopilot.js';
+import type { BoxKind } from './box-kinds.js';
 import { oneOf } from './parse.js';
 
 // The ordered set of boards, highest level of project management first. Adding a board
@@ -132,5 +133,9 @@ export interface ProjectConfig {
   // derives the hierarchy off these links — the position it works from, and the checkup that advances a
   // parent once its children are settled — and an agent cannot mean "see also".
   enforceOneParent?: boolean;
+  // The agent box's shape: which image layer (from the kind) and which packages of the project's own
+  // are replayed into a new box. Optional and never backfilled — an existing project without it keeps
+  // the default image, exactly as it behaved before kinds existed. decision 75.
+  box?: { kind?: BoxKind; packages?: string[] };
   copilot: CopilotConfig;
 }

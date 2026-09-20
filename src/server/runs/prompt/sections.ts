@@ -199,7 +199,19 @@ const CHECKUP_CREATES = phase('feature-checkup').creates;
 // credential, and until now nothing at all about the machine it is standing in — so it re-fetched a
 // browser the image ships. See `server/boxes/image-tools.ts` for the measurement and why the version
 // belongs in the sentence.
-export function boxSection(): string {
+//
+// AND WHICH BOX IT IS, since the kinds split the image. The browser is what the WEB LAYER adds, so a
+// `game` or `research` project's box is created from the shared base and has none — telling one of
+// those agents the download is already done is the same wrong belief the section exists to remove,
+// arrived at from the other side. The caller decides, from the image the kind selects. decision 75.
+export function boxSection(browser: boolean): string {
+  if (!browser) {
+    return [
+      'No browser is installed in this container — this project’s kind does not carry the web layer, so',
+      'nothing here can open a page. If a check needs a page opened, say so in the report rather than',
+      'downloading a browser: that is minutes of this run’s budget, and it dies with the container.',
+    ].join('\n');
+  }
   return [
     `A **Chromium for Playwright ${BOX_PLAYWRIGHT_VERSION}** is already installed in this container, at`,
     `\`${BOX_BROWSERS_PATH}\`, and \`PLAYWRIGHT_BROWSERS_PATH\` points at it. You do not need to download one,`,

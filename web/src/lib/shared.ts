@@ -266,6 +266,14 @@ export interface AutopilotConfig {
 // mocked wholesale by several component tests, which would each have to fake it.
 export const MAX_ENTRY_TEXT = 2000;
 
+// Mirrors BOX_KINDS in src/core/box-kinds.ts. A LIST rather than the union alone, for the reason the
+// keys below are a list: a type has no runtime value to compare, so the mirror could not be asserted at
+// all — and this one decides which IMAGE a project's box is built from, where drift means a kind the
+// browser offers and the server refuses by name. The union is derived from it so the two cannot part.
+// Asserted in test/mirror.test.ts.
+export const BOX_KINDS = ['web', 'game', 'research'] as const;
+export type BoxKind = (typeof BOX_KINDS)[number];
+
 export const AUTOPILOT_CONFIG_KEYS = [
   'maxIterations',
   'budgetUsd',
@@ -286,6 +294,7 @@ export interface ProjectConfig {
   maxConcurrentRuns: number;
   autopilot?: AutopilotConfig; // absent on a project created before the lifecycle existed
   enforceOneParent?: boolean; // one parent per card, applied to the copilot and the browser too
+  box?: { kind?: BoxKind; packages?: string[] }; // absent = the pre-kinds default image
   copilot: CopilotConfig;
 }
 

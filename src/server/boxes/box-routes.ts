@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AutopilotStateName } from '../../core/autopilot-state.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { type BoxBackend, boxName } from './containers.js';
-import { buildAgentImage } from './image-build.js';
+import { ensureAgentImages } from './image-build.js';
 
 // Throwing a project's boxes away, and nothing else.
 //
@@ -36,6 +36,35 @@ export function rebuildRefusal(activity: { runs: number; autopilot: AutopilotSta
     return `${activity.runs} agent${s} ${activity.runs === 1 ? 'is' : 'are'} running on this project, so throwing the boxes away would kill ${activity.runs === 1 ? 'it' : 'them'} mid-turn. Wait, or stop the run${s} from the Execution dashboard.`;
   }
   return null;
+}
+
+// THE FRAMES A BUILD SENDS, and the first one is LAZY. `ensureAgentImages` is idempotent, so pressing
+// the button on a machine that has both images is a legitimate no-op — and announcing a start and a done
+// around it put every open browser's build log into "running" and out again for a build that never
+// happened. Opening on the first STREAMED LINE means the frames describe something that occurred: no
+// output, no build, nothing said. `useBuildLog` only ever leaves "running" on a start, so a no-op that
+// says nothing leaves nothing behind either.
+//
+// Its own function, like `rebuildRefusal` above: the whole of the behaviour is which frames come out and
+// in what order, and asserting that through the socket would need a browser to watch it.
+export function buildFrames(send: (frame: { type: 'box:build'; state?: string; line?: string }) => void): {
+  onLine: (line: string) => void;
+  finish: (result: Awaited<ReturnType<typeof ensureAgentImages>>) => void;
+} {
+  let started = false;
+  return {
+    onLine(line) {
+      if (!started) {
+        started = true;
+        send({ type: 'box:build', state: 'start' });
+      }
+      send({ type: 'box:build', line });
+    },
+    finish(result) {
+      if (!started) return;
+      send({ type: 'box:build', state: result === 'failed' || result === 'no-docker' ? 'failed' : 'done' });
+    },
+  };
 }
 
 export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -89,15 +118,20 @@ export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     }
     // REFUSED IF DOCKER ITSELF IS DOWN, rather than spending a failed build to discover it. `probe`
     // names which of the two is missing precisely so this can be told apart.
+    //
+    // A PRESENT WEB LAYER IS NOT A FINISHED JOB, so this no longer returns early on it: the base can be
+    // absent on a machine whose `:latest` predates the split, and the ensurer is what notices. It is
+    // idempotent, so "already" falls out of its answer rather than out of a second probe. decision 75.
     const before = await boxes.probe();
-    if (before.ok) return { ok: true, already: true };
-    if (before.missing !== 'image') return reply.code(409).send({ error: before.reason });
+    if (!before.ok && before.missing !== 'image') return reply.code(409).send({ error: before.reason });
 
-    ctx.broadcast({ type: 'box:build', state: 'start' });
-    const result = await buildAgentImage((line: string) => ctx.broadcast({ type: 'box:build', line }));
-    ctx.broadcast({ type: 'box:build', state: result.ok ? 'done' : 'failed', line: result.last });
-    req.log.info({ ok: result.ok }, 'agent image build finished');
-    if (!result.ok) return reply.code(500).send({ error: `The build failed: ${result.last}` });
-    return { ok: true, already: false };
+    const frames = buildFrames(ctx.broadcast);
+    const result = await ensureAgentImages(boxes, frames.onLine);
+    frames.finish(result);
+    req.log.info({ result }, 'agent image build finished');
+    if (result === 'failed' || result === 'no-docker') {
+      return reply.code(500).send({ error: 'The build failed — the streamed lines carry the reason.' });
+    }
+    return { ok: true, already: result === 'present' };
   });
 }

@@ -109,9 +109,11 @@ describe('the phase skills the phase table names', () => {
     expect(boardsOf('implement-story')).toEqual(['product']);
     expect(boardsOf('implement')).toEqual(['engineering']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
-    // The lifecycle's own, each scoped to the boards its phases sit on. `fix` is TWO phases since decision
-    // 80 — a task's and a story's — so it is the one skill here that answers on more than one board; the
-    // story's judgement is about a story, a feature checkup about a feature.
+    // The lifecycle's own, each scoped to the boards its phases sit on. `fix` is ONE phase since decision 83
+    // retired the task's — `phaseForRun('fix', 'engineering')` is undefined, pinned in test/phases.test.ts —
+    // and it still answers on BOTH boards, because a person fixing one task by hand is a thing the skill is
+    // seeded for (the reason is on `FIX_PHASES` in src/core/bounds.ts). The story's judgement is about a
+    // story, a feature checkup about a feature.
     expect(boardsOf('fix')).toEqual(['engineering', 'product']);
     expect(boardsOf('review-story')).toEqual(['product']);
     expect(boardsOf('checkup-feature')).toEqual(['features']);

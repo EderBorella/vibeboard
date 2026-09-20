@@ -49,6 +49,30 @@ describe('the tasks a story’s implement run is given', () => {
     expect(r.diary.some((d) => d.text.includes('E-001 moved to in-progress'))).toBe(false);
   });
 
+  // AND NOT ONE A PERSON FINISHED WHILE THE TICK WAS DECIDING. The group is formed from what is outstanding,
+  // so this is the window between the board being read and the claim being written — and the guard above
+  // compares against `entry` alone, so without this one a task already in `done` is pulled back into
+  // `in-progress` and a run is asked to do work that has landed.
+  it('claims nothing for a task that is already settled', async () => {
+    const r = recorder();
+    await performAction(deps(r.client), IMPLEMENT(STORY(), [task('E-001', 'done'), task('E-002')]), context);
+    expect(r.moves.filter((m) => m.card === 'E-001')).toEqual([]);
+    expect(r.diary.some((d) => d.text.includes('E-001 moved'))).toBe(false);
+  });
+
+  // THE SAME CARE AT THE OTHER END, and this was the one of the five stamps that did not take it: a move to
+  // where a card already stands is a write for nothing and a diary line for an event that did not happen.
+  it('settles nothing for a task already standing in the settled column', async () => {
+    const r = recorder();
+    await performAction(
+      deps(r.client),
+      IMPLEMENT(STORY(), [task('E-001', 'done'), task('E-002', 'in-progress')]),
+      context,
+    );
+    expect(r.moves).toEqual([{ card: 'E-002', to: 'done' }]);
+    expect(r.diary.some((d) => d.text.includes('E-001 moved to done'))).toBe(false);
+  });
+
   // THE ATOMICITY THE STORY'S JUDGEMENT DEPENDS ON. One act: every task, in the one call that followed the
   // run. Stamped one at a time — a tick each, or a group of one at a time — the story spends a window with
   // some tasks settled and some not, and a loop that died inside it would come back to a judgement firing

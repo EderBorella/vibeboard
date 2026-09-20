@@ -340,11 +340,26 @@ function noBlockedColumn(input: TickInput, card: Card, used: string): TickAction
   );
 }
 
-// A card that has used every attempt at one skill.
-function capReached(input: TickInput, name: PhaseName, card: Card, skill: string): TickAction | undefined {
+// A card that has used every attempt at one skill — NET OF WHAT IT HAS ALREADY DELIVERED (decision 84).
+// `attemptCap` bounds RETRYING, and a story on its fourth group of tasks is progressing: every run burns an
+// attempt (`burnsAttempt` counts `success`), so counting them all put a hard ceiling of
+// `TASKS_PER_RUN × attemptCap` tasks on a story and blocked a sixteen-task one for succeeding three times.
+//
+// `delivered` is what the caller has EARNED BACK, and it is 0 for every phase that delivers nothing but its
+// own card — so the sentence below is unchanged for all of them. The allowance is named rather than the cap,
+// because after two groups the story really did have five attempts and "used all 3" describes nothing that
+// happened.
+function capReached(
+  input: TickInput,
+  name: PhaseName,
+  card: Card,
+  skill: string,
+  delivered = 0,
+): TickAction | undefined {
   const { ap } = input;
-  if (attemptsUsed(input.runs, card.id, skill) < ap.attemptCap) return undefined;
-  const used = `${card.id} has used all ${ap.attemptCap} attempts at ${skill}`;
+  const allowed = ap.attemptCap + delivered;
+  if (attemptsUsed(input.runs, card.id, skill) < allowed) return undefined;
+  const used = `${card.id} has used all ${allowed} attempts at ${skill}`;
   const leaves = BLOCKS_AT_CAP[name];
   if (leaves === undefined) {
     // IT DOES NOT SAY "this board has no blocked column", which is what it used to say and which is a claim
@@ -362,7 +377,7 @@ function capReached(input: TickInput, name: PhaseName, card: Card, skill: string
       name,
       card,
       ap.blockedColumn,
-      `it has used all ${ap.attemptCap} attempts at ${skill} and ${leaves}, so auto-pilot has left it for you and carried on.`,
+      `it has used all ${allowed} attempts at ${skill} and ${leaves}, so auto-pilot has left it for you and carried on.`,
     )
   );
 }
@@ -370,10 +385,14 @@ function capReached(input: TickInput, name: PhaseName, card: Card, skill: string
 // A dispatching phase, bounded. The skill comes from the TABLE rather than the call site, so the one place
 // that says which skill a phase runs is the table — and `undefined` falls through rather than throwing,
 // because a phase with no skill is one the loop carries out alone and never dispatches.
-function dispatchPhase(input: TickInput, name: PhaseName, card: Card): TickAction | undefined {
+//
+// `delivered` is the work this card has already got out of the phase, which its cap must not be spent on
+// (decision 84). Absent for every caller but the story's implement: nothing else hands a run anything below
+// its own card, so there is nothing else to have delivered.
+function dispatchPhase(input: TickInput, name: PhaseName, card: Card, delivered = 0): TickAction | undefined {
   const skill = phase(name).skill;
   if (skill === undefined) return undefined;
-  return capReached(input, name, card, skill) ?? { kind: 'dispatch', phase: name, skill, card };
+  return capReached(input, name, card, skill, delivered) ?? { kind: 'dispatch', phase: name, skill, card };
 }
 
 // A phase the loop carries out alone. `exitPass` rather than a column named here: the table already says
@@ -475,6 +494,32 @@ const TASKS_PER_RUN = 5;
 // and a project that has renamed it is outside what either can drive.
 const TASK_ENTRY = 'in-progress';
 
+// FAIL CLOSED WHERE THE GROUP'S STAMPS CANNOT LAND, which is `noBlockedColumn`'s argument for the two
+// columns the tick now names below a story. A column IS a folder: a claim stamped into one the board has
+// not got creates it and hides the task where `readBoard` never looks, and a refused claim answers
+// `dispatches: 0` — which leaves earlier tasks claimed, resets nothing, and lets the next tick decide the
+// same thing until `MAX_IDLE_TICKS` ends the project without naming any of this.
+function missingGroupColumn(input: TickInput, story: Card, settled: string): TickAction | undefined {
+  const columns = input.columns.engineering ?? [];
+  const absent = [TASK_ENTRY, settled].filter((slug) => !columns.includes(slug));
+  if (absent.length === 0) return undefined;
+  return stop(
+    'stalled',
+    `${story.id}'s tasks are moved through ${absent.join(' and ')} on their way to being done, and the engineering board has no such column — a column IS a folder, so auto-pilot will not stamp one the board has not got. Add ${absent.length === 1 ? 'it' : 'them'} to that board, or point terminal at a column it does have.`,
+  );
+}
+
+// WHAT A STORY HAS ALREADY GOT OUT OF ITS IMPLEMENT, in groups, read off the BOARD (decision 84). A run
+// settles its whole group or none of it (`settleGroup`), and only the LAST group is ever a partial one — so
+// the tasks standing settled are the record of how many runs delivered, and dividing by the ceiling is the
+// strictest honest reading of it.
+//
+// THE BOARD AND NOT THE RUN RECORDS, and that is what makes the bound terminate. A rule that read "this run
+// ended `success`, so it delivered" would grant an attempt back for every run that ended well, and a phase
+// that stopped settling anything would then dispatch for ever. This number cannot exceed the tasks the
+// story has, so an implement that delivers nothing leaves it fixed while the attempts climb past it.
+const groupsDelivered = (settledTasks: number): number => Math.floor(settledTasks / TASKS_PER_RUN);
+
 // ROW P3, AT THE STORY (decision 83). One run does the story's work, and the tasks under it are what it is
 // asked for: they are stamped into `TASK_ENTRY` before the dispatch and `done` TOGETHER when it succeeds,
 // which `Group` in core/actions.ts carries and service/act/group.ts writes.
@@ -487,23 +532,39 @@ const TASK_ENTRY = 'in-progress';
 //
 // AT THE CAP THE STORY IS BLOCKED (`BLOCKS_AT_CAP`), which is where the per-task implement's "settle it and
 // let the gates decide" went: there is no card below the story to settle any more.
+//
+// A TASK CARRYING AN OLD PER-TASK VERDICT IS RE-IMPLEMENTED WITHOUT IT, and the loss is bounded rather than
+// absent: no `previous` is handed over, because the run being dispatched is the STORY's and a finding on one
+// task's retired implement is not what it is being asked to answer. What recovers it is that the story's
+// gates and its judge run over the whole tree afterwards, so anything still wrong is found again there.
 function implementStory(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
   // WHERE A FINISHED TASK GOES, off the config rather than off a slug written here: `terminal` is per board
   // and a board may name several, of which the first is the one a person would have dragged it to — the
   // same reading `advanceOnCoverage` takes in service/act/outcomes.ts.
   //
   // ABSENT IS A BOARD ON WHICH NOTHING COULD EVER FINISH, which `coverageProblems` refuses before a project
-  // starts and a hand-edited config can still reach. Falling through rather than guessing a column reports
-  // it as every other unmovable card is reported — `nothingToWorkOn` names what is left and why.
+  // starts and a hand-edited config can still reach. Falling through rather than guessing is what keeps the
+  // machine from settling tasks into a column nobody named. What a person reads then is `nothingToWorkOn`'s
+  // catch-all, which names the cards nothing can move WITHOUT knowing that this config is why — the honest
+  // limit of a sentence written one level up, and the reason readiness refuses this board before it starts.
   const settled: string | undefined = (input.ap.terminal.engineering ?? [])[0];
   if (settled === undefined) return undefined;
   const outstanding = tasks.filter((t) => !isSettled(input.ap, t)).sort(byQueueOrder);
-  const action = dispatchPhase(input, 'story-implement', story);
+  const action = dispatchPhase(
+    input,
+    'story-implement',
+    story,
+    groupsDelivered(tasks.length - outstanding.length),
+  );
   if (action?.kind !== 'dispatch') return action;
-  return {
-    ...action,
-    group: { cards: outstanding.slice(0, TASKS_PER_RUN), entry: TASK_ENTRY, settled },
-  };
+  // AFTER THE CAP AND NOT BEFORE IT, so a story that is out of attempts is still BLOCKED rather than
+  // stopping the project over a column its block would never have used (decision 82).
+  return (
+    missingGroupColumn(input, story, settled) ?? {
+      ...action,
+      group: { cards: outstanding.slice(0, TASKS_PER_RUN), entry: TASK_ENTRY, settled },
+    }
+  );
 }
 
 // ROW P5. ONE FIX BUDGET FOR BOTH SEND-BACK KINDS: a story can be sent back by a gate or by the judge and

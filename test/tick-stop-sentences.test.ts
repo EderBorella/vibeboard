@@ -105,6 +105,25 @@ describe('why the remaining work is stuck', () => {
     expect(detail).toMatch(/P-001 is waiting for its own cards further down/);
   });
 
+  // WHAT A BLOCKED STORY LEAVES BEHIND (decision 84). `story-implement` is the only blocking point that can
+  // settle its card while unsettled children are still under it — a break-down blocks with nothing below it,
+  // and a fix blocks a story whose tasks are all settled — so this state was unreachable until the work moved
+  // up, and `whyStuck`'s catch-all was the first branch to claim it. What it said was a lie a reader can act
+  // on: `E-001` is in `engineering/backlog`, a column the scaffolder creates.
+  it('says a task is stranded under a blocked story, rather than blaming its column', () => {
+    const cards = [
+      card('F-001', 'features', 'done', 10, ['P-001']),
+      card('P-001', 'product', 'blocked', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
+    ];
+    const detail = detailOf(decideTick(input({ cards })));
+    expect(detail).toContain('E-001');
+    expect(detail).not.toContain('a column the lifecycle has no phase for');
+    expect(detail).not.toContain('added by hand');
+    // The card above it, which is the thing a person has to deal with before anything picks E-001 up.
+    expect(detail).toMatch(/E-001 is under a card that ran out of attempts/);
+  });
+
   // CHANGE 1's own subject, and the reason it is asserted here rather than beside the rest of finding D:
   // with change 2 in place a purely-blocked board never reaches `whyStuck`, so the sentence is only
   // observable in the MIXED case — without this test, deleting it is an equivalent mutant.

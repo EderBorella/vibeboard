@@ -179,9 +179,17 @@ async function earnedItsExit(
   context: TickContext,
 ): Promise<ActResult> {
   const p = phase(action.phase);
-  // THE CARDS ONE LEVEL DOWN THIS RUN DELIVERED, stamped TOGETHER and BEFORE the card itself moves
-  // (decision 83). Before, because the level above is judged on its children being settled: a story that
-  // advanced while one of its tasks was still outstanding would be judged over work no run ever did.
+  // THE CARDS ONE LEVEL DOWN THIS RUN DELIVERED, stamped TOGETHER and before anything else in here
+  // (decision 83). What "together" buys is held by test/service-act-group.test.ts: a refusal part-way
+  // returns from this line, so no exit stamp is written and the diary does not report the run as completed
+  // — the side the machine recovers from, because the next dispatch re-forms the group out of what is left.
+  //
+  // BEING AHEAD OF THE EXIT STAMP IS DEFENSIVE, AND NOTHING EXERCISES IT — said plainly rather than as a
+  // live rule, because `story-implement` is the only phase that carries a group and its `exitPass` IS its
+  // `entry`, so `moved` below is always undefined and no test can tell the two orders apart. It is written
+  // this way for the table row that does not exist yet: a group-carrying phase whose exit differed from its
+  // entry would advance its card while a task under it was still outstanding, and the level above is judged
+  // on its children being settled.
   const group = await settleGroup(deps, action, 1);
   if (group) return group;
 

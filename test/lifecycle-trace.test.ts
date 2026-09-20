@@ -1077,3 +1077,51 @@ for (const mode of MODES) {
     });
   });
 }
+
+// A STORY BIGGER THAN ONE RUN'S CEILING, THROUGH THE WHOLE MACHINE (decision 84). The tick-level test in
+// test/tick.test.ts pins the arithmetic; this pins that the arithmetic is reachable — four real dispatches,
+// four real groups of tasks claimed and settled over HTTP, and a judgement at the end of them.
+//
+// ONE MODE, deliberately. `MODES` exists to drive the API's two create routes, and nothing here varies by
+// which of them made the cards: what is under test is how many runs the story costs and what happens after
+// the last one.
+//
+// SIXTEEN IS THE SMALLEST BOARD THAT SHOWS IT: `TASKS_PER_RUN × attemptCap` is fifteen, and fifteen closed
+// perfectly well while sixteen was blocked FOR SUCCEEDING — three successful groups, the sixteenth task
+// stranded in `backlog`, `story-review` never dispatched, so the gates never ran over any of the work.
+describe('a story with more tasks than one cap could pay for', { timeout: 60_000 }, () => {
+  it('delivers it in groups and closes it, rather than blocking the story that succeeded', async () => {
+    const started = await start({
+      skills: {
+        ...HAPPY,
+        'derive-features': creates('create', 'features:1:product:1:engineering:16'),
+        'break-down': HARNESS_CHAIN('create'),
+      },
+    });
+    const ended = await drive(started);
+    expect(ended.reason).toBe('complete');
+
+    // FOUR RUNS FOR SIXTEEN TASKS — three full groups and the remainder — and ONE judgement after them.
+    const all = await runs(started.project);
+    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'implement-story')).toHaveLength(4);
+    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'review-story')).toHaveLength(1);
+
+    // THE CEILING HELD ON THE WAY IN: the first run was handed five tasks and not sixteen, counted from the
+    // claims the loop wrote before it dispatched.
+    const traced = await trace(started.project);
+    const first = traced.indexOf('ran P-001 implement-story');
+    expect(first).toBeGreaterThan(-1);
+    expect(
+      traced.slice(0, first).filter((line) => /^move engineering\/\S+ in-progress$/.test(line)),
+    ).toHaveLength(5);
+
+    // AND EVERY TASK LANDED. The story is closed by its judgement, and nothing is left behind it.
+    const cards = (await board(started.project)).filter(isLive);
+    const story = cards.find((c) => c.id === 'P-001') as Card;
+    const tasks = childrenOf(story, cards);
+    expect(tasks).toHaveLength(16);
+    expect(tasks.filter((t) => t.columnSlug !== 'done')).toEqual([]);
+    expect(story.columnSlug).toBe('done');
+    await assertHierarchy(started.project);
+  });
+});

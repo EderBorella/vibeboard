@@ -24,7 +24,10 @@ export type TickAction =
 // "finished" is a decision about the machine, and the executor holds no decisions of its own — so the pure
 // side names them and the service does the writing.
 export interface Group {
-  // In queue order, and never more than the tick's ceiling: this is the whole of what one run is asked for.
+  // In queue order, and never more than the tick's ceiling — which bounds what the run is TOLD to do and
+  // what is closed for it, not what it can see. The prompt lists every card the story links to, file path
+  // included (`resolveDispatch` in server/runs/routes.ts filters nothing), so a sixth task is in front of
+  // the agent and what says it is a later run's is its COLUMN plus the sentence the skill is seeded with.
   cards: Card[];
   // Stamped before the dispatch, and it is how the run is TOLD which cards are its own — the board is the
   // only channel there is, the prompt naming every linked card with the column it stands in.

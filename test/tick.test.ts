@@ -858,6 +858,38 @@ describe("decideTick — the story's work", () => {
     });
   });
 
+  // AND THE FIXTURE ABOVE CANNOT TELL THE CONFIG FROM THE LITERAL, because `DEFAULT_AUTOPILOT` calls the
+  // terminal column `done`: replacing the lookup with `'done'` passed the whole suite. A board that names
+  // another one distinguishes them — in BOTH directions, which is the half a `settled` assertion alone
+  // misses: `done` is then an ordinary column, so a task sitting in it is outstanding work and joins the
+  // group like any other.
+  it('reads the settled column off the config, on a board whose terminal column is not done', () => {
+    const ap = {
+      ...DEFAULT_AUTOPILOT,
+      terminal: { ...DEFAULT_AUTOPILOT.terminal, engineering: ['shipped'] },
+    };
+    const columns = { ...COLUMNS, engineering: [...COLUMNS.engineering, 'shipped'] };
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'backlog', 10), task('E-002', 'done', 20)];
+    const action = decideTick(input({ ap, cards, columns }));
+    expect(action.kind === 'dispatch' && action.group).toMatchObject({
+      entry: 'in-progress',
+      settled: 'shipped',
+    });
+    expect(groupOf(action)).toEqual(['E-001', 'E-002']);
+  });
+
+  // THE FALL-THROUGH, which no fixture had ever observed. A board on which nothing can finish is refused
+  // before a project starts (`checkTerminal` in core/autopilot-cover.ts) and a hand-edited config still
+  // reaches here, so the branch is real — and what it must not do is guess a column and settle tasks into
+  // one nobody named.
+  it('dispatches nothing when the config names no terminal column for engineering', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, terminal: { ...DEFAULT_AUTOPILOT.terminal, engineering: [] } };
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const action = decideTick(input({ ap, cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('E-001');
+  });
+
   it('takes tasks in (order, then id)', () => {
     // Only `order` can decide this: E-002 sorts first by number and last by order.
     const cards = [...story(['E-001', 'E-002']), task('E-001', 'backlog', 20), task('E-002', 'backlog', 10)];
@@ -967,6 +999,41 @@ describe("decideTick — the story's work", () => {
     expect(detailOf(action)).toContain('no blocked column');
     expect(detailOf(action)).toContain('Add a blocked column');
   });
+
+  // THE SAME ARGUMENT AT THE TWO COLUMNS THE GROUP NAMES (decision 84). The tick now decides where a task is
+  // claimed and where it is settled, and neither was guarded: a column IS a folder, so a stamp into one the
+  // board has not got creates it and hides the task, and a REFUSED claim answers `dispatches: 0` — the shape
+  // that leaves earlier tasks claimed and lets the next tick decide the same thing until `MAX_IDLE_TICKS`
+  // ends the project without naming any of this.
+  it('stops stalled when the engineering board has no column to claim a task into', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const columns = { ...COLUMNS, engineering: ['backlog', 'review', 'blocked', 'done'] };
+    const action = decideTick(input({ cards, columns }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-001');
+    expect(detailOf(action)).toContain('in-progress');
+  });
+
+  // AND IT IS ASKED AFTER THE CAP, never before it: a story with no attempts left is BLOCKED, and blocking
+  // uses neither of these columns. Asked first, a board missing one would stop the whole project over a
+  // card that was about to be settled and carried on from (decision 82).
+  it('blocks a story at its cap even where the group columns are missing', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const columns = { ...COLUMNS, engineering: ['backlog', 'review', 'blocked'] };
+    const runs = threeRunsOf('P-001', 'product', 'implement-story');
+    const action = decideTick(input({ cards, columns, runs }));
+    expect(action).toMatchObject({ kind: 'stamp', phase: 'story-implement', to: 'blocked' });
+  });
+
+  // AND THE OTHER ONE, which is the settled column off the config rather than a slug written in the tick —
+  // so this fires for a board that never had it and for a `terminal` naming one that has been renamed.
+  it('stops stalled when the engineering board has no column to settle a task in', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'review', 'blocked'] };
+    const action = decideTick(input({ cards, columns }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('done');
+  });
 });
 
 // THE CEILING ON WHAT ONE RUN IS ASKED FOR, and the thing it exists to stop: the experiment measured three
@@ -1007,6 +1074,76 @@ describe('decideTick — how much work one run is given', () => {
       ['E-001', 'E-002', 'E-003', 'E-004', 'E-005'].includes(c.id) ? { ...c, columnSlug: 'done' } : c,
     );
     expect(groupOf(decideTick(input({ cards })))).toEqual(['E-006', 'E-007']);
+  });
+});
+
+// PROGRESSING IS NOT RETRYING, AND THE CAP IS ONLY ALLOWED TO STOP THE SECOND (decision 84). Every run that
+// succeeds burns an attempt (`burnsAttempt`), and `capReached` counts them against the STORY for one skill —
+// so before this the hard ceiling on a story was `TASKS_PER_RUN × attemptCap` tasks, and a sixteen-task story
+// whose every group SUCCEEDED was blocked on its fourth: fifteen tasks delivered, the sixteenth stranded,
+// `story-review` never reached, so the gates never ran and nothing judged any of it.
+describe('decideTick — a story bigger than one cap can pay for', () => {
+  // `n` tasks under the story, the first `settled` of them delivered. Ids are PADDED: `E-00${i + 1}` runs
+  // out at nine, and every board this is about is bigger than that.
+  const bigStory = (n: number, settled: number): Card[] => {
+    const ids = Array.from({ length: n }, (_, i) => `E-${String(i + 1).padStart(3, '0')}`);
+    return [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', ...ids]),
+      ...ids.map((id, i) =>
+        card(id, 'engineering', i < settled ? 'done' : 'backlog', (i + 1) * 10, ['P-001']),
+      ),
+    ];
+  };
+
+  const groupRuns = (n: number): RunRecord[] => Array.from({ length: n }, () => storyWork('implement-story'));
+
+  // THE REGRESSION ITSELF, at the smallest board that shows it: sixteen tasks, three groups delivered, and
+  // every one of those runs a success. Fifteen is `TASKS_PER_RUN × attemptCap` and closed perfectly well.
+  it('gives a sixteen-task story its fourth group, having delivered the first three', () => {
+    const action = decideTick(input({ cards: bigStory(16, 15), runs: groupRuns(3) }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', card: { id: 'P-001' } });
+    expect(groupOf(action)).toEqual(['E-016']);
+  });
+
+  // AND AT `attemptCap: 1`, which is legal and made the ceiling six. Nothing about the size of a story is
+  // the cap's business, and one attempt per group is what one attempt was always meant to mean.
+  it('gives a six-task story its second group under an attempt cap of one', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, attemptCap: 1 };
+    const action = decideTick(input({ ap, cards: bigStory(6, 5), runs: groupRuns(1) }));
+    expect(groupOf(action)).toEqual(['E-006']);
+  });
+
+  // THE OTHER DIRECTION, and it is what keeps the cap a cap: the budget is `attemptCap` runs that delivered
+  // NOTHING, whatever has been delivered before them. Three groups delivered plus three barren runs is six.
+  it('blocks a story whose runs stop delivering, however much it delivered before', () => {
+    const action = decideTick(input({ cards: bigStory(16, 15), runs: groupRuns(6) }));
+    expect(action).toMatchObject({ kind: 'stamp', phase: 'story-implement', to: 'blocked' });
+  });
+
+  // TERMINATION, ASSERTED RATHER THAN ARGUED. A run that succeeds and settles nothing is the shape that
+  // could loop for ever under a rule that forgave every success, so the driver here is exactly that run:
+  // the record is written, the board does not move, and the machine has to reach `blocked` on its own.
+  it('stops asking for a group that never lands, rather than dispatching for ever', () => {
+    const cards = bigStory(16, 15);
+    const runs = groupRuns(3);
+    const seen: TickAction[] = [];
+    for (let i = 0; i < 20; i++) {
+      const action = decideTick(input({ cards, runs }));
+      seen.push(action);
+      if (action.kind !== 'dispatch') break;
+      runs.push(storyWork('implement-story')); // it succeeded, and settled nothing
+    }
+    expect(seen.at(-1)).toMatchObject({ kind: 'stamp', phase: 'story-implement', to: 'blocked' });
+    expect(seen.filter((a) => a.kind === 'dispatch')).toHaveLength(DEFAULT_AUTOPILOT.attemptCap);
+  });
+
+  // AND THE SENTENCE NAMES THE ALLOWANCE THE STORY REALLY HAD. "used all 3 attempts" after six runs — three
+  // of which delivered five tasks each — is the stop describing something that did not happen, which this
+  // repository treats as worse than no sentence at all.
+  it('names the attempts the story actually had, not the configured cap', () => {
+    const action = decideTick(input({ cards: bigStory(16, 15), runs: groupRuns(6) }));
+    expect(action.kind === 'stamp' && action.why).toContain('all 6 attempts at implement-story');
   });
 });
 

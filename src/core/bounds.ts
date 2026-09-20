@@ -54,9 +54,10 @@ const latest = (runs: RunRecord[]): RunRecord | undefined => [...runs].sort(inOr
 //
 // `bounded: 'skill'` IS NOT "EVERY RUN BUT A JUDGING ONE", and the comment here claimed it was. The feature
 // checkup carries it too, so a feature's checkup run reads as one of that feature's work runs. Nothing is
-// wrong today because nothing asks — the two callers are the story's judgement and the task loop, and
-// neither is ever handed a feature — but the property a reader would take from "excluded by construction"
-// is not one this predicate has.
+// wrong today because nothing asks: `latestWorkRun` is the only caller and its one call site is
+// `judgeStory`, which is handed a STORY. But the property a reader would take from "excluded by
+// construction" is not one this predicate has, and a second caller reached from the feature loop would
+// find it out the hard way.
 const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'skill';
 
 const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'review';
@@ -96,8 +97,8 @@ export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | unde
 // review total stopped the whole project. A review run is itself a record, so that is where its verdict goes
 // in that case, and this reads it back.
 //
-// FILTERED TO ONE THAT CARRIES A VERDICT, like `verdictRun`: a review that answered nothing left the story
-// exactly where it stood.
+// FILTERED TO ONE THAT CARRIES A VERDICT: a review that answered nothing left the story exactly where it
+// stood, so it is no more the answer than no review at all.
 //
 // SECOND TO `latestWorkRun` AT EVERY CALL SITE, never instead of it. The moment a fix has answered, the fix
 // is the run under judgement and the review before it is history — reading this first would send the story

@@ -539,6 +539,9 @@ for (const mode of MODES) {
     });
 
     it('sends a story back through a fix when a gate fails, dispatching no model for the gate', async () => {
+      // Hoisted because two things need the exact bytes: the document the loop reads it out of, and the
+      // assertion below that the FIX was handed this very command rather than told to go and look.
+      const failing = `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`;
       const started = await start({
         // The gate fails the first time it runs and passes the second: the test chooses the failure, because the
         // command comes from foundation/CODE-QUALITY.md.
@@ -548,7 +551,7 @@ for (const mode of MODES) {
         // is a gates verdict carrying no command, and inside the setup subtree — which every card under the
         // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
         // judgement. The first draft of this test did exactly that and asserted nothing at all.
-        gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
+        gates: failing,
         skills: {
           ...HAPPY,
           'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
@@ -584,6 +587,27 @@ for (const mode of MODES) {
       expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
       // Three: P-001 fails, P-001 passes after the fix, and the harness feature's own story passes first time.
       expect(await ranTimes(started.project.root, GATE_LOG)).toBe(3);
+
+      // WHERE THE FAILURE LOCALITY WENT (decision 83). The gates run once for the whole story now, so a red
+      // suite no longer says which task broke it — and what recovers that is the fix being HANDED the gate's
+      // own command and what it printed, rather than told to go and look. Three links compose to make that
+      // true — the verdict is written onto the run the tick named, the tick hands that run to the fix as
+      // `previous`, and the prompt renders its verification — and this is the one place all three are
+      // exercised together, against the prompt the shim was really given.
+      //
+      // NOT the judge: it is dispatched only once the gates PASS, so it never sees a failing one. Its own
+      // prompt carries `gatesPassed` and nothing else about them.
+      const prompts = (await readFile(started.argsLog, 'utf8'))
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => (JSON.parse(line) as { prompt: string }).prompt);
+      const fixPrompt = prompts.find((text) => text.startsWith('# Fix\n'));
+      expect(fixPrompt).toBeDefined();
+      // THE WHOLE LINE, command included. `toContain('The command that failed:')` alone passes over a
+      // heading with nothing under it, and the command's own text appears in this prompt anyway —
+      // foundation/CODE-QUALITY.md is quoted in full a few sections up, so matching on it proves nothing.
+      expect(fixPrompt).toContain(`The command that failed: \`${failing}\``);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });

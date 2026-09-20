@@ -99,9 +99,10 @@ export interface TickInput {
   // tick's business, and nothing here spawns anything.
   commands: DeclaredCommands;
   // THE SEND-BACKS THE LOOP HAD NOWHERE TO WRITE DOWN, by card id (decision 82). A story that skipped its
-  // break-down because it arrived carrying tasks (decision 50) has no work run, and the gates run BEFORE any
-  // dispatch — so when they fail there is no review record either, and the verdict has nothing on the card to
-  // land on. Without this the next tick reads no verdict, judges again, runs the whole gate suite again, and
+  // break-down because it arrived carrying tasks (decision 50), every one of them already SETTLED, has no
+  // work run — it was never implemented, because there was nothing outstanding to implement — and the gates
+  // run BEFORE any dispatch, so when they fail there is no review record either and the verdict has nothing
+  // on the card to land on. Without this the next tick reads no verdict, judges again, runs the whole gate suite again, and
   // never dispatches: `MAX_IDLE_TICKS` then halts the PROJECT over one card, which is exactly what the fix
   // budget and `capReached` exist to prevent.
   //
@@ -563,7 +564,8 @@ function fixPhase(
 // once. That bug was found at task level and it is the same bug here, reached through the same lookup.
 //
 // AND A STORY WITH NO WORK RUN READS ITS VERDICT OFF THE REVIEW THAT GAVE IT (decision 81). One that
-// skipped its break-down because it arrived carrying tasks has no record of its own, so the judgement was
+// skipped its break-down having arrived with every task under it already settled has no record of its own,
+// so the judgement was
 // written nowhere and none of the three rows above could ever be reached: the loop re-judged until the
 // review total stopped the whole project, `story-fix` never ran, and the stop blamed this server for a
 // write it had never attempted. The review run is a record too, and `reviewVerdictRun` is where that
@@ -608,9 +610,10 @@ function judgeStory(input: TickInput, story: Card): TickAction | undefined {
 // timed out or crashed produced no verdict at all. Marking its story blocked would put a dead API key on the
 // board permanently as work nobody can fix.
 //
-// `judging` may be ABSENT, and the dispatch still goes: a story whose tasks were made by hand, or one that
-// skipped its break-down because it arrived with tasks attached, has no work run of its own — and refusing
-// to judge it would leave the story unsettled for ever over a record that was never written. The verdict
+// `judging` may be ABSENT, and the dispatch still goes: a story that arrived with every task under it
+// already settled has no work run of its own — nothing was outstanding, so nothing was dispatched for it,
+// and it skipped its break-down as well (decision 50). Refusing to judge it would leave the story unsettled
+// for ever over a record that was never written. The verdict
 // then lands on the review's own record (decision 81), which is what makes that story's send-back
 // answerable; the total below is no longer what catches it.
 function reviewPhase(input: TickInput, story: Card, judging: RunRecord | undefined): TickAction | undefined {

@@ -128,8 +128,8 @@ export async function afterCardRun(
   // gates-first path bypasses it, so `judge` in review.ts asserts the clause again for itself.
   //
   // No verdict, deliberately. The attempt is burned by the record (accounting.ts) and the card retries its OWN
-  // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending
-  // the fix budget on a run that produced no finding to fix.
+  // phase until that phase's cap gives up — a failed verdict here would spend the fix budget on a run that
+  // produced no finding to fix.
   if (settled.status === 'failed') return await recordFailedRun(deps, action, card, settled, context);
 
   // DECISION 69, AND IT REVERSES HALF OF RULING 55. That ruling made the smoke result EVIDENCE rather than a

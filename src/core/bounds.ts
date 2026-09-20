@@ -89,7 +89,8 @@ export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | unde
 }
 
 // WHERE A STORY'S VERDICT LIVES WHEN THERE IS NO WORK RUN TO HANG ONE ON (decision 81). A story that skipped
-// its break-down because it arrived carrying tasks (decision 50) has no run of its own, so `recordVerdict`
+// its break-down because it arrived carrying tasks (decision 50), every one of them already SETTLED — an
+// import, or work somebody finished by hand — has no run of its own, so `recordVerdict`
 // had nothing to write the judgement onto and wrote it nowhere: every later tick read no verdict, dispatched
 // the judgement again, and `story-fix` was unreachable — the send-back could never be answered and the
 // review total stopped the whole project. A review run is itself a record, so that is where its verdict goes
@@ -124,10 +125,10 @@ export function fixedSince(runs: RunRecord[], card: string, since: RunRecord): b
 // review trigger was corrected for, one module over.
 //
 // NOT `latestWorkRun`, and the difference is what counts as a card's OWN work. That one selects the phases
-// the table marks `bounded: 'skill'`, which is the lifecycle's own set — a task's implement and fix, a
-// story's break-down and fix. A checkup is describing a CHILD, and a child's last run may be a skill a
-// person dispatched by hand, which belongs in that sentence and is in no phase at all. Excluding the
-// reviews and nothing else is the rule that matches the question.
+// the table marks `bounded: 'skill'`, which is the lifecycle's own set — a story's break-down, implement and
+// fix, and nothing on engineering at all since decision 83. A checkup is describing a CHILD, and a child's
+// last run may be a skill a person dispatched by hand, which belongs in that sentence and is in no phase at
+// all. Excluding the reviews and nothing else is the rule that matches the question.
 export function latestOwnRun(runs: RunRecord[], card: string): RunRecord | undefined {
   return latest(runs.filter((r) => r.card === card && !isReviewRun(r)));
 }

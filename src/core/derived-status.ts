@@ -5,11 +5,16 @@ import type { Card } from './types.js';
 // What is under this card, read as a status. Two questions live here, and they answer differently on
 // purpose:
 //
-//   SETTLED (decision 45) — done OR blocked. A blocked task has had every attempt it is allowed and is
-//   waiting for a person, so it unblocks its story: the checkup runs, the story closes, and the machine
-//   carries on. Stopping the project instead means one task nobody can fix costs you every feature after
-//   it. AT BOTH LEVELS since the 2026-08-13 correction: a blocked STORY settles its feature the same way,
-//   so the feature checkup can run over a feature holding one.
+//   SETTLED (decision 45) — done OR blocked. A blocked card is waiting for a person, so it unblocks the
+//   level above: the judgement runs, the parent closes, and the machine carries on. Stopping the project
+//   instead means one card nobody can fix costs you every feature after it. AT BOTH LEVELS since the
+//   2026-08-13 correction: a blocked STORY settles its feature the same way, so the feature checkup can
+//   run over a feature holding one.
+//
+//   WHO PUTS A CARD THERE has changed and the rule has not. Decision 45 was written about a TASK that had
+//   used every attempt; since decision 83 the loop blocks a STORY — the caps it counts are the story's —
+//   and a blocked task is one a person dragged there. Either way it is settled for the same reason: what
+//   is waiting for a person must not hold up the card above it.
 //
 //   UNFINISHED CHILDREN — terminal only, so a blocked child still counts as unfinished. That is the
 //   distinction that makes both functions necessary rather than one of them redundant.

@@ -155,8 +155,8 @@ async function judge(
     by: settled.run,
     ...(settled.summary ? { reason: settled.summary } : {}),
   };
-  // ONTO THE RUN IT JUDGED, or onto ITSELF when there was none (decision 81). A story that skipped its
-  // break-down because it arrived carrying tasks has no work run, so the tick names none — and writing the
+  // ONTO THE RUN IT JUDGED, or onto ITSELF when there was none (decision 81). A story that arrived with
+  // every task under it already settled has no work run, so the tick names none — and writing the
   // verdict nowhere is what made the send-back invisible: the next tick read no verdict, judged again, and
   // `story-fix` was never reached. A review run is a record like any other, and this is its own answer.
   return await recordVerdict(
@@ -179,7 +179,7 @@ async function judge(
 // verdict is recorded first, so a card that moved is always a card whose reason is on disk.
 //
 // `onto` IS THE RUN THE VERDICT LANDS ON: the work run the judgement was about, or — for a story that has
-// none, because it skipped its break-down having arrived with tasks attached — the review's own record
+// none, because it arrived with every task under it already settled — the review's own record
 // (decision 81). The caller decides which; this writes it.
 //
 // STILL OPTIONAL, and the case it is optional FOR is the GATES path on such a story: the gates run before any

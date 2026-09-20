@@ -8,6 +8,7 @@ import { BOARDS, type BoardName, type Card } from '../../core/types.js';
 import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
+import { settleGroup } from './group.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused } from './refusals.js';
 import {
@@ -77,7 +78,6 @@ export async function afterCardRun(
   // already in scope. A field on the run record would be a second copy of a fact with one reader.
   smoke: Verification | undefined,
 ): Promise<ActResult> {
-  const p = phase(action.phase);
   // An ending nobody is answerable for: the user cancelled it, a restart left it stale, the MACHINE
   // failed rather than the work, or a person has forgiven it. No attempt is burned (accounting.ts),
   // and the card does not move — as far as the card is concerned the work never happened.
@@ -128,8 +128,8 @@ export async function afterCardRun(
   // gates-first path bypasses it, so `judge` in review.ts asserts the clause again for itself.
   //
   // No verdict, deliberately. The attempt is burned by the record (accounting.ts) and the card retries its OWN
-  // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending
-  // the fix budget on a run that produced no finding to fix.
+  // phase until that phase's cap gives up — a failed verdict here would spend the fix budget on a run that
+  // produced no finding to fix.
   if (settled.status === 'failed') return await recordFailedRun(deps, action, card, settled, context);
 
   // DECISION 69, AND IT REVERSES HALF OF RULING 55. That ruling made the smoke result EVIDENCE rather than a
@@ -165,20 +165,55 @@ export async function afterCardRun(
     return { dispatches: 1 };
   }
 
+  return await earnedItsExit(deps, action, card, settled, context);
+}
+
+// WHAT A RUN THAT EARNED ITS EXIT LEAVES BEHIND, and the ORDER is the behaviour. One function rather than
+// three blocks at the end of `afterCardRun`, which the complexity gate decides: that function is at the
+// ceiling, and flattening beats a suppression.
+async function earnedItsExit(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  const p = phase(action.phase);
+  // THE CARDS ONE LEVEL DOWN THIS RUN DELIVERED, stamped TOGETHER and before anything else in here
+  // (decision 83). What "together" buys is held by test/service-act-group.test.ts: a refusal part-way
+  // returns from this line, so no exit stamp is written and the diary does not report the run as completed
+  // — the side the machine recovers from, because the next dispatch re-forms the group out of what is left.
+  //
+  // BEING AHEAD OF THE EXIT STAMP IS DEFENSIVE, AND NOTHING EXERCISES IT — said plainly rather than as a
+  // live rule, because `story-implement` is the only phase that carries a group and its `exitPass` IS its
+  // `entry`, so `moved` below is always undefined and no test can tell the two orders apart. It is written
+  // this way for the table row that does not exist yet: a group-carrying phase whose exit differed from its
+  // entry would advance its card while a task under it was still outstanding, and the level above is judged
+  // on its children being settled.
+  const group = await settleGroup(deps, action, 1);
+  if (group) return group;
+
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
-  if (p.exitPass) {
-    const stamped = await stamp(deps, card, p.exitPass, `its ${action.skill} run completed.`);
+  //
+  // AND ONLY WHERE THE CARD IS NOT ALREADY THERE, which is the same care `stampEntry` and `recordVerdict`
+  // each take at their own end. The entry stamp has already run, so where the card stands now is the phase's
+  // `entry` if it declares one — and `story-implement` exits into the column it runs in, so without this it
+  // would move a story to where it stands and write a diary line about an event that did not happen.
+  const at = p.entry ?? card.columnSlug;
+  const moved = p.exitPass !== undefined && p.exitPass !== at ? p.exitPass : undefined;
+  if (moved !== undefined) {
+    const stamped = await stamp(deps, card, moved, `its ${action.skill} run completed.`);
     // `dispatches: 1` EVEN HERE, and that is not tidiness: a dispatch that happened and then failed to move
     // its card was reported as no dispatch at all, so neither cap was told about a real agent run, the tick
     // counted as idle, and the next tick re-picked the same card and dispatched over work that had already
     // passed — three times over, until the attempt cap caught it.
     if (!stamped.ok) {
-      return refused(deps, `could not advance ${card.id} to ${p.exitPass}`, stamped.reason, stamped.fatal, 1);
+      return refused(deps, `could not advance ${card.id} to ${moved}`, stamped.reason, stamped.fatal, 1);
     }
   }
   // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
   // and `outcome` precisely so the diary's readers do not have to regex prose.
-  await deps.client.log('run', runLine(card, action, settled, p.exitPass, context), {
+  await deps.client.log('run', runLine(card, action, settled, moved, context), {
     iteration: context.iteration + 1,
     card: card.id,
     board: card.board,

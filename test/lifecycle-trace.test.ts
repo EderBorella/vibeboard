@@ -93,7 +93,9 @@ async function seedSkillBodies(root: string, markers: Record<string, string>): P
 // What the shim reports for every skill the machine dispatches. The two break-downs are absent by design; the
 // rest say what this suite wants of them.
 const HAPPY = {
-  implement: '[[behaviour:success]]',
+  // THE STORY'S WORK IN ONE RUN (decision 83), which is why no `implement` appears anywhere below: the
+  // tasks are what this run is asked for and the loop settles them together when it ends.
+  'implement-story': '[[behaviour:success]]',
   // THE ONE JUDGEMENT A STORY GETS (decision 80), and it answers a verdict rather than an outcome — the
   // story checkup it absorbed did not, which is what makes the trace below three dispatches where it was
   // five.
@@ -472,15 +474,17 @@ for (const mode of MODES) {
         'move product/P-001 todo',
         'move product/P-001 in-progress',
         'ran P-001 break-down',
+        // DECISION 83: ONE RUN, AND BOTH TASKS. They are claimed together before the dispatch — which is how
+        // the run is told which tasks are its own — and settled together after it, so there is no window in
+        // which the story is half-closed. No per-task dispatch, and the run line names the STORY.
+        //
+        // DECISION 80 still: a task is finished when its work lands, and nothing is stamped into the Review
+        // column at all — what gets judged is the story, once every task under it is settled.
         'move engineering/E-001 in-progress',
-        // DECISION 80: a task is finished when its work lands. No per-task review, and nothing stamped into
-        // the Review column at all — what gets judged is the story, once every task under it is settled.
-        'move engineering/E-001 done',
-        'ran E-001 implement',
-        // E-002 the same shape, and only after E-001 is done: one task at a time.
         'move engineering/E-002 in-progress',
+        'move engineering/E-001 done',
         'move engineering/E-002 done',
-        'ran E-002 implement',
+        'ran P-001 implement-story',
         // AND THEN THE ONE JUDGEMENT, which closes the story and absorbs what the story checkup asked.
         'move product/P-001 done',
         'review P-001 pass',
@@ -497,7 +501,7 @@ for (const mode of MODES) {
         'ran P-002 break-down',
         'move engineering/E-003 in-progress',
         'move engineering/E-003 done',
-        'ran E-003 implement',
+        'ran P-002 implement-story',
         'move product/P-002 done',
         'review P-002 pass',
         'smoke F-002 pass',
@@ -506,19 +510,20 @@ for (const mode of MODES) {
         'stopped complete',
       ]);
 
-      // THE COST, WHICH IS THE POINT OF DECISION 80. Two tasks under P-001 used to cost five dispatches —
-      // implement, review, implement, review, checkup — and cost three here.
+      // THE COST, WHICH IS THE POINT OF DECISIONS 80 AND 83. Two tasks under P-001 cost five dispatches
+      // before either — implement, review, implement, review, checkup — three after the judgement moved up,
+      // and two here: one run that does both tasks, and the one judgement.
       expect(await dispatches(started.project, started.argsLog)).toEqual([
         'dispatch project derive-features',
         'dispatch F-001 break-down in features/todo',
         'dispatch P-001 break-down in product/todo',
-        'dispatch E-001 implement in engineering/in-progress',
-        'dispatch E-002 implement in engineering/in-progress',
+        // THE STORY, in the column it is judged from: no entry stamp was needed and none was written.
+        'dispatch P-001 implement-story in product/in-progress',
         'dispatch P-001 review-story in product/in-progress',
         'dispatch F-001 checkup-feature in features/in-progress',
         'dispatch F-002 break-down in features/todo',
         'dispatch P-002 break-down in product/todo',
-        'dispatch E-003 implement in engineering/in-progress',
+        'dispatch P-002 implement-story in product/in-progress',
         'dispatch P-002 review-story in product/in-progress',
         'dispatch F-002 checkup-feature in features/in-progress',
       ]);
@@ -534,6 +539,9 @@ for (const mode of MODES) {
     });
 
     it('sends a story back through a fix when a gate fails, dispatching no model for the gate', async () => {
+      // Hoisted because two things need the exact bytes: the document the loop reads it out of, and the
+      // assertion below that the FIX was handed this very command rather than told to go and look.
+      const failing = `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`;
       const started = await start({
         // The gate fails the first time it runs and passes the second: the test chooses the failure, because the
         // command comes from foundation/CODE-QUALITY.md.
@@ -543,7 +551,7 @@ for (const mode of MODES) {
         // is a gates verdict carrying no command, and inside the setup subtree — which every card under the
         // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
         // judgement. The first draft of this test did exactly that and asserted nothing at all.
-        gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
+        gates: failing,
         skills: {
           ...HAPPY,
           'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
@@ -557,8 +565,8 @@ for (const mode of MODES) {
       // TO THE END OF THE FIRST FEATURE only. The harness feature is walked after it — its own trace is the
       // subject of the test above — and this one is about the send-back, which happens once.
       const upTo = traced.indexOf('ran F-001 checkup-feature');
-      expect(traced.slice(traced.indexOf('ran E-001 implement'), upTo + 1)).toEqual([
-        'ran E-001 implement',
+      expect(traced.slice(traced.indexOf('ran P-001 implement-story'), upTo + 1)).toEqual([
+        'ran P-001 implement-story',
         // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
         // AND NO MOVE WITH IT (decision 80): `in-progress` is where a story stands while it is judged, so a
         // send-back's destination is where it already is — a stamp there would be a diary line about an
@@ -579,6 +587,27 @@ for (const mode of MODES) {
       expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
       // Three: P-001 fails, P-001 passes after the fix, and the harness feature's own story passes first time.
       expect(await ranTimes(started.project.root, GATE_LOG)).toBe(3);
+
+      // WHERE THE FAILURE LOCALITY WENT (decision 83). The gates run once for the whole story now, so a red
+      // suite no longer says which task broke it — and what recovers that is the fix being HANDED the gate's
+      // own command and what it printed, rather than told to go and look. Three links compose to make that
+      // true — the verdict is written onto the run the tick named, the tick hands that run to the fix as
+      // `previous`, and the prompt renders its verification — and this is the one place all three are
+      // exercised together, against the prompt the shim was really given.
+      //
+      // NOT the judge: it is dispatched only once the gates PASS, so it never sees a failing one. Its own
+      // prompt carries `gatesPassed` and nothing else about them.
+      const prompts = (await readFile(started.argsLog, 'utf8'))
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => (JSON.parse(line) as { prompt: string }).prompt);
+      const fixPrompt = prompts.find((text) => text.startsWith('# Fix\n'));
+      expect(fixPrompt).toBeDefined();
+      // THE WHOLE LINE, command included. `toContain('The command that failed:')` alone passes over a
+      // heading with nothing under it, and the command's own text appears in this prompt anyway —
+      // foundation/CODE-QUALITY.md is quoted in full a few sections up, so matching on it proves nothing.
+      expect(fixPrompt).toContain(`The command that failed: \`${failing}\``);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
@@ -694,7 +723,12 @@ for (const mode of MODES) {
     // which is exactly why none of them could see this.
     it('blocks a story that arrived with its tasks and cannot pass its gates', async () => {
       const started = await start({ gates: `echo ran >> ${GATE_LOG}; exit 1` });
-      const task = await place(started.project, 'engineering', 'backlog', 'A task');
+      // THE TASK ARRIVES DONE, which is what keeps this shape reachable at all since the work moved up to
+      // the story (decision 83). A story carrying an OUTSTANDING task now gets an implement run of its own
+      // first, and that run is a record the verdict can land on — so the hole decision 82 is about is the
+      // board where every task under the story is already settled: an import, or a person who finished the
+      // work by hand. The skip, no work run, and the gates running before any dispatch.
+      const task = await place(started.project, 'engineering', 'done', 'A task');
       const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
       await place(started.project, 'features', 'backlog', 'A feature', [story]);
 
@@ -722,9 +756,8 @@ for (const mode of MODES) {
       expect((await trace(started.project)).slice(1)).toEqual([
         'move features/F-001 in-progress',
         'move product/P-001 in-progress',
-        'move engineering/E-001 in-progress',
-        'move engineering/E-001 done',
-        'ran E-001 implement',
+        // No implement run: the one task under this story arrived settled, so there is no outstanding work
+        // and the story goes straight to its judgement carrying no record of any kind.
         // The gate refuses a story with nothing on it to record the refusal against, and the fix goes anyway.
         'gates P-001 fail',
         'ran P-001 fix',
@@ -748,6 +781,9 @@ for (const mode of MODES) {
     // feature — one gate run and one review, with no fix anywhere.
     it('closes a story that arrived with its tasks and passes its gates first time', async () => {
       const started = await start();
+      // OUTSTANDING, unlike its neighbour above: this is the imported board whose work has NOT been done,
+      // so the story's own implement run is dispatched for it — and that run is then the record the
+      // judgement lands on, which is the ordinary path rather than decision 81's.
       const task = await place(started.project, 'engineering', 'backlog', 'A task');
       const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
       await place(started.project, 'features', 'backlog', 'A feature', [story]);
@@ -763,9 +799,8 @@ for (const mode of MODES) {
         'move product/P-001 in-progress',
         'move engineering/E-001 in-progress',
         'move engineering/E-001 done',
-        'ran E-001 implement',
-        // One judgement, and the verdict lands on the review's own record because there is no work run
-        // (decision 81) — which is what lets the story close rather than be judged again.
+        'ran P-001 implement-story',
+        // One judgement, and the verdict lands on the implement run the story now has of its own.
         'move product/P-001 done',
         'review P-001 pass',
         'smoke F-001 pass',
@@ -778,7 +813,7 @@ for (const mode of MODES) {
       expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual([
         'F-001 checkup-feature',
         'P-001 review-story',
-        'E-001 implement',
+        'P-001 implement-story',
       ]);
       expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
       await assertHierarchy(started.project);
@@ -858,10 +893,11 @@ for (const mode of MODES) {
         'move product/P-002 in-progress',
         'ran P-002 break-down',
         // And L3 under that, on the task the sibling's own break-down produced — the whole vertical below a card
-        // no phase would ever have reached if it were hung off its sibling.
+        // no phase would ever have reached if it were hung off its sibling. The run is the STORY's and the
+        // task is claimed and settled by it (decision 83).
         'move engineering/E-002 in-progress',
         'move engineering/E-002 done',
-        'ran E-002 implement',
+        'ran P-002 implement-story',
       ]);
       await assertHierarchy(started.project);
     });
@@ -1041,3 +1077,51 @@ for (const mode of MODES) {
     });
   });
 }
+
+// A STORY BIGGER THAN ONE RUN'S CEILING, THROUGH THE WHOLE MACHINE (decision 84). The tick-level test in
+// test/tick.test.ts pins the arithmetic; this pins that the arithmetic is reachable — four real dispatches,
+// four real groups of tasks claimed and settled over HTTP, and a judgement at the end of them.
+//
+// ONE MODE, deliberately. `MODES` exists to drive the API's two create routes, and nothing here varies by
+// which of them made the cards: what is under test is how many runs the story costs and what happens after
+// the last one.
+//
+// SIXTEEN IS THE SMALLEST BOARD THAT SHOWS IT: `TASKS_PER_RUN × attemptCap` is fifteen, and fifteen closed
+// perfectly well while sixteen was blocked FOR SUCCEEDING — three successful groups, the sixteenth task
+// stranded in `backlog`, `story-review` never dispatched, so the gates never ran over any of the work.
+describe('a story with more tasks than one cap could pay for', { timeout: 60_000 }, () => {
+  it('delivers it in groups and closes it, rather than blocking the story that succeeded', async () => {
+    const started = await start({
+      skills: {
+        ...HAPPY,
+        'derive-features': creates('create', 'features:1:product:1:engineering:16'),
+        'break-down': HARNESS_CHAIN('create'),
+      },
+    });
+    const ended = await drive(started);
+    expect(ended.reason).toBe('complete');
+
+    // FOUR RUNS FOR SIXTEEN TASKS — three full groups and the remainder — and ONE judgement after them.
+    const all = await runs(started.project);
+    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'implement-story')).toHaveLength(4);
+    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'review-story')).toHaveLength(1);
+
+    // THE CEILING HELD ON THE WAY IN: the first run was handed five tasks and not sixteen, counted from the
+    // claims the loop wrote before it dispatched.
+    const traced = await trace(started.project);
+    const first = traced.indexOf('ran P-001 implement-story');
+    expect(first).toBeGreaterThan(-1);
+    expect(
+      traced.slice(0, first).filter((line) => /^move engineering\/\S+ in-progress$/.test(line)),
+    ).toHaveLength(5);
+
+    // AND EVERY TASK LANDED. The story is closed by its judgement, and nothing is left behind it.
+    const cards = (await board(started.project)).filter(isLive);
+    const story = cards.find((c) => c.id === 'P-001') as Card;
+    const tasks = childrenOf(story, cards);
+    expect(tasks).toHaveLength(16);
+    expect(tasks.filter((t) => t.columnSlug !== 'done')).toEqual([]);
+    expect(story.columnSlug).toBe('done');
+    await assertHierarchy(started.project);
+  });
+});

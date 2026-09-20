@@ -38,16 +38,26 @@ export const BREAKDOWN = (card = CARD('F-001', 'features')): TickAction => ({
   card,
 });
 
-export const IMPLEMENT = (card = CARD()): TickAction => ({
-  kind: 'dispatch',
-  phase: 'task-implement',
-  skill: 'implement',
-  card,
-});
-
-// A story at its judging point, which is where it stands while the judgement runs: `story-review` has no
-// entry stamp, so a fixture in any other column would be testing a board state the machine never produces.
+// A story at its judging point, which is where it stands while every phase on product runs: neither the
+// judgement nor the implement moves it, so a fixture in any other column would be testing a board state
+// the machine never produces.
 export const STORY = (id = 'P-001'): Card => ({ ...CARD(id, 'product'), columnSlug: 'in-progress' });
+
+// THE STORY'S IMPLEMENT (decision 83), and the one phase left that takes the ordinary dispatch path with
+// both an entry column and an exit one. Its `group` is what the run is asked for: the tasks are stamped
+// into `in-progress` before it and `done` together after it, which is the whole of what a task's own
+// implement used to do one card at a time.
+//
+// ONE TASK BY DEFAULT, because most of this suite is about the path rather than the group — the suites
+// that are about the group name their own, and two is the smallest fixture that can tell "all of them"
+// from "one of them".
+export const IMPLEMENT = (card = STORY(), cards = [CARD()]): TickAction => ({
+  kind: 'dispatch',
+  phase: 'story-implement',
+  skill: 'implement-story',
+  card,
+  group: { cards, entry: 'in-progress', settled: 'done' },
+});
 
 // THE STORY'S JUDGEMENT (decision 80). It carries the run its verdict will be WRITTEN onto — a story's
 // break-down, or the fix that answered a send-back — because a verdict lands on a run and there is nothing
@@ -61,12 +71,12 @@ export const REVIEW = (card = STORY()): Extract<TickAction, { kind: 'dispatch' }
   previous: 'WORK-1',
 });
 
-// The phase with NO entry column that DOES take the ordinary path: a task being fixed is already in
-// `in-progress`, so a move to where it is would be a write for nothing — and a diary line about an event that
-// did not happen.
-export const FIX = (card = CARD()): TickAction => ({
+// THE PHASE WITH NO STAMP AT EITHER END that still takes the ordinary path. A story being fixed is already
+// in `in-progress`, so a move to where it is would be a write for nothing — and a fix does not close a
+// story, the judge does, so there is no exit column either.
+export const FIX = (card = STORY()): TickAction => ({
   kind: 'dispatch',
-  phase: 'task-fix',
+  phase: 'story-fix',
   skill: 'fix',
   card,
   previous: 'IMPL-1',

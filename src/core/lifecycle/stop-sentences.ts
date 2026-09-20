@@ -1,7 +1,8 @@
 import type { CardProblem } from '../../store/cards/board.js';
 import type { DeclaredCommands } from '../../store/project/foundation.js';
-import type { AutopilotConfig } from '../autopilot.js';
+import { type AutopilotConfig, isBlockedColumn } from '../autopilot.js';
 import { hasUnfinishedChildren } from '../derived-status.js';
+import { parentOf } from '../hierarchy.js';
 import type { RunRecord } from '../runs.js';
 import type { Card } from '../types.js';
 
@@ -99,21 +100,32 @@ export const isAre = (cards: Card[]): string => (cards.length === 1 ? 'is' : 'ar
 // There is no `barred` bucket. It existed only for the setup barrier's EFFECT ON ELIGIBILITY, which decision
 // 44 removes — the barrier is a feature now, worked in its turn like any other — and a sentence about a rule
 // that no longer exists is worse than no sentence.
+//
+// `stranded` IS FIRST, and it is the bucket decision 84 had to add. Until the work moved up to the story no
+// blocking point could settle its card and leave unsettled children behind — a break-down blocks with
+// nothing under it, a fix blocks a story whose tasks are all settled — so a task under a blocked story fell
+// through to `rest`, and the reader was told it sat in a column the lifecycle has no phase for. It sits in
+// `backlog`, which the scaffolder creates: a diagnosis a person can act on, pointing at nothing.
 function partitionStuck(
   ap: AutopilotConfig,
   cards: Card[],
   unfinished: Card[],
-): { waiting: Card[]; rest: Card[] } {
+): { stranded: Card[]; waiting: Card[]; rest: Card[] } {
+  const stranded: Card[] = [];
   const waiting: Card[] = [];
   const rest: Card[] = [];
   for (const card of unfinished) {
+    // ONE LEVEL UP IS THE WHOLE OF IT: `BLOCKED_BOARDS` is product and engineering, and a card whose parent
+    // sits on neither cannot have a blocked one above it at all.
+    const above = parentOf(card, cards);
+    if (above !== undefined && isBlockedColumn(ap, above.board, above.columnSlug)) stranded.push(card);
     // The same rule that kept it from being worked, read back as a reason. A parent stuck behind one
     // blocked grandchild is the ordinary shape of a stalled board, and calling it unroutable — which is
     // what the first version of this message did — sends the reader to edit a routing table that is fine.
-    if (hasUnfinishedChildren(ap, card, cards)) waiting.push(card);
+    else if (hasUnfinishedChildren(ap, card, cards)) waiting.push(card);
     else rest.push(card);
   }
-  return { waiting, rest };
+  return { stranded, waiting, rest };
 }
 
 // Why the remaining work is stuck, per KIND of stuck. One list of ids with one piece of advice named
@@ -124,8 +136,16 @@ function partitionStuck(
 // reader looking at a stalled board needs to know it is there — but the clause claiming it makes `complete`
 // unreachable for ever is gone, since that is no longer true.
 export function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], blocked: Card[]): string {
-  const { waiting, rest } = partitionStuck(ap, cards, unfinished);
+  const { stranded, waiting, rest } = partitionStuck(ap, cards, unfinished);
   const parts: string[] = [];
+  // WHAT A BLOCKED STORY LEFT BEHIND. The card above is named by the `blocked` clause below rather than
+  // here: this list can span several parents, and one of them quoted as though it were the only one is how
+  // a sentence that reads well on the fixture misleads on the board.
+  if (stranded.length > 0) {
+    parts.push(
+      `${names(stranded)} ${isAre(stranded)} under a card that ran out of attempts, so nothing will pick ${stranded.length === 1 ? 'it' : 'them'} up until that card is dealt with`,
+    );
+  }
   if (rest.length > 0) {
     // WHAT ACTUALLY PLACES A CARD, which is not a table the reader can edit. Under ruling 52 the phase table
     // is code and a column dispatches nothing, so "check that every column is routed, terminal or blocked" —

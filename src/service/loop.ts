@@ -79,9 +79,10 @@ export interface ActResult {
   // what that costs as well as what it buys.
   stop?: { reason: StopReason; detail?: string };
   // A SEND-BACK THIS ACTION HAD NOWHERE TO RECORD, by card id (decision 82). A story's gates failed and the
-  // card carries no run of any kind — no work run, because it arrived with its tasks, and no review run,
-  // because the gates run before the judge is dispatched. Nothing on disk says it happened, so the loop
-  // carries it to the next `decideTick`, which routes the story to its fix on it.
+  // card carries no run of any kind — no work run, because it arrived with every task under it already
+  // settled and so was never implemented, and no review run, because the gates run before the judge is
+  // dispatched. Nothing on disk says it happened, so the loop carries it to the next `decideTick`, which
+  // routes the story to its fix on it.
   //
   // NOT a decision: `act` reports what it did and could not do, exactly as `dispatches` does. Which row the
   // machine is in is still the tick's answer.

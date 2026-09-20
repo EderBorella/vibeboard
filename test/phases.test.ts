@@ -17,15 +17,31 @@ describe('the phase table', () => {
     });
   });
 
-  it('stamps a task into in-progress before implement and done after it', () => {
-    expect(phase('task-implement')).toMatchObject({
-      board: 'engineering',
+  // DECISION 83, AS THE TABLE STATES IT. The work is the STORY's: it runs on product, where the judgement
+  // already is, and the tasks under it are what one run is asked for rather than what N runs are dispatched
+  // against.
+  it('runs the implement on the story, where the judgement already is', () => {
+    expect(phase('story-implement')).toMatchObject({
+      board: 'product',
       entry: 'in-progress',
-      exitPass: 'done',
-      skill: 'implement',
+      // The column the judgement reads. A story is already standing in it, so neither stamp is written —
+      // both are declared for the day the derivation changes.
+      exitPass: 'in-progress',
+      skill: 'implement-story',
+      bounded: 'skill',
     });
     // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
-    expect(phase('task-implement').creates).toBeUndefined();
+    expect(phase('story-implement').creates).toBeUndefined();
+  });
+
+  // The union is the load-bearing half, exactly as it was for the per-task judgement: a `task-implement`
+  // left in the table would be a second place a task could be dispatched from, which is the cost this
+  // removes. `phaseForRun` below is what would resolve it.
+  it('has no per-task phase at all', () => {
+    const names: string[] = PHASES.map((p) => p.name);
+    expect(names).not.toContain('task-implement');
+    expect(names).not.toContain('task-fix');
+    expect(PHASES.filter((p) => p.board === 'engineering')).toEqual([]);
   });
 
   // DECISION 80, AS THE TABLE STATES IT. The union is the load-bearing half: a `task-review` left in it
@@ -53,8 +69,9 @@ describe('the phase table', () => {
     expect(phase('story-review').entry).toBeUndefined();
   });
 
-  // A SEND-BACK NEEDS SOMEWHERE TO GO. Without this row a refused story sits settled in `in-progress`
-  // carrying a failed verdict, and every later tick re-stamps it to where it already is.
+  // A SEND-BACK NEEDS SOMEWHERE TO GO, and since decision 83 it is the only fix row there is. Without it a
+  // refused story sits settled in `in-progress` carrying a failed verdict, and every later tick re-stamps
+  // it to where it already is.
   it('answers a sent-back story with a fix that does not close it', () => {
     expect(phase('story-fix')).toMatchObject({ board: 'product', skill: 'fix', bounded: 'skill' });
     expect(phase('story-fix').exitPass).toBeUndefined();
@@ -86,7 +103,7 @@ describe('the phase table', () => {
       'checkup-feature',
       'derive-features',
       'fix',
-      'implement',
+      'implement-story',
       'review-story',
     ]);
   });
@@ -115,11 +132,12 @@ describe('phaseForRun', () => {
     expect(phaseForRun('break-down', 'features')?.creates).toBe('product');
     expect(phaseForRun('break-down', 'product')?.creates).toBe('engineering');
   });
-  // AND `fix` IS THE SECOND OF THEM since decision 80 — one skill, a task's phase and a story's, which is
-  // what keeps `isWorkRun` in bounds.ts able to tell a story's fix from a task's.
-  it('resolves fix on engineering to task-fix, and on product to story-fix', () => {
-    expect(phaseForRun('fix', 'engineering')?.name).toBe('task-fix');
+  // AND `fix` ON ENGINEERING IS NOBODY'S PHASE since decision 83 took the per-task one out. The skill is
+  // still seeded there for a person to dispatch by hand, and `isWorkRun` in bounds.ts reads this — so a
+  // hand-run fix on a task is not a run any story's verdict can land on.
+  it('resolves fix on product to story-fix, and on engineering to no phase at all', () => {
     expect(phaseForRun('fix', 'product')?.name).toBe('story-fix');
+    expect(phaseForRun('fix', 'engineering')).toBeUndefined();
   });
   it('resolves a card-less run to the bootstrap', () => {
     expect(phaseForRun('derive-features')?.name).toBe('bootstrap');
@@ -133,8 +151,14 @@ describe('phaseForRun', () => {
     expect(phaseForRun('break-down', 'engineering')).toBeUndefined();
   });
   it('resolves each single-board lifecycle skill', () => {
-    expect(phaseForRun('implement', 'engineering')?.name).toBe('task-implement');
+    expect(phaseForRun('implement-story', 'product')?.name).toBe('story-implement');
     expect(phaseForRun('review-story', 'product')?.name).toBe('story-review');
     expect(phaseForRun('checkup-feature', 'features')?.name).toBe('feature-checkup');
+  });
+
+  // `implement` IS A HAND SKILL NOW, and it is still seeded: the endpoint must not invent a `creates` for
+  // it, exactly as it must not for `execute`.
+  it('is undefined for the per-task implement the lifecycle no longer dispatches', () => {
+    expect(phaseForRun('implement', 'engineering')).toBeUndefined();
   });
 });

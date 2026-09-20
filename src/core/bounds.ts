@@ -2,7 +2,6 @@ import { burnsAttempt } from './accounting.js';
 import { type PhaseName, phaseForRun } from './phases.js';
 import type { RunRecord } from './runs.js';
 import type { Card } from './types.js';
-import type { Verification } from './verify.js';
 
 // Every count in §5 that `accounting.ts` does not already answer. Pure, and every one of them is a QUERY
 // over records already on disk plus the board — no new stored counter to drift out of step (decision 46).
@@ -46,11 +45,12 @@ const inOrder = (a: RunRecord, b: RunRecord): number =>
 const latest = (runs: RunRecord[]): RunRecord | undefined => [...runs].sort(inOrder).at(-1);
 
 // A run whose WORK a verdict is written onto: a dispatching phase that BUILDS rather than judges, which the
-// table already says as `bounded: 'skill'`. For a task that is its implement and its fix; for a story, since
-// the judgement moved up (decision 80), its break-down and its fix — the runs a story-level verdict lands on.
+// table already says as `bounded: 'skill'`. Since the work moved up to the story too (decision 83) those are
+// a story's break-down, its implement and its fix — every run a story-level verdict can land on, and a task
+// has none of its own any more.
 //
-// `exitPass === 'review'` was the marker and could not survive that move: no phase exits to a review column
-// any more, so it selected nothing at all.
+// `exitPass === 'review'` was the marker and could not survive the judgement moving up: no phase exits to a
+// review column any more, so it selected nothing at all.
 //
 // `bounded: 'skill'` IS NOT "EVERY RUN BUT A JUDGING ONE", and the comment here claimed it was. The feature
 // checkup carries it too, so a feature's checkup run reads as one of that feature's work runs. Nothing is
@@ -61,32 +61,25 @@ const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)
 
 const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'review';
 
-// THE TWO PHASES THAT ANSWER A SEND-BACK. Named rather than read off `skill === 'fix'`, which would also
-// match that skill dispatched by hand onto a board no phase owns.
-const FIX_PHASES: readonly PhaseName[] = ['task-fix', 'story-fix'];
+// THE PHASE THAT ANSWERS A SEND-BACK. Named rather than read off `skill === 'fix'`, which would also match
+// that skill dispatched by hand onto a board no phase owns — a task's own fix among them, which is what a
+// person dispatching `fix` on an engineering card is doing since decision 83 retired the phase.
+//
+// A LIST OF ONE, and it stays a list: it was two until the work moved up to the story, and `fix` is still a
+// skill two boards offer.
+const FIX_PHASES: readonly PhaseName[] = ['story-fix'];
 
 const isFixRun = (run: RunRecord): boolean => {
   const p = phaseForRun(run.skill, run.board);
   return p !== undefined && FIX_PHASES.includes(p.name);
 };
 
-// The verdict this task currently stands under, or nothing. FILTERED TO RUNS THAT CARRY ONE, which is what
-// makes a dead `fix` leave the earlier failure standing: the task was sent back, the fix produced no
-// judgement of its own, and the finding is still outstanding. Reading the latest settled run instead would
-// clear a real failure because the run after it died.
-//
-// Pass or fail, both: the caller reads `passed`. P3 dispatches when there is no FAILED verdict, P5 when
-// there is one, and P4r re-stamps from whichever it is — three questions, one lookup.
-export function outstandingVerdict(runs: RunRecord[], card: string): Verification | undefined {
-  return verdictRun(runs, card)?.verification;
-}
-
-// THE RUN THAT CARRIES THE VERDICT, which is what a `fix` is handed as `previous`: the findings are on the
-// run, not on the card, and a fix told to go and look for them is a fix guessing. Its own export rather than
-// a second filter at the call site, so "the latest work run that was judged" has one definition.
-export function verdictRun(runs: RunRecord[], card: string): RunRecord | undefined {
-  return latest(runs.filter((r) => r.card === card && isWorkRun(r) && r.verification !== undefined));
-}
+// `outstandingVerdict` AND `verdictRun` WERE HERE, and they went with the task loop (decision 83). They
+// answered "the latest work run that CARRIES a verdict", which was how a task in `in-progress` told a fix
+// from an implement — a question no card is asked now that the work and the judgement are both the story's,
+// and `judgeStory` reads the latest work run's OWN verdict for the reason written beside it in
+// core/lifecycle/tick.ts. Recorded rather than silently dropped because the difference between the two
+// lookups is a bug this machine has had twice.
 
 // THE RUN UNDER JUDGEMENT, which is what a `review` is handed as `previous`. Not filtered on carrying a
 // verdict — the whole point is that this one has none yet — and the review must be told WHICH run it is

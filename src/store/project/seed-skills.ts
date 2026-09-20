@@ -135,6 +135,10 @@ List every card you created in your report, by id.
 `,
   },
   {
+    // NO LONGER A PHASE'S SKILL since the work moved up to the story (decision 83) — `implement-story` below
+    // is what the lifecycle dispatches, and `phaseSkillProblems` no longer asks a project for this one. It
+    // stays seeded because implementing ONE task by hand is a thing a person does, exactly as `execute` is:
+    // a skill no phase names blocks nothing and is offered on the card it is scoped to.
     slug: 'implement',
     content: `---
 name: Implement
@@ -170,6 +174,66 @@ missing dependency, work the card implies but does not say — goes to
 
 You do not move your own card, and cannot: auto-pilot moves it when this run
 finishes, and your credential grants nothing that could.
+`,
+  },
+  {
+    // THE STORY'S WORK IN ONE RUN (decision 83). `implement`'s text with the unit changed from a card to a
+    // story and the tasks under it: one agent given all three of a story's tasks did their work in 18 turns
+    // and 50k of context against 41 turns and 148k, for equivalent code and equivalent defect detection.
+    //
+    // WHICH TASKS ARE THIS RUN'S IS READ OFF THE BOARD, because the board is the only channel there is: the
+    // loop stamps the group into `in-progress` before dispatching and the prompt names every linked card
+    // with the column it stands in. That is also what bounds a big story — a story with more tasks than the
+    // ceiling in core/lifecycle/tick.ts is dispatched in groups, and the ones not in this group are still in
+    // `backlog` where this text tells the run to leave them.
+    slug: 'implement-story',
+    content: `---
+name: Implement the story
+description: Build every task under this story, and make the gates pass
+boards: [product]
+---
+Implement the story below by doing the work of the tasks under it.
+
+**The tasks in \`engineering/in-progress\` are this run's, and every one of them
+is required.** Each card this story links to is listed above with the board and
+column it sits in and the path to its file. Read every task in that column, and
+deliver the acceptance criterion each one states. A task still in \`backlog\` is a
+later run's — do not do it, and do not touch it.
+
+**Do them as one piece of work.** They were split for the board's sake; they
+share files and they share a design, which is why they are given to you
+together. Decide once, write once, test once.
+
+The gates in the project's foundation/CODE-QUALITY.md are the bar, and they are
+quoted here in full. Run them yourself before you finish: auto-pilot runs them
+again the moment you are done, and a run that leaves them failing has not
+delivered. They run ONCE for this whole story, so a red suite will not say which
+task broke it — that is yours to keep track of as you go.
+
+**If one of these tasks asks you to declare the project's \`smoke:\` command**,
+declare it with \`POST /api/foundation/smoke\` and a body of \`{ command }\`. Do NOT
+try to edit foundation/TESTING.md: the foundation documents are read-only to
+every run, that endpoint is the only way to declare this, and it writes that one
+key and nothing else. If the card tells you to edit the file, this is what it
+means.
+
+The command must not be one of the gate commands foundation/CODE-QUALITY.md
+declares — the endpoint refuses that outright. A gate and a smoke command that are
+the same command are one check, not two: gates are written alongside the code they
+judge, so they pass over a product with no way to run it. Make the smoke command
+start the product the way the README describes starting it, and use it the way the
+README describes using it.
+
+Do what these tasks ask and nothing more. Anything else you find — an unrelated
+bug, a missing dependency, work a task implies but does not say — goes to
+\`POST /api/suggestions\`. Do the part you can, file the rest, and stop.
+
+End your report by naming each task by id with its acceptance criterion and how
+this run meets it. That list is what the story's review is checked against, and a
+task you could not finish belongs in it too, said plainly.
+
+You do not move any card, and cannot: auto-pilot stamps these tasks done together
+when this run finishes, and your credential grants nothing that could.
 `,
   },
   {

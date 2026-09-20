@@ -9,6 +9,7 @@ import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
 import { afterProjectRun } from './bootstrap.js';
 import { CHECKUP_PHASES, type CheckupEvidence, checkupEvidence } from './checkup.js';
+import { claimGroup } from './group.js';
 import { afterCardRun, countsTheBoard, liveCount } from './outcomes.js';
 import { refused, stop } from './refusals.js';
 import { inSetup, reviewStory } from './review.js';
@@ -19,7 +20,11 @@ import { settle } from './settle.js';
 //
 // THE ORDINARY DISPATCH, which is every phase but one:
 //
-//   commit → stamp the entry column → dispatch → wait for the record to settle → stamp the exit column → diary
+//   commit → stamp the entry column → claim the group → dispatch → wait for the record to settle
+//          → settle the group → stamp the exit column → diary
+//
+// The two group steps are the story's implement alone (decision 83) and are no-ops everywhere else: it is
+// the one phase whose run delivers cards other than its own.
 //
 // AND THE STORY'S JUDGEMENT, which is deterministic first (decision 51) and so does not take that path at all:
 //
@@ -186,6 +191,17 @@ async function stampEntry(deps: ActDeps, action: Dispatch): Promise<ActResult | 
   return await refused(deps, `could not move ${card.id} to ${entry}`, stamped.reason, stamped.fatal);
 }
 
+// EVERY STAMP THAT PRECEDES A DISPATCH, in the order they are written: the card into its entry column, then
+// the cards one level down this run is for (decision 83). The group's is BEFORE the dispatch because it is
+// part of the dispatch's own input — the prompt lists every card the story links to with the column it
+// stands in, and that is how the run is told which tasks are its own.
+//
+// One function rather than two guards at the call site, and it is the complexity budget that decides: the
+// second guard took `dispatch` past what the gate allows, and flattening beats a suppression.
+async function stampsBefore(deps: ActDeps, action: Dispatch): Promise<ActResult | undefined> {
+  return (await stampEntry(deps, action)) ?? (await claimGroup(deps, action));
+}
+
 // One dispatch, card or project. The two differ in exactly three places and share everything else, so they
 // are one function rather than two that drift: a project run has no card to stamp, no card to write a verdict
 // beside, and its own list rather than a card's to be found in.
@@ -214,8 +230,8 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     return await reviewStory(deps, action, card, { setupSubtree: await inSetup(deps, card) }, context);
   }
 
-  const refusedEntry = await stampEntry(deps, action);
-  if (refusedEntry) return refusedEntry;
+  const refusedStamp = await stampsBefore(deps, action);
+  if (refusedStamp) return refusedStamp;
 
   // HOW BIG THE BOARD WAS BEFORE, for a phase whose only product is cards. Read here rather than counted from
   // the run's own `created` list, which is the agent's claim about itself (decision 43): that list would refuse

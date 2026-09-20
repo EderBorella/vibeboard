@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  creatingRoundSpent,
-  inconclusiveReviews,
-  latestWorkRun,
-  outstandingVerdict,
-  reviewsRun,
-} from '../src/core/bounds.js';
+import { creatingRoundSpent, inconclusiveReviews, latestWorkRun, reviewsRun } from '../src/core/bounds.js';
 import {
   type ReviewVerdict,
   type RunRecord,
@@ -43,13 +37,25 @@ function base(over: Partial<RunRecord> = {}): RunRecord {
   };
 }
 
-// A run that did the work and delivered a report.
-const work = (skill: 'implement' | 'fix', card = 'E-001'): RunRecord =>
-  withReport(base({ skill, card }), { outcome: 'success', summary: 'did it', body: '## What I did' }, 'T');
+// A run that did the work and delivered a report. ON PRODUCT, and that is decision 83 rather than a
+// fixture preference: `isWorkRun` reads the phase table, and since the work moved up to the story the runs
+// a verdict can land on are a story's break-down, its implement and its fix. A run on engineering is in no
+// phase at all.
+const work = (skill: 'break-down' | 'implement-story' | 'fix', card = 'P-001'): RunRecord =>
+  withReport(
+    base({ skill, card, board: 'product' }),
+    { outcome: 'success', summary: 'did it', body: '## What I did' },
+    'T',
+  );
 
 // A run that DIED: no report at all, which is exactly the shape that must not clear an earlier verdict.
-const died = (skill: string, card = 'E-001'): RunRecord =>
-  withoutReport(base({ skill, card }), 'failed', 'The agent exited with code 1 and wrote no report.', 'T');
+const died = (skill: string, card = 'P-001'): RunRecord =>
+  withoutReport(
+    base({ skill, card, board: 'product' }),
+    'failed',
+    'The agent exited with code 1 and wrote no report.',
+    'T',
+  );
 
 const gates = (passed: boolean): Verification =>
   passed
@@ -90,41 +96,42 @@ function card(board: BoardName, id: string, over: Partial<Card> = {}): Card {
   };
 }
 
-describe('outstandingVerdict', () => {
-  it('is absent for a task with no runs', () => {
-    expect(outstandingVerdict([], 'E-001')).toBeUndefined();
+// `outstandingVerdict` HAD A SUITE HERE, and it went with the lookup (decision 83). It answered "the
+// latest work run that CARRIES a verdict", which is how a task in `in-progress` told a fix from an
+// implement — a question no card is asked now that the work and the judgement are both the story's.
+// What survives of it is the ordering suite below, which is where the bug it was written around lives.
+describe('latestWorkRun', () => {
+  it('is absent for a story with no runs', () => {
+    expect(latestWorkRun([], 'P-001')).toBeUndefined();
   });
 
-  it('is absent when the only run carries no verification', () => {
-    // Nothing has judged it yet, which is not the same fact as failing.
-    expect(outstandingVerdict([work('implement')], 'E-001')).toBeUndefined();
-  });
-
-  it('is the verification on the latest settled implement or fix run that has one', () => {
-    const first = withVerification(work('implement'), gates(false));
-    const second = withVerification(work('fix'), gates(true));
-    expect(outstandingVerdict([first, second], 'E-001')?.passed).toBe(true);
-    // Order of the argument must not decide the answer.
-    expect(outstandingVerdict([second, first], 'E-001')?.passed).toBe(true);
-  });
-
-  // A fix that DIED leaves the previous failed verdict outstanding — the task still needs fixing.
-  it('keeps the earlier failed verdict when a later fix run carries none', () => {
-    const judged = withVerification(work('implement'), gates(false));
-    expect(outstandingVerdict([judged, died('fix')], 'E-001')?.passed).toBe(false);
-    expect(outstandingVerdict([judged, died('fix')], 'E-001')?.command).toBe('npm test');
+  // THE RUN UNDER JUDGEMENT, whether or not it has been judged: that is the difference from the lookup
+  // that went, and it is what lets a story that was sent back and fixed pass.
+  it('answers with the latest work run even when it carries no verdict', () => {
+    const judged = withVerification(work('implement-story'), gates(false));
+    const fix = work('fix');
+    expect(latestWorkRun([judged, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestWorkRun([judged, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('ignores a review run — a reviewer does not judge itself', () => {
-    const judged = withVerification(work('implement'), gates(false));
-    // A verdict sitting on the REVIEW run's own record, which is not a verdict about the task's work.
-    const reviewJudged = withVerification(rev('done'), gates(true));
-    expect(outstandingVerdict([judged, reviewJudged], 'E-001')?.passed).toBe(false);
+    const judged = withVerification(work('implement-story'), gates(false));
+    expect(latestWorkRun([judged, rev('done')], 'P-001')?.skill).toBe('implement-story');
+  });
+
+  // A TASK HAS NO WORK RUN OF ITS OWN. Every phase on engineering has gone, so a run recorded there is in
+  // no phase — which is what stops a hand-dispatched `fix` on a task becoming a run a verdict lands on.
+  it('is absent for a run on the engineering board, which is in no phase at all', () => {
+    const byHand = withReport(
+      base({ skill: 'fix', card: 'E-001', board: 'engineering' }),
+      { outcome: 'success', summary: 'did it', body: '## What I did' },
+      'T',
+    );
+    expect(latestWorkRun([byHand], 'E-001')).toBeUndefined();
   });
 
   it('is scoped to the card', () => {
-    const other = withVerification(work('implement', 'E-002'), gates(false));
-    expect(outstandingVerdict([other], 'E-001')).toBeUndefined();
+    expect(latestWorkRun([work('implement-story', 'P-002')], 'P-001')).toBeUndefined();
   });
 });
 
@@ -135,39 +142,40 @@ describe('outstandingVerdict', () => {
 // fixed again and again until the cap blocks it.
 describe('latest, when two runs share a second', () => {
   const inOneSecond = (
-    skill: 'implement' | 'fix',
+    skill: 'implement-story' | 'fix',
     id: string,
     started: string,
     over: Partial<RunRecord> = {},
   ): RunRecord =>
     withReport(
-      { ...base({ skill, ...over }), run: `20260813-100000-${id}`, started },
+      { ...base({ skill, card: 'P-001', board: 'product', ...over }), run: `20260813-100000-${id}`, started },
       { outcome: 'success', summary: 'did it', body: '## What I did' },
       'T',
     );
 
   it('answers with the run that started later, not the one whose id sorts higher', () => {
-    const implement = inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z');
+    const implement = inOneSecond('implement-story', 'uzpn', '2026-08-13T10:00:00.536Z');
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'E-001')?.skill).toBe('fix');
-    expect(latestWorkRun([fix, implement], 'E-001')?.skill).toBe('fix');
+    expect(latestWorkRun([implement, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestWorkRun([fix, implement], 'P-001')?.skill).toBe('fix');
   });
 
   it('leaves no verdict outstanding when the later fix carries none', () => {
     // The whole failure in one assertion: the implement run's failed gates verdict must not be what the
-    // task stands under once a fix has run, or the loop re-stamps it back to `in-progress` for ever.
+    // card stands under once a fix has run, or the loop re-stamps it back to `in-progress` for ever. Found
+    // at task level and moved up with the machine — the lookup is the same and so is the bug.
     const implement = withVerification(
-      inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z'),
+      inOneSecond('implement-story', 'uzpn', '2026-08-13T10:00:00.536Z'),
       gates(false),
     );
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'E-001')?.verification).toBeUndefined();
+    expect(latestWorkRun([implement, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('falls back to the id when neither run says when it started', () => {
-    const first = inOneSecond('implement', 'aaaa', '');
+    const first = inOneSecond('implement-story', 'aaaa', '');
     const second = inOneSecond('fix', 'zzzz', '');
-    expect(latestWorkRun([second, first], 'E-001')?.skill).toBe('fix');
+    expect(latestWorkRun([second, first], 'P-001')?.skill).toBe('fix');
   });
 });
 
@@ -223,7 +231,7 @@ describe('inconclusiveReviews', () => {
   it('does not count a work run that carries no verdict', () => {
     // Only a REVIEW is inconclusive for want of one: an implement run is never asked for a verdict, and
     // counting it would exhaust the review bound before a review had ever run.
-    expect(inconclusiveReviews([work('implement'), died('fix')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([work('implement-story'), died('fix')], 'P-001')).toBe(0);
   });
 
   it('is scoped to the card', () => {
@@ -256,7 +264,7 @@ describe('reviewsRun', () => {
   });
 
   it('does not count the work runs, or another card’s reviews', () => {
-    expect(reviewsRun([work('implement'), work('fix'), rev('done', 'P-002')], 'P-001')).toBe(0);
+    expect(reviewsRun([work('implement-story'), work('fix'), rev('done', 'P-002')], 'P-001')).toBe(0);
   });
 });
 

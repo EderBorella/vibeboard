@@ -116,14 +116,14 @@ describe('GET /api/autopilot/readiness', () => {
 
     const deleted = await app.inject({
       method: 'DELETE',
-      url: `/api/control/file?path=${encodeURIComponent(skillRel('implement', 'SKILL.md'))}`,
+      url: `/api/control/file?path=${encodeURIComponent(skillRel('implement-story', 'SKILL.md'))}`,
     });
     expect(deleted.statusCode).toBe(200);
 
     const r = await readiness(app);
     expect(r.ok).toBe(false);
-    expect(r.phases.problems.join(' ')).toContain('task-implement');
-    expect(r.phases.problems.join(' ')).toContain('"implement"');
+    expect(r.phases.problems.join(' ')).toContain('story-implement');
+    expect(r.phases.problems.join(' ')).toContain('"implement-story"');
     // Every one of them reaches the blocker list — the panel shows one list, not two.
     expect(r.blockers).toEqual(expect.arrayContaining(r.phases.problems));
   });

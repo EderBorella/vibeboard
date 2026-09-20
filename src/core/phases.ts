@@ -16,8 +16,7 @@ export type PhaseName =
   | 'feature-breakdown-skip'
   | 'story-breakdown'
   | 'story-breakdown-skip'
-  | 'task-implement'
-  | 'task-fix'
+  | 'story-implement'
   | 'story-fix'
   | 'story-review'
   | 'feature-checkup';
@@ -69,43 +68,37 @@ export const PHASES: readonly Phase[] = [
     exitPass: 'in-progress',
     bounded: 'none',
   },
+  // THE WORK OF A WHOLE STORY, IN ONE RUN (decision 83). It replaces the per-task implement and the per-task
+  // fix: one agent given a story and the tasks under it did three tasks' work in 18 turns and 50k of context
+  // against 41 turns and 148k, for equivalent code and equivalent defect detection.
+  //
+  // ON PRODUCT, and that is the whole of the change — the unit of work is the story, and the tasks under it
+  // are the record of what was asked rather than the thing dispatched. They stay on the board (the format is
+  // frozen) and are stamped `done` TOGETHER when this run succeeds: `Group` in core/actions.ts carries which
+  // ones and which columns, `settleGroup` in service/act/group.ts does the writing.
+  //
+  // `entry` AND `exitPass` ARE THE SAME COLUMN, and they are both declared rather than left out. A story is
+  // already in `in-progress` every time this phase is reached — `derivePosition` picks the open story out of
+  // `todo` or `in-progress`, and `storyPhase` has already skipped the break-down for either entering column
+  // — so both stamps are no-ops today and are written down for the day the derivation changes. Neither is
+  // WRITTEN while the card is already there: `stampEntry` in service/act/index.ts skips one and
+  // `afterCardRun` in service/act/outcomes.ts skips the other, because a move to where a card stands is a
+  // write for nothing and a diary line about an event that did not happen.
+  //
   // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
-  //
-  // `done` AND NOT `review` (decision 80). A task is finished when its work lands; the STORY is what gets
-  // judged, once every task under it is settled. Engineering's Review column stays in the scaffolder's
-  // defaults — the on-disk format is frozen — and is no longer a state the loop stamps.
-  //
-  // IT IS ALSO NO LONGER A COLUMN A CARD RESTS IN. A person may still drag one there, and the next tick
-  // stamps it `done` on this row: a stateless tick has no run and no judgement to read, so a task the old
-  // machine left behind and one dropped in a minute ago are the same board state. The alternative is a task
-  // nothing can settle, making its story unjudgeable for ever. `taskPhase` in core/lifecycle/tick.ts is
-  // where that happens and carries the same reason.
   {
-    name: 'task-implement',
-    skill: 'implement',
-    board: 'engineering',
+    name: 'story-implement',
+    skill: 'implement-story',
+    board: 'product',
     entry: 'in-progress',
-    exitPass: 'done',
-    bounded: 'skill',
-  },
-  // No entry stamp: its trigger is a task already in `in-progress`, so there is no move to make.
-  //
-  // TWO TRIGGERS, both of them outstanding failed verdicts rather than a judgement: the loop's OWN
-  // correctness refusal, where a run that left nothing behind earns one (`recordEmptyRun` in
-  // service/act/outcomes.ts); and a task the old machine left in `review` still carrying the send-back that
-  // put it there, because `taskPhase` asks for an outstanding verdict before it looks at any column. The
-  // judgement that used to write those is at the story now, and `story-fix` below is what answers that one.
-  {
-    name: 'task-fix',
-    skill: 'fix',
-    board: 'engineering',
-    exitPass: 'done',
+    exitPass: 'in-progress',
     bounded: 'skill',
   },
   // WHERE A SENT-BACK STORY'S WORK IS REDONE, and without it a refused judgement has nowhere to go: the
   // story sits settled in `in-progress` carrying a failed verdict, and every later tick re-stamps it to
-  // where it already is. The same shape `task-fix` has one level down, and the same SINGLE budget across
-  // both send-back kinds — a story the gates sent back and one the judge sent back spend one count.
+  // where it already is. ONE budget across both send-back kinds — a story the gates sent back and one the
+  // judge sent back spend one count — which is the whole of the bound now that the per-task fix it used to
+  // share that rule with has gone (decision 83).
   //
   // No `exitPass`: a fix does not close a story, the judge does. The story stays where it is, and the next
   // tick finds a work run carrying no verdict — which is the judgement's own trigger.

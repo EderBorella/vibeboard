@@ -104,6 +104,9 @@ describe('the phase skills the phase table names', () => {
     const { skills } = await readSkills(root, config);
     const boardsOf = (slug: string): string[] => skills.find((s) => s.slug === slug)?.boards ?? ['MISSING'];
     expect(boardsOf('derive-features')).toEqual(['features']);
+    // THE STORY'S, since the work moved up to it (decision 83). `implement` is still seeded — implementing
+    // one task by hand is a thing a person does — but no phase names it, so it is scoped like `execute`.
+    expect(boardsOf('implement-story')).toEqual(['product']);
     expect(boardsOf('implement')).toEqual(['engineering']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
     // The lifecycle's own, each scoped to the boards its phases sit on. `fix` is TWO phases since decision
@@ -291,6 +294,35 @@ describe('the lifecycle skills', () => {
     expect(prose.indexOf('user stories')).toBeGreaterThan(-1);
     expect(prose.indexOf('user stories')).toBeLessThan(prose.indexOf('tasks'));
     expect(prose.indexOf('**feature**')).toBeLessThan(prose.indexOf('user stories'));
+  });
+
+  // DECISION 83, AND THE THREE THINGS THE UNIT CHANGE TURNS ON. The wording IS the behaviour for a prompt,
+  // and each of these is a rule that has no other home: the run is told which tasks are its own by where
+  // they stand, ALL of them are required, and the gates are still the bar it must leave green.
+  it('tells implement-story which tasks are its own, and that all of them are required', () => {
+    // The column the loop stamps the group into, named as the thing to read — that stamp is the only way a
+    // run can be told, so a body that named no column would leave the ceiling unenforceable.
+    expect(body('implement-story')).toContain('`engineering/in-progress`');
+    expect(body('implement-story')).toContain('every one of them\nis required');
+    // AND THE ONES IT MUST LEAVE ALONE, which is what makes a story past the ceiling two runs rather than
+    // one bundled one.
+    expect(body('implement-story')).toContain("A task still in `backlog` is a\nlater run's");
+    // EVERY CRITERION, said as an obligation on the report: the tasks arrive as file paths, so "read them
+    // all" has to be stated or the run answers the story's own criterion and stops.
+    expect(body('implement-story')).toContain('naming each task by id with its acceptance criterion');
+  });
+
+  it('keeps the gate bar on the story’s implement, where the per-task one had it', () => {
+    expect(body('implement-story')).toContain('foundation/CODE-QUALITY.md are the bar');
+    expect(body('implement-story')).toContain('a run that leaves them failing has not\ndelivered');
+    // AND NAMES WHAT RUNNING THEM ONCE COSTS. Failure locality is the price of the merge, and a run that
+    // does not know that cannot keep track of which task broke the suite.
+    expect(body('implement-story')).toContain('not say which\ntask broke it');
+  });
+
+  it('tells implement-story to file what it finds rather than widen the story', () => {
+    expect(body('implement-story')).toContain('POST /api/suggestions');
+    expect(body('implement-story')).toMatch(/nothing more/i);
   });
 
   it('tells fix to address the findings and nothing else', () => {

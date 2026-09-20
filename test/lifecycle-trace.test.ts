@@ -93,7 +93,9 @@ async function seedSkillBodies(root: string, markers: Record<string, string>): P
 // What the shim reports for every skill the machine dispatches. The two break-downs are absent by design; the
 // rest say what this suite wants of them.
 const HAPPY = {
-  implement: '[[behaviour:success]]',
+  // THE STORY'S WORK IN ONE RUN (decision 83), which is why no `implement` appears anywhere below: the
+  // tasks are what this run is asked for and the loop settles them together when it ends.
+  'implement-story': '[[behaviour:success]]',
   // THE ONE JUDGEMENT A STORY GETS (decision 80), and it answers a verdict rather than an outcome — the
   // story checkup it absorbed did not, which is what makes the trace below three dispatches where it was
   // five.
@@ -472,15 +474,17 @@ for (const mode of MODES) {
         'move product/P-001 todo',
         'move product/P-001 in-progress',
         'ran P-001 break-down',
+        // DECISION 83: ONE RUN, AND BOTH TASKS. They are claimed together before the dispatch — which is how
+        // the run is told which tasks are its own — and settled together after it, so there is no window in
+        // which the story is half-closed. No per-task dispatch, and the run line names the STORY.
+        //
+        // DECISION 80 still: a task is finished when its work lands, and nothing is stamped into the Review
+        // column at all — what gets judged is the story, once every task under it is settled.
         'move engineering/E-001 in-progress',
-        // DECISION 80: a task is finished when its work lands. No per-task review, and nothing stamped into
-        // the Review column at all — what gets judged is the story, once every task under it is settled.
-        'move engineering/E-001 done',
-        'ran E-001 implement',
-        // E-002 the same shape, and only after E-001 is done: one task at a time.
         'move engineering/E-002 in-progress',
+        'move engineering/E-001 done',
         'move engineering/E-002 done',
-        'ran E-002 implement',
+        'ran P-001 implement-story',
         // AND THEN THE ONE JUDGEMENT, which closes the story and absorbs what the story checkup asked.
         'move product/P-001 done',
         'review P-001 pass',
@@ -497,7 +501,7 @@ for (const mode of MODES) {
         'ran P-002 break-down',
         'move engineering/E-003 in-progress',
         'move engineering/E-003 done',
-        'ran E-003 implement',
+        'ran P-002 implement-story',
         'move product/P-002 done',
         'review P-002 pass',
         'smoke F-002 pass',
@@ -506,19 +510,20 @@ for (const mode of MODES) {
         'stopped complete',
       ]);
 
-      // THE COST, WHICH IS THE POINT OF DECISION 80. Two tasks under P-001 used to cost five dispatches —
-      // implement, review, implement, review, checkup — and cost three here.
+      // THE COST, WHICH IS THE POINT OF DECISIONS 80 AND 83. Two tasks under P-001 cost five dispatches
+      // before either — implement, review, implement, review, checkup — three after the judgement moved up,
+      // and two here: one run that does both tasks, and the one judgement.
       expect(await dispatches(started.project, started.argsLog)).toEqual([
         'dispatch project derive-features',
         'dispatch F-001 break-down in features/todo',
         'dispatch P-001 break-down in product/todo',
-        'dispatch E-001 implement in engineering/in-progress',
-        'dispatch E-002 implement in engineering/in-progress',
+        // THE STORY, in the column it is judged from: no entry stamp was needed and none was written.
+        'dispatch P-001 implement-story in product/in-progress',
         'dispatch P-001 review-story in product/in-progress',
         'dispatch F-001 checkup-feature in features/in-progress',
         'dispatch F-002 break-down in features/todo',
         'dispatch P-002 break-down in product/todo',
-        'dispatch E-003 implement in engineering/in-progress',
+        'dispatch P-002 implement-story in product/in-progress',
         'dispatch P-002 review-story in product/in-progress',
         'dispatch F-002 checkup-feature in features/in-progress',
       ]);
@@ -557,8 +562,8 @@ for (const mode of MODES) {
       // TO THE END OF THE FIRST FEATURE only. The harness feature is walked after it — its own trace is the
       // subject of the test above — and this one is about the send-back, which happens once.
       const upTo = traced.indexOf('ran F-001 checkup-feature');
-      expect(traced.slice(traced.indexOf('ran E-001 implement'), upTo + 1)).toEqual([
-        'ran E-001 implement',
+      expect(traced.slice(traced.indexOf('ran P-001 implement-story'), upTo + 1)).toEqual([
+        'ran P-001 implement-story',
         // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
         // AND NO MOVE WITH IT (decision 80): `in-progress` is where a story stands while it is judged, so a
         // send-back's destination is where it already is — a stamp there would be a diary line about an
@@ -694,7 +699,12 @@ for (const mode of MODES) {
     // which is exactly why none of them could see this.
     it('blocks a story that arrived with its tasks and cannot pass its gates', async () => {
       const started = await start({ gates: `echo ran >> ${GATE_LOG}; exit 1` });
-      const task = await place(started.project, 'engineering', 'backlog', 'A task');
+      // THE TASK ARRIVES DONE, which is what keeps this shape reachable at all since the work moved up to
+      // the story (decision 83). A story carrying an OUTSTANDING task now gets an implement run of its own
+      // first, and that run is a record the verdict can land on — so the hole decision 82 is about is the
+      // board where every task under the story is already settled: an import, or a person who finished the
+      // work by hand. The skip, no work run, and the gates running before any dispatch.
+      const task = await place(started.project, 'engineering', 'done', 'A task');
       const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
       await place(started.project, 'features', 'backlog', 'A feature', [story]);
 
@@ -722,9 +732,8 @@ for (const mode of MODES) {
       expect((await trace(started.project)).slice(1)).toEqual([
         'move features/F-001 in-progress',
         'move product/P-001 in-progress',
-        'move engineering/E-001 in-progress',
-        'move engineering/E-001 done',
-        'ran E-001 implement',
+        // No implement run: the one task under this story arrived settled, so there is no outstanding work
+        // and the story goes straight to its judgement carrying no record of any kind.
         // The gate refuses a story with nothing on it to record the refusal against, and the fix goes anyway.
         'gates P-001 fail',
         'ran P-001 fix',
@@ -748,6 +757,9 @@ for (const mode of MODES) {
     // feature — one gate run and one review, with no fix anywhere.
     it('closes a story that arrived with its tasks and passes its gates first time', async () => {
       const started = await start();
+      // OUTSTANDING, unlike its neighbour above: this is the imported board whose work has NOT been done,
+      // so the story's own implement run is dispatched for it — and that run is then the record the
+      // judgement lands on, which is the ordinary path rather than decision 81's.
       const task = await place(started.project, 'engineering', 'backlog', 'A task');
       const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
       await place(started.project, 'features', 'backlog', 'A feature', [story]);
@@ -763,9 +775,8 @@ for (const mode of MODES) {
         'move product/P-001 in-progress',
         'move engineering/E-001 in-progress',
         'move engineering/E-001 done',
-        'ran E-001 implement',
-        // One judgement, and the verdict lands on the review's own record because there is no work run
-        // (decision 81) — which is what lets the story close rather than be judged again.
+        'ran P-001 implement-story',
+        // One judgement, and the verdict lands on the implement run the story now has of its own.
         'move product/P-001 done',
         'review P-001 pass',
         'smoke F-001 pass',
@@ -778,7 +789,7 @@ for (const mode of MODES) {
       expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual([
         'F-001 checkup-feature',
         'P-001 review-story',
-        'E-001 implement',
+        'P-001 implement-story',
       ]);
       expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
       await assertHierarchy(started.project);
@@ -858,10 +869,11 @@ for (const mode of MODES) {
         'move product/P-002 in-progress',
         'ran P-002 break-down',
         // And L3 under that, on the task the sibling's own break-down produced — the whole vertical below a card
-        // no phase would ever have reached if it were hung off its sibling.
+        // no phase would ever have reached if it were hung off its sibling. The run is the STORY's and the
+        // task is claimed and settled by it (decision 83).
         'move engineering/E-002 in-progress',
         'move engineering/E-002 done',
-        'ran E-002 implement',
+        'ran P-002 implement-story',
       ]);
       await assertHierarchy(started.project);
     });

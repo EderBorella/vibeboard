@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Spend } from '../src/core/accounting.js';
+import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { decideTick, type TickInput } from '../src/core/lifecycle/tick.js';
 import { type RunRecord, type RunStatus, withVerification } from '../src/core/runs.js';
@@ -792,19 +793,16 @@ const gates = (passed: boolean): Verification =>
     ? { mode: 'gates', passed: true, at: 'T' }
     : { mode: 'gates', passed: false, at: 'T', command: 'npm test', output: '1 failing' };
 
-const work = (skill: 'implement' | 'fix', cardId = 'E-001'): RunRecord =>
-  run(cardId, 'engineering', skill, 'success');
+// THE STORY'S OWN WORK RUNS: its break-down, the implement that does the tasks under it (decision 83) and
+// the fix that answers a send-back. All three are `bounded: 'skill'` phases on product, which is what
+// `isWorkRun` reads — so these are what a story-level verdict lands on and what `latestWorkRun` answers
+// with. There is no engineering equivalent any more: no phase sits on that board.
+type StorySkill = 'break-down' | 'implement-story' | 'fix';
 
-const judged = (skill: 'implement' | 'fix', passed: boolean, cardId = 'E-001'): RunRecord =>
-  withVerification(work(skill, cardId), gates(passed));
-
-// THE STORY'S OWN WORK RUNS (decision 80): its break-down, and the fix that answers a send-back. Both are
-// `bounded: 'skill'` phases on product, which is what `isWorkRun` reads — so these are what a story-level
-// verdict lands on and what `latestWorkRun` answers with.
-const storyWork = (skill: 'break-down' | 'fix', cardId = 'P-001'): RunRecord =>
+const storyWork = (skill: StorySkill, cardId = 'P-001'): RunRecord =>
   run(cardId, 'product', skill, 'success');
 
-const storyJudged = (skill: 'break-down' | 'fix', passed: boolean, cardId = 'P-001'): RunRecord =>
+const storyJudged = (skill: StorySkill, passed: boolean, cardId = 'P-001'): RunRecord =>
   withVerification(storyWork(skill, cardId), gates(passed));
 
 // A judgement that answered, and one that did not. Only the second kind counts towards the review bound.
@@ -833,18 +831,37 @@ const story = (taskIds: string[]): Card[] => [
   card('P-001', 'product', 'in-progress', 10, ['F-001', ...taskIds]),
 ];
 
-describe('decideTick — the task loop', () => {
-  it('stamps a backlog task into in-progress and dispatches implement', () => {
+// THE IDS OF THE TASKS ONE DISPATCH WAS ASKED FOR, which is the whole subject below: the group is what
+// makes "one run per story" different from "one run per task" with the same phase name on it.
+const groupOf = (action: TickAction): string[] =>
+  action.kind === 'dispatch' ? (action.group?.cards ?? []).map((c: Card) => c.id) : [];
+
+describe("decideTick — the story's work", () => {
+  it("dispatches the story's implement, and asks it for the task in the backlog", () => {
     const cards = [...story(['E-001']), task('E-001', 'backlog')];
     const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-implement', skill: 'implement' });
-    expect(action.kind === 'dispatch' && action.card?.id).toBe('E-001');
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', skill: 'implement-story' });
+    // THE STORY, not the task. A run scoped to one task is what decision 83 costs out of the machine.
+    expect(action.kind === 'dispatch' && action.card?.id).toBe('P-001');
+    expect(groupOf(action)).toEqual(['E-001']);
+  });
+
+  // THE TWO COLUMNS COME FROM THE TICK, because deciding which slug means "being worked" and which means
+  // "finished" is the machine's job and the executor holds no decisions of its own. `settled` is read off
+  // the config's own `terminal` list rather than written here.
+  it('names where the tasks are claimed and where they are settled', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const action = decideTick(input({ cards }));
+    expect(action.kind === 'dispatch' && action.group).toMatchObject({
+      entry: 'in-progress',
+      settled: 'done',
+    });
   });
 
   it('takes tasks in (order, then id)', () => {
     // Only `order` can decide this: E-002 sorts first by number and last by order.
     const cards = [...story(['E-001', 'E-002']), task('E-001', 'backlog', 20), task('E-002', 'backlog', 10)];
-    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'dispatch', card: { id: 'E-002' } });
+    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-002', 'E-001']);
   });
 
   // THE OTHER HALF OF THE NAME ABOVE, and it was missing. That test varies `order` alone, so the
@@ -856,89 +873,140 @@ describe('decideTick — the task loop', () => {
   // creates, and a break-down that creates two tasks in one round gives them the same number.
   it('breaks an equal order by id, so the queue is not left to sort stability', () => {
     // THE PRE-SORT ORDER COMES FROM THE PARENT'S `links`, not from this array: `childrenOf` maps over
-    // `card.links`. So the story lists E-002 first, which is what makes a comparator returning 0 pick
-    // E-002 and the id tie-break pick E-001. Listing the task cards in a different order proves
-    // nothing — the first version of this test did exactly that and passed with the tie-break deleted.
+    // `card.links`. So the story lists E-002 first, which is what makes a comparator returning 0 put
+    // E-002 first and the id tie-break put E-001 there instead.
     const cards = [...story(['E-002', 'E-001']), task('E-001', 'backlog', 10), task('E-002', 'backlog', 10)];
-    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'dispatch', card: { id: 'E-001' } });
+    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-001', 'E-002']);
   });
 
-  it('finishes one task before starting the next', () => {
-    // The trace's own shape: E-001 goes all the way to done before E-002 is picked up.
+  // WHAT DECISION 83 CHANGES, in one assertion. This test read "finishes one task before starting the
+  // next" and asserted a dispatch against E-001 alone: a task went all the way to done before the next was
+  // picked up, at one cold start each. One run is given both.
+  it('gives one run every unsettled task, rather than one at a time', () => {
     const cards = [
       ...story(['E-001', 'E-002']),
       task('E-001', 'in-progress', 10),
       task('E-002', 'backlog', 20),
     ];
     const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-implement', card: { id: 'E-001' } });
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', card: { id: 'P-001' } });
+    expect(groupOf(action)).toEqual(['E-001', 'E-002']);
   });
 
-  // A TASK THE OLD MACHINE LEFT IN `review`, which is every board mid-flight when decision 80 landed. Its
-  // work is on the tree, and that is all `done` means for a task now — so it settles rather than making its
-  // story unjudgeable for ever. Without this the board stalls: `review` is neither terminal nor blocked, so
-  // `allSettled` is false and the story never reaches its own judgement.
-  it('settles a task the old machine left in review, so its story can be judged', () => {
+  // AND A SETTLED TASK IS NOT WORK. A run is asked for what is outstanding and nothing else, or a story
+  // dispatched twice would pay for the first group's work again in the second.
+  it('leaves out a task that is already done, and one that is blocked', () => {
+    const cards = [
+      ...story(['E-001', 'E-002', 'E-003']),
+      task('E-001', 'done', 10),
+      task('E-002', 'blocked', 20),
+      task('E-003', 'backlog', 30),
+    ];
+    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-003']);
+  });
+
+  // A TASK THE OLD MACHINE LEFT IN `review`, which is every board mid-flight when the judgement moved up.
+  // It used to be stamped `done` on the strength of its column alone; there is no per-task row to stamp it
+  // from now, and `review` is neither terminal nor blocked — so it is outstanding work, and the story's run
+  // is given it like any other task. A run handed work that has already landed says so and costs a reading
+  // of one card; leaving it unsettled would make its story unjudgeable for ever.
+  it('gives a task the old machine left in review to the story’s run, rather than stranding it', () => {
     const cards = [...story(['E-001']), task('E-001', 'review')];
-    expect(decideTick(input({ cards, runs: [work('implement')] }))).toMatchObject({
-      kind: 'stamp',
-      phase: 'task-implement',
-      to: 'done',
-      card: { id: 'E-001' },
-    });
+    const action = decideTick(input({ cards, runs: [storyWork('break-down')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement' });
+    expect(groupOf(action)).toEqual(['E-001']);
   });
 
-  // AND SO IS ONE A PERSON DRAGGED THERE A MINUTE AGO, which is the same branch and cannot be anything else:
-  // a stateless tick has no run and no judgement to read, so "left by the old machine" and "just dropped in"
-  // are one board state. Pinned because the trade is deliberate rather than overlooked — the alternative is a
-  // task nothing can settle, making its story unjudgeable for ever.
-  it('settles a task in review that has no run at all, because nothing can tell the two apart', () => {
+  it('gives a task a person dragged into review the same treatment, with no run on the board at all', () => {
     const cards = [...story(['E-001']), task('E-001', 'review')];
-    expect(decideTick(input({ cards }))).toMatchObject({
-      kind: 'stamp',
-      phase: 'task-implement',
-      to: 'done',
-      card: { id: 'E-001' },
-    });
+    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-001']);
   });
 
-  it('dispatches implement for a task in in-progress with no verdict on record', () => {
-    // A crashed dispatch left it there; it has not been sent back, so it is still implement's phase.
+  it('dispatches the story’s implement for a task a crashed run left in in-progress', () => {
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    expect(decideTick(input({ cards, runs: [work('implement')] }))).toMatchObject({
-      kind: 'dispatch',
-      phase: 'task-implement',
-    });
+    const action = decideTick(input({ cards, runs: [storyWork('break-down')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement' });
+    expect(groupOf(action)).toEqual(['E-001']);
   });
 
-  // THE ONE SEND-BACK A TASK STILL HAS: the loop's own correctness refusal. A run that left nothing behind
-  // earns a failed verdict (`recordEmptyRun` in service/act/outcomes.ts) and that is now the only way a task
-  // reaches `fix` — the judgement that used to send it back is the story's.
-  it('dispatches fix for a task whose run left a failed verdict behind', () => {
+  // THE LOOP'S OWN CORRECTNESS REFUSAL, one level up. A run that left nothing behind earns a failed verdict
+  // (`recordEmptyRun` in service/act/outcomes.ts), and that verdict now lands on the STORY's own run. It
+  // does not buy a fix: the tasks are still outstanding, so the story's implement is what is dispatched
+  // again, under its own cap — a fix handed a run that produced nothing has no finding to address.
+  it('retries the story’s implement when a run left nothing behind, rather than spending a fix', () => {
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    const failed = judged('implement', false);
-    const action = decideTick(input({ cards, runs: [failed] }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-fix', skill: 'fix' });
-    // The run carrying the findings, so the fix is handed the evidence rather than told to look.
-    expect(action.kind === 'dispatch' && action.previous).toBe(failed.run);
+    const empty = storyJudged('implement-story', false);
+    const action = decideTick(input({ cards, runs: [empty] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', skill: 'implement-story' });
   });
 
-  it('blocks a task that has used every fix attempt, and does not stop the loop', () => {
-    const cards = [...story(['E-001', 'E-002']), task('E-001', 'in-progress'), task('E-002', 'backlog', 20)];
-    const runs = [judged('implement', false), ...threeRunsOf('E-001', 'engineering', 'fix')];
-    expect(decideTick(input({ cards, runs }))).toMatchObject({
-      kind: 'stamp',
-      phase: 'task-fix',
-      to: 'blocked',
-    });
-  });
-
-  it('settles a task at the implement cap anyway', () => {
-    // Section 5: the gates and the judge take it as it stands, and since decision 80 both of those run over
-    // the STORY — which a settled task is what lets reach them. NOT blocked, and NOT a stop.
+  // AT THE CAP THE STORY IS BLOCKED AND THE LOOP CARRIES ON (decision 45). The per-task implement it
+  // replaces settled its task instead and let the gates and the judge take it as it stood — there is no
+  // card below the story to settle now, and a story sits among siblings exactly as a task did, so blocking
+  // costs one story where stopping costs every feature queued behind it.
+  it('blocks a story that has used every implement attempt, and does not stop the loop', () => {
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    const runs = threeRunsOf('E-001', 'engineering', 'implement');
-    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'done' });
+    const runs = threeRunsOf('P-001', 'product', 'implement-story');
+    const action = decideTick(input({ cards, runs }));
+    expect(action).toMatchObject({ kind: 'stamp', phase: 'story-implement', to: 'blocked' });
+    // The clause is this branch's own: "nothing under it" is the break-down's, and a shared phrase is how
+    // a phase added to the blocking list once changed the answer with no test able to tell.
+    expect(action.kind === 'stamp' && action.why).toContain('still has tasks nothing has finished');
+  });
+
+  // RULING 59 AT THE NEW BLOCKING POINT. Product gained its blocked column on 2026-08-13 with no migration,
+  // and a column IS a folder — so an unguarded stamp does not fail, it creates a folder `readBoard` never
+  // looks in and the story disappears. Every caller of the blocking branch has to ask, which is why one
+  // function asks it.
+  it('stops stalled, naming the missing column, rather than blocking a story on a board without one', () => {
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const runs = threeRunsOf('P-001', 'product', 'implement-story');
+    const action = decideTick(input({ cards, runs, columns: WITHOUT_PRODUCT_BLOCKED }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-001');
+    expect(detailOf(action)).toContain('no blocked column');
+    expect(detailOf(action)).toContain('Add a blocked column');
+  });
+});
+
+// THE CEILING ON WHAT ONE RUN IS ASKED FOR, and the thing it exists to stop: the experiment measured three
+// tasks and eighteen turns, which is the cheap part of the cost-per-turn curve. A story with eight tasks is
+// a run nobody has costed, so it is dispatched in groups instead of bundled.
+describe('decideTick — how much work one run is given', () => {
+  const many = (n: number): Card[] => [
+    card('F-001', 'features', 'in-progress', 10, ['P-001']),
+    card('P-001', 'product', 'in-progress', 10, [
+      'F-001',
+      ...Array.from({ length: n }, (_, i) => `E-00${i + 1}`),
+    ]),
+    ...Array.from({ length: n }, (_, i) => task(`E-00${i + 1}`, 'backlog', (i + 1) * 10)),
+  ];
+
+  it('gives one run every task of a story that is under the ceiling', () => {
+    expect(groupOf(decideTick(input({ cards: many(5) })))).toEqual([
+      'E-001',
+      'E-002',
+      'E-003',
+      'E-004',
+      'E-005',
+    ]);
+  });
+
+  it('gives a bigger story the first group only, and leaves the rest for the next run', () => {
+    const action = decideTick(input({ cards: many(7) }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement' });
+    expect(groupOf(action)).toEqual(['E-001', 'E-002', 'E-003', 'E-004', 'E-005']);
+    expect(groupOf(action)).not.toContain('E-006');
+    expect(groupOf(action)).not.toContain('E-007');
+  });
+
+  // AND THE SECOND GROUP IS WHAT IS LEFT. The board is the whole of the state: the first group is settled
+  // when its run succeeds, and what is still outstanding is the next run's.
+  it('gives the next run what the first group left', () => {
+    const cards = many(7).map((c) =>
+      ['E-001', 'E-002', 'E-003', 'E-004', 'E-005'].includes(c.id) ? { ...c, columnSlug: 'done' } : c,
+    );
+    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-006', 'E-007']);
   });
 });
 

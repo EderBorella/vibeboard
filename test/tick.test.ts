@@ -718,6 +718,29 @@ describe('decideTick — the story loop', () => {
     });
   });
 
+  // AND A SEND-BACK THAT WAS ANSWERED IS NOT A SECOND ASK (decision 81). Decision 80 gave the judgement an
+  // `exitFail`, so a second review is now the ORDINARY path — and the seeded `review-story` skill lets one
+  // run create a sibling and send the story back together. The bound above then fired on a story that was
+  // making progress, with two of its three fix attempts still unspent, and stopped the whole project.
+  //
+  // THE FIX RUN BETWEEN THEM IS WHAT SEPARATES THE TWO CASES, and a feature has no fix phase at all — which
+  // is what leaves the feature checkup's bound exactly where decision 47 put it.
+  it('judges a story again after a fix answered the send-back, creating round or not', () => {
+    const creating = answered('sent-back');
+    const fix = run('P-001', 'product', 'fix', 'success');
+    const second = answered('sent-back');
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    expect(decideTick(input({ cards, runs: [creating, fix, second] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-review',
+    });
+  });
+
   // THE FIXTURE MUST HAVE TWO TASKS: with one, "all settled" and "any settled" are the same answer.
   it('does not dispatch story-review while one of two tasks is unsettled', () => {
     const cards = [
@@ -791,6 +814,19 @@ const answered = (verdict: 'done' | 'sent-back', cardId = 'P-001'): RunRecord =>
 });
 const inconclusive = (cardId = 'P-001'): RunRecord => run(cardId, 'product', 'review-story', 'failed');
 
+// A JUDGEMENT CARRYING ITS OWN VERDICT, which is where one goes when the story has no work run to hang it
+// on (decision 81). `by` is the run itself, exactly as `reviewStory` writes it in that case.
+const selfRecorded = (passed: boolean, cardId = 'P-001'): RunRecord => {
+  const judging = answered(passed ? 'done' : 'sent-back', cardId);
+  return withVerification(judging, {
+    mode: 'review',
+    passed,
+    at: 'T',
+    by: judging.run,
+    ...(passed ? {} : { reason: 'the flag is not parsed' }),
+  });
+};
+
 // The story that owns the tasks, in progress with its break-down done.
 const story = (taskIds: string[]): Card[] => [
   card('F-001', 'features', 'in-progress', 10, ['P-001']),
@@ -845,6 +881,20 @@ describe('decideTick — the task loop', () => {
   it('settles a task the old machine left in review, so its story can be judged', () => {
     const cards = [...story(['E-001']), task('E-001', 'review')];
     expect(decideTick(input({ cards, runs: [work('implement')] }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'task-implement',
+      to: 'done',
+      card: { id: 'E-001' },
+    });
+  });
+
+  // AND SO IS ONE A PERSON DRAGGED THERE A MINUTE AGO, which is the same branch and cannot be anything else:
+  // a stateless tick has no run and no judgement to read, so "left by the old machine" and "just dropped in"
+  // are one board state. Pinned because the trade is deliberate rather than overlooked — the alternative is a
+  // task nothing can settle, making its story unjudgeable for ever.
+  it('settles a task in review that has no run at all, because nothing can tell the two apart', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    expect(decideTick(input({ cards }))).toMatchObject({
       kind: 'stamp',
       phase: 'task-implement',
       to: 'done',
@@ -917,6 +967,73 @@ describe('decideTick — the story judgement', () => {
     const action = decideTick(input({ cards: settledStory() }));
     expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
     expect(action.kind === 'dispatch' && action.previous).toBeUndefined();
+  });
+
+  // AND THAT JUDGEMENT HAS SOMEWHERE TO LAND (decision 81). The review run is itself a record, so a story
+  // with none of its own carries the verdict on the review that gave it. Without that the send-back was
+  // written nowhere: every later tick read no verdict, dispatched the judgement again, and `story-fix` was
+  // unreachable — four paid reviews for one answer, and then a project-wide stop over a card the loop had a
+  // budget to fix.
+  it('fixes a story the review sent back when the verdict is on the review run itself', () => {
+    const refused = selfRecorded(false);
+    const action = decideTick(input({ cards: settledStory(), runs: [refused] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix', skill: 'fix' });
+    // The findings are on the review, so the review is what the fix is handed.
+    expect(action.kind === 'dispatch' && action.previous).toBe(refused.run);
+  });
+
+  // P4r THROUGH THE SAME LOOKUP: a judgement that passed and whose move failed is re-stamped rather than
+  // paid for twice, whichever record the verdict ended up on.
+  it('re-stamps a story whose review passed it with the verdict on the review run itself', () => {
+    expect(decideTick(input({ cards: settledStory(), runs: [selfRecorded(true)] }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-review',
+      to: 'done',
+    });
+  });
+
+  // AND THE WORK RUN WINS THE MOMENT THERE IS ONE, which is what pins the ORDER of the two lookups. Read the
+  // other way round the story would be fixed again after every fix, on a send-back the fix had answered.
+  it('judges the fix rather than the review once a fix has answered the send-back', () => {
+    const fixed = storyWork('fix');
+    const action = decideTick(input({ cards: settledStory(), runs: [selfRecorded(false), fixed] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.previous).toBe(fixed.run);
+  });
+
+  // AND THE BUDGET IS THE CARD'S. A send-back recorded on the review spends the same three fixes as one
+  // recorded on a work run, and running out leaves the STORY blocked with the loop carrying on.
+  it('blocks a story sent back by a review-carried verdict once its fix budget is spent', () => {
+    const runs = [
+      selfRecorded(false),
+      run('P-001', 'product', 'fix', 'failed'),
+      run('P-001', 'product', 'fix', 'failed'),
+      storyJudged('fix', false),
+    ];
+    expect(decideTick(input({ cards: settledStory(), runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-fix',
+      to: 'blocked',
+    });
+  });
+
+  // THE OTHER HALF OF RULING 59, and it was missing here. `capReached` refuses to stamp a column the board
+  // has not got; `fixPhase` stamped it unconditionally, which was harmless while `fix` was engineering-only
+  // and is not now that `story-fix` puts one on PRODUCT — the board with no migration. A column is a folder,
+  // so the stamp did not fail: it created one product's config does not name and the story vanished from
+  // `readBoard`, reported as `Unknown column` every tick in place of the remedy.
+  it('stops stalled, naming the missing column, rather than blocking a story on a board without one', () => {
+    const runs = [
+      storyJudged('break-down', false),
+      run('P-001', 'product', 'fix', 'failed'),
+      run('P-001', 'product', 'fix', 'failed'),
+      storyJudged('fix', false),
+    ];
+    const action = decideTick(input({ cards: settledStory(), runs, columns: WITHOUT_PRODUCT_BLOCKED }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-001');
+    expect(detailOf(action)).toContain('no blocked column');
+    expect(detailOf(action)).toContain('Add a blocked column');
   });
 
   // "HAS THIS ALREADY BEEN DONE" — the row that stops a second judgement being paid for.

@@ -187,7 +187,7 @@ describe('the story judgement', () => {
     expect(r.requests[0]?.review).toEqual({ gatesPassed: true, setupSubtree: true });
   });
 
-  it('writes the review verdict onto the run it judged, never onto the review run', async () => {
+  it('writes the review verdict onto the run it judged rather than onto the review run', async () => {
     const r = recorder({ settle: [reviewRun({ verdict: 'done', summary: 'does what the card asked' })] });
     await reviewStory(
       deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
@@ -200,6 +200,47 @@ describe('the story judgement', () => {
     expect(r.verdicts[0]).toMatchObject({ run: 'WORK-1', mode: 'review', passed: true, by: 'REV-1' });
     // The findings travel with the verdict: a `fix` run is handed this, not told to go and look.
     expect(r.verdicts[0]?.reason).toContain('does what the card asked');
+    expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
+  });
+
+  // THE SAME ACTION WITH NOTHING TO WRITE ONTO. A story that skipped its break-down because it arrived
+  // carrying tasks (decision 50) has no work run of its own, so the tick names none.
+  const noWorkRun = (): ReturnType<typeof REVIEW> => ({
+    kind: 'dispatch',
+    phase: 'story-review',
+    skill: 'review-story',
+    card: STORY(),
+  });
+
+  // AND THEN THE REVIEW'S OWN RECORD IS WHERE IT GOES (decision 81). Writing it nowhere is what made the
+  // send-back invisible: the next tick saw no verdict, judged again, and the story never reached `story-fix`
+  // — four paid reviews and then a stop that blamed this server for a write it had never been asked to make.
+  it('writes the verdict onto the review run itself when the story has no work run', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'sent-back', summary: 'the flag is not parsed' })] });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      noWorkRun(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.verdicts).toHaveLength(1);
+    expect(r.verdicts[0]).toMatchObject({ run: 'REV-1', mode: 'review', passed: false, by: 'REV-1' });
+    expect(r.verdicts[0]?.reason).toContain('the flag is not parsed');
+    // Still no move: `in-progress` is where a story stands while it is judged.
+    expect(r.moves).toEqual([]);
+  });
+
+  it('closes a story with no work run on a verdict recorded the same way', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done', summary: 'does what the card asked' })] });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      noWorkRun(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.verdicts[0]).toMatchObject({ run: 'REV-1', passed: true });
     expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
   });
 

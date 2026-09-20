@@ -73,8 +73,13 @@ export const PHASES: readonly Phase[] = [
   //
   // `done` AND NOT `review` (decision 80). A task is finished when its work lands; the STORY is what gets
   // judged, once every task under it is settled. Engineering's Review column stays in the scaffolder's
-  // defaults and is simply no longer a state the loop stamps — the on-disk format is frozen, and a person
-  // dragging a card into it is still allowed to.
+  // defaults — the on-disk format is frozen — and is no longer a state the loop stamps.
+  //
+  // IT IS ALSO NO LONGER A COLUMN A CARD RESTS IN. A person may still drag one there, and the next tick
+  // stamps it `done` on this row: a stateless tick has no run and no judgement to read, so a task the old
+  // machine left behind and one dropped in a minute ago are the same board state. The alternative is a task
+  // nothing can settle, making its story unjudgeable for ever. `taskPhase` in core/lifecycle/tick.ts is
+  // where that happens and carries the same reason.
   {
     name: 'task-implement',
     skill: 'implement',
@@ -85,9 +90,11 @@ export const PHASES: readonly Phase[] = [
   },
   // No entry stamp: its trigger is a task already in `in-progress`, so there is no move to make.
   //
-  // Its one remaining trigger is the loop's OWN correctness refusal — a run that left nothing behind earns
-  // a failed verdict (`recordEmptyRun` in service/act/outcomes.ts). The judgement that used to send a task
-  // back is at the story now, and `story-fix` below is what answers that one.
+  // TWO TRIGGERS, both of them outstanding failed verdicts rather than a judgement: the loop's OWN
+  // correctness refusal, where a run that left nothing behind earns one (`recordEmptyRun` in
+  // service/act/outcomes.ts); and a task the old machine left in `review` still carrying the send-back that
+  // put it there, because `taskPhase` asks for an outstanding verdict before it looks at any column. The
+  // judgement that used to write those is at the story now, and `story-fix` below is what answers that one.
   {
     name: 'task-fix',
     skill: 'fix',

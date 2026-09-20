@@ -5,7 +5,7 @@ import type { Verification } from '../../core/verify.js';
 import { verifyGates } from '../../exec/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
-import { CHECKUP_PHASES, checkupEvidence, refuseWhileGateDocumentUnread } from './checkup.js';
+import { checkupEvidence, refuseWhileGateDocumentUnread } from './checkup.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused, stop } from './refusals.js';
 import { failedRunLine, gatesLine, inconclusiveLine, reviewLine } from './sentences.js';
@@ -90,9 +90,10 @@ async function judge(
   const p = phase('story-review');
   const skill = p.skill;
   if (skill === undefined) return { dispatches: 0 };
-  const gathered = CHECKUP_PHASES.includes(action.phase)
-    ? await checkupEvidence(deps, action, card, context)
-    : {};
+  // UNCONDITIONALLY, because this function is only ever reached for `story-review` — the caller in
+  // act/index.ts routes on that name. The `CHECKUP_PHASES` test that used to stand here could not be false,
+  // and a branch that cannot be false reads as one that can.
+  const gathered = await checkupEvidence(deps, action, card, context);
   if (gathered.refused) return gathered.refused;
   const started = await deps.client.dispatch({
     board: card.board,
@@ -102,6 +103,8 @@ async function judge(
     // what `setupSubtree` says. The prompt renders the setup wording in preference, so it never claims a
     // suite is green when there was none to run.
     review: { gatesPassed: true, setupSubtree },
+    // `evidence` is optional because the REFUSAL shares this return shape, and the line above has already
+    // taken that case out; the compiler cannot see it, so the spread stays.
     ...(gathered.evidence === undefined ? {} : { checkup: gathered.evidence }),
   });
   if (!started.ok) {
@@ -152,38 +155,52 @@ async function judge(
     by: settled.run,
     ...(settled.summary ? { reason: settled.summary } : {}),
   };
-  return await recordVerdict(deps, card, action.previous, verification, passed ? p.exitPass : p.exitFail, {
-    why: passed ? 'its review passed it.' : 'its review sent it back with findings.',
-    line: reviewLine(card, settled, passed, context),
-    dispatches: 1,
-    iteration: context.iteration + 1,
-  });
+  // ONTO THE RUN IT JUDGED, or onto ITSELF when there was none (decision 81). A story that skipped its
+  // break-down because it arrived carrying tasks has no work run, so the tick names none — and writing the
+  // verdict nowhere is what made the send-back invisible: the next tick read no verdict, judged again, and
+  // `story-fix` was never reached. A review run is a record like any other, and this is its own answer.
+  return await recordVerdict(
+    deps,
+    card,
+    action.previous ?? settled.run,
+    verification,
+    passed ? p.exitPass : p.exitFail,
+    {
+      why: passed ? 'its review passed it.' : 'its review sent it back with findings.',
+      line: reviewLine(card, settled, passed, context),
+      dispatches: 1,
+      iteration: context.iteration + 1,
+    },
+  );
 }
 
 // A VERDICT WRITTEN ONTO THE RUN IT JUDGES, and then the move that verdict decides. One function for both
 // kinds — a gate's and a judge's — because the ORDER is the behaviour and must not be written twice: the
 // verdict is recorded first, so a card that moved is always a card whose reason is on disk.
 //
-// `workRun` IS OPTIONAL, and the absent case is real rather than defensive: a story whose tasks were made by
-// hand, or one that skipped its break-down because it arrived with them attached, has no work run of its own
-// (`judgeStory` in core/lifecycle/tick.ts dispatches it anyway rather than leaving it unsettled for ever).
-// There is then nowhere to record a verdict, so the move is made on its own — a pass closes the story exactly
-// as the story checkup used to, and a send-back is caught by the review total, which is the bound written for
-// a verdict that cannot be recorded.
+// `onto` IS THE RUN THE VERDICT LANDS ON: the work run the judgement was about, or — for a story that has
+// none, because it skipped its break-down having arrived with tasks attached — the review's own record
+// (decision 81). The caller decides which; this writes it.
+//
+// STILL OPTIONAL, and the one remaining absent case is the GATES path on such a story: the gates run before
+// any dispatch, so when they fail there is no review record either and nothing at all on the card to write
+// onto. The move is then made on its own, which for a send-back is a move to where the story already stands
+// — so that verdict is lost and the next tick runs the gates again. It is a real hole and it is named here
+// because the fix is not a line of code: nothing the loop may create can carry it.
 async function recordVerdict(
   deps: ActDeps,
   card: Card,
-  workRun: string | undefined,
+  onto: string | undefined,
   verification: Verification,
   to: string | undefined,
   what: { why: string; line: string; dispatches: number; iteration: number },
 ): Promise<ActResult> {
-  if (workRun !== undefined) {
-    const recorded = await deps.client.verdict(card.board, card.id, workRun, verification);
+  if (onto !== undefined) {
+    const recorded = await deps.client.verdict(card.board, card.id, onto, verification);
     if (!recorded.ok) {
       return refused(
         deps,
-        `could not record the verdict on ${workRun}`,
+        `could not record the verdict on ${onto}`,
         recorded.reason,
         recorded.fatal,
         what.dispatches,

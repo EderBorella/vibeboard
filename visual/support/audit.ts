@@ -103,13 +103,14 @@ export const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'] as const;
 // the steps themselves. It carries no text and no corner of its own.
 //
 // WHICH SURFACE IS BEING MEASURED. `null` is the whole document, which is what every check measured
-// before Phase 6 and is what the four top-level views still measure — a view IS the page.
+// before Phase 6 and is what the six top-level views still measure — a view IS the page.
 //
-// A selector is given for the four surfaces that are OVERLAYS: the settings modal, the model picker,
-// the confirm dialog and the archive drawer all render with the board still behind them, so a
-// whole-document walk would report the board's numbers again under a second name. That is the exact
-// failure this phase exists to avoid — a harness that measures the board five times and calls it five
-// surfaces is worse than one that measures it once, because the numbers would look like coverage.
+// A selector is given for the six surfaces that are OVERLAYS: the settings modal, the model picker,
+// the confirm dialog, the archive drawer, the open card in the dock and the copilot dock all render
+// with the board still behind them, so a whole-document walk would report the board's numbers again
+// under a second name. That is the exact failure this phase exists to avoid — a harness that measures
+// the board five times and calls it five surfaces is worse than one that measures it once, because the
+// numbers would look like coverage.
 //
 // An unmatched selector yields an EMPTY population rather than falling back to the document, so a
 // surface whose root stopped existing fails its floor instead of silently measuring the board.
@@ -119,12 +120,12 @@ export interface AuditOptions {
 
 // A TOKEN SUPPLIED AT RUN TIME BY THE SURFACE THAT USES IT IS NOT A FINDING, and that is the ruling
 // Phase 10 was asked to make. Phase 0 recorded `--exec-cols` as *"a gap in the harness's coverage
-// rather than a defect"* and Phase 6 closed the coverage half by rendering all ten surfaces; what was
+// rather than a defect"* and Phase 6 closed the coverage half by rendering all twelve surfaces; what was
 // left was the question itself, and the honest answer is that there is nothing here to fix. Neither
 // token can be defined in a stylesheet without becoming a lie: `--max-cols` is the number of columns
 // the widest board has and `--exec-cols` is the length of `ExecutionView`'s own `COLUMNS`, so a CSS
 // definition would be a second copy of a fact React already owns — which is exactly the class of
-// defect the `--track-fit` comment in styles.css records. Counting them as findings on the nine
+// defect the `--track-fit` comment in styles.css records. Counting them as findings on the eleven
 // surfaces that do not render their view was the instrument mistaking its own scope for a fault, and a
 // gate that reports a correct design gets switched off.
 //
@@ -803,11 +804,11 @@ function pageTokens({ root, runtime }: { root: string | null; runtime: RunTimeTo
     // keeps it honest — if the element that supplies the token IS in the population and still supplies
     // nothing, the excuse does not apply and the token falls through to a finding below.
     //
-    // MEASURED AGAINST THE POPULATION AND NOT THE DOCUMENT, which is a distinction the four overlay
-    // surfaces force: the settings modal, the model picker, the confirm dialog and the open card all
-    // render with the board still behind them, so `main.boards` exists in the document while being no
-    // part of what is being measured. Asking the document reported `--max-cols` as a fault on four
-    // surfaces that neither use it nor could supply it.
+    // MEASURED AGAINST THE POPULATION AND NOT THE DOCUMENT, which is a distinction the six overlay
+    // surfaces force: the settings modal, the model picker, the confirm dialog, the archive drawer, the
+    // open card and the copilot dock all render with the board still behind them, so `main.boards`
+    // exists in the document while being no part of what is being measured. Asking the document
+    // reported `--max-cols` as a fault on every one of them, none of which uses it or could supply it.
     const named = runtime.find((token) => token.name === name);
     if (named && !elements.some((el) => el.matches(named.supplier))) {
       excused.push(name);

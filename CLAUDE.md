@@ -95,12 +95,12 @@ TypeScript is ESM: **imports always carry the `.js` extension**, including for `
 `design/ → atoms/ → molecules/ → organisms/ → templates/ → pages/`. A layer may read downward and
 never up; `npm run check:layers` blocks that at zero.
 
-- **The cascade is declared once**, in [`web/src/styles.ts`](web/src/styles.ts) — 41 layer sheets,
+- **The cascade is declared once**, in [`web/src/styles.ts`](web/src/styles.ts) — 42 layer sheets,
   order load-bearing. The app, the Storybook preview and `test/css-box.tsx` all read that one list.
   A second copy would drift silently, and a workbench showing a cascade the app does not have is
   worse than one showing nothing.
 - **No surface reinvents a primitive.** Raw controls outside the atom layer are a gate failure.
-- **Class budget is a ratchet at 230, zero slack.** The stated target of 146 is the number to
+- **Class budget is a ratchet at 220, zero slack.** The stated target of 146 is the number to
   revisit, not the tree: the 30 remaining single-declaration classes are hover/`:disabled` inks,
   parent-selector anchors and genuine one-offs, and reaching 76 needs a *design ruling* that a
   surface may not have a hover ink of its own — not another merge.

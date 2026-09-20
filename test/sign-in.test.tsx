@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SignIn } from '../web/src/pages/signin/SignIn.js';
-import { chooseContent, rebindOnSignIn } from '../web/src/templates/shell.js';
+import { chooseContent, emptyMessage, rebindOnSignIn } from '../web/src/templates/shell.js';
 
 afterEach(cleanup);
 
@@ -75,11 +75,17 @@ describe('when it stopped', () => {
     expect(screen.getByText(reason)).toBeTruthy();
   });
 
-  it('offers Try again where trying again could work', () => {
+  it('offers Try again where trying again could work, and paints it as the action', () => {
     const onRetry = vi.fn();
     render(<SignIn phase={{ phase: 'stopped', reason: 'busy', retry: true }} onRetry={onRetry} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    const again = screen.getByRole('button', { name: /try again/i });
+    // The only thing on a first-contact screen a person can do, so it reads as one. It used to be
+    // painted filled by `.gate button`, a surface writing the primary variant over every button in the
+    // frame; that rule is gone, and the atom is what says this now.
+    expect(again.className).toContain('vb-btn-primary');
+
+    fireEvent.click(again);
 
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -95,11 +101,21 @@ describe('when it stopped', () => {
   });
 });
 
+// TWO DIFFERENT FACTS, AND ONLY ONE OF THEM IS AN ANSWER. Telling somebody their project is gone while
+// the socket is still opening is a lie for the length of a round trip.
+describe('what the blank pane says', () => {
+  it('says the project is gone only once the socket can answer for it', () => {
+    expect(emptyMessage('open')).toBe('No project open.');
+    expect(emptyMessage('connecting')).toBe('Connecting…');
+    expect(emptyMessage('closed')).toBe('Connecting…');
+  });
+});
+
 // THE ORDERING IS THE BUG. With no credential the project gate cannot work — listProjects 401s,
 // scaffold 401s — so showing it is showing a screen whose every button fails. `!signedIn` has to come
 // first, and that is a decision worth holding in one testable place rather than in JSX.
 describe('what the shell shows', () => {
-  const base = { signedIn: true, ready: true, showGate: false, hasSnapshot: true } as const;
+  const base = { signedIn: true, ready: true, showGate: false, hasSnapshot: true, wizard: false } as const;
 
   it('shows sign-in before anything else when there is no credential', () => {
     // Every other condition says "show the board" — only the credential is missing.
@@ -114,6 +130,19 @@ describe('what the shell shows', () => {
     expect(chooseContent({ ...base, ready: false })).toBe('loading');
     expect(chooseContent({ ...base, showGate: true })).toBe('gate');
     expect(chooseContent({ ...base, hasSnapshot: false })).toBe('empty');
+    expect(chooseContent(base)).toBe('work');
+  });
+
+  // The wizard sits BETWEEN the gate and the snapshot check, and both edges are the point. Its first
+  // step scaffolds, so it has to be reachable with no project open; and Switch Project is an explicit
+  // request that must win over a setup someone left half-finished.
+  it('the wizard shows instead of the work area, and never over the gate or sign-in', () => {
+    const inWizard = { ...base, wizard: true };
+    expect(chooseContent(inWizard)).toBe('wizard');
+    expect(chooseContent({ ...inWizard, hasSnapshot: false })).toBe('wizard');
+    expect(chooseContent({ ...inWizard, showGate: true })).toBe('gate');
+    expect(chooseContent({ ...inWizard, ready: false })).toBe('loading');
+    expect(chooseContent({ ...inWizard, signedIn: false })).toBe('signin');
     expect(chooseContent(base)).toBe('work');
   });
 });

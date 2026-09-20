@@ -167,6 +167,35 @@ describe('a path that is not absolute', () => {
   });
 });
 
+// WHAT SCAFFOLD ANSWERS WHEN THE PROJECT IT HAS JUST WRITTEN WILL NOT OPEN. The open route has always
+// caught this and said what was wrong; scaffold let the throw out as a raw 500. That was survivable
+// while the only caller was a form sitting on a screen with a board behind it — the wizard is the
+// caller now, and its identity step is the one screen in the product with no project behind it at all,
+// where a 500 reads as the app having crashed rather than as a request having failed.
+describe('POST /api/project/scaffold, when the project it wrote will not open', () => {
+  it('answers the refusal the open route answers, rather than a 500', async () => {
+    bare = new ProjectSession();
+    // INJECTED AT THE ONE SEAM A TEST CAN REACH, and nothing else here is faked: the folder, the
+    // board and the git repository are really written, and what is being read is the route's answer
+    // to a failure after all of that. There is no cheap way to make a freshly scaffolded folder
+    // genuinely unopenable inside one request — everything that would do it fails the scaffold first.
+    bare.open = () => Promise.reject(new Error('the folder cannot be read'));
+    const base = await tempDir();
+    const path = join(base, 'made-then-unopenable');
+
+    const res = await testApp(bare).inject({
+      method: 'POST',
+      url: '/api/project/scaffold',
+      payload: { path, name: 'made-then-unopenable', mode: 'greenfield' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'Not a VibeBoard project' });
+    // And it really did get as far as writing one, or this would be a test of the guard above it.
+    expect(existsSync(join(path, CONFIG_DIR, CONFIG_FILE))).toBe(true);
+  });
+});
+
 // POST /api/project/delete — the only recursive delete a user can aim, and the tests that matter are
 // the ones about what it REFUSES. A wrong path here is a `rm -rf` of whatever the server can reach.
 describe('POST /api/project/delete', () => {

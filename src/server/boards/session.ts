@@ -1,5 +1,11 @@
 import chokidar, { type FSWatcher } from 'chokidar';
-import { AUTOPILOT_STATE_FILE, CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../../core/layout.js';
+import {
+  AUTOPILOT_STATE_FILE,
+  CHAT_DIR,
+  PROJECT_LOG_FILE,
+  RUNS_DIR,
+  WIZARD_FILE,
+} from '../../core/layout.js';
 import type { ProjectConfig } from '../../core/types.js';
 import {
   ensureAutopilotKeys,
@@ -39,7 +45,10 @@ export function isIgnored(p: string): boolean {
     // Auto-pilot's counters change on every tick and nothing on the board depends on them. Watched,
     // this would rebuild the whole snapshot once per dispatch; state changes are pushed over the
     // websocket by whoever wrote them instead.
-    p.endsWith(`/${AUTOPILOT_STATE_FILE}`)
+    p.endsWith(`/${AUTOPILOT_STATE_FILE}`) ||
+    // The wizard's scratch state changes on every step and nothing on the board reads it — the
+    // browser fetches it when it wants it. Watched, each answer would rebuild the whole snapshot.
+    p.endsWith(`/${WIZARD_FILE}`)
   );
 }
 

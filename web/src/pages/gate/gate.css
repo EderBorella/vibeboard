@@ -22,9 +22,11 @@
  * THE 16px UNDER THE LIST IS GONE: it was the one declaration here that needed the extra weight — to beat
  * `ul.vb-list, ol.vb-list { margin: 0 }` at (0,1,1) — and the card's own `gap` is what says it now. With
  * nothing left to outrank, the atom's `margin: 0` is what the list takes. */
-/* `.gate-list`'s GAP IS `List gap={3}` NOW, and the (0,2,0) weight bought to outrank `.vb-list` goes with
-   it — the whole reason that specificity existed was to win a gap. The class name survives only as the
-   left-hand side of `.gate button:not(.gate-list button)` below. */
+/* `.gate-list` IS GONE ENTIRELY, class name included. Its GAP became `List gap={3}` and the (0,2,0)
+   weight bought to outrank `.vb-list` went with it — the whole reason that specificity existed was to
+   win a gap — and the name survived only as the left-hand side of `.gate button:not(.gate-list button)`,
+   which is the paint removed below. `check:name-resolution` is what said so: a class in a `className`
+   that no rule defines styles nothing. */
 /* A `Row as="li" stack variant="inset" interactive`. A project in the recents list has no VOICE — it is a
    region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and it
    draws its box at rest, which is what `inset` is and `flat` is not. The stack of name over path is
@@ -36,12 +38,19 @@
    gap is for; the two hints that took 4px and the notice that took 16px take 12px like everything else in
    the card, which is the uniform column the fold buys. */
 /* `.gate-row` IS GONE — a `Row`, at the one call site it had. */
-.gate .vb-ctl { flex: 1; }
-.gate button:not(.gate-list button) {
-  background: var(--accent-fill); color: var(--on-fill); border: none;
-  border-radius: var(--r-md); padding: 0 var(--s-6); font-weight: 600; cursor: pointer;
-}
-.gate button:disabled { opacity: 0.5; cursor: default; }
+/* `.gate .vb-ctl` IS GONE — `flex: 1` on a control the picker no longer has. The two fields it stretched
+   left with the create form when the gate became two doors, and the wizard's identity step asks for them
+   inside a `Field` that spends the width itself. decision 76. */
+/* `.gate button:not(.gate-list button)` IS GONE, AND IT WAS REPAINTING A PRIMITIVE. Filled ground, no
+   edge, 600 weight: the `Button` atom's `primary` variant, written out by a surface over every button in
+   the frame — so the `Map an existing repository` door was drawn filled even though it asks for the
+   default variant, and the exception in its `:not()` was there because the recents rows would have been
+   painted too. Whatever paints a button is the atom's to say. decision 76. */
+/* `.gate button:disabled` IS GONE, AND IT WAS THE ATOM'S RULE WRITTEN A SECOND TIME. `opacity: 0.5;
+   cursor: default` is `.vb-btn:disabled` declaration for declaration, and every button inside this
+   frame is a `Button` — the recents rows are `<li>`s, which a `button` selector never reached. Same
+   reasoning as the paint rule above it: whatever a button looks like is the atom's to say, and a
+   surface that says it again is a second place for it to drift. decision 76. */
 /* AN INLINE `<code>` IN PROSE IS A TYPE SELECTOR NOW, in atoms/prose.css — see there. It was
    `.gate-preview code, .ap-help-body code`: one rule naming TWO surfaces from inside an atom's sheet,
    which is the fifth of the seven misfiled strays and the shape the layer gate exists to refuse. */

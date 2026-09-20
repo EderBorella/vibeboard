@@ -3609,7 +3609,7 @@ moved into `templates/` — the same criticism as `organisms/shared/`; and the p
 three classes.
 
 **One `.css` beside every component and every organism directory**, imported by `web/src/styles.ts`, which is
-the single ordered list of all 41 sheets — the app loads it, the Storybook preview loads it, and
+the single ordered list of all 42 sheets — the app loads it, the Storybook preview loads it, and
 `test/css-box.tsx` resolves boxes through it. A second copy of that order would drift silently, and a
 workbench showing a cascade the app does not have is worse than one showing nothing.
 

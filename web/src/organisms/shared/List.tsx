@@ -21,15 +21,14 @@ import { Stack } from '../../atoms/Stack';
 // majority — half the tree, and the half that is a list of adjacent rows, which is what this class is for:
 // the rows carry their own padding.
 //
-// AND THE OTHER FIVE HAD TO SAY SO, which was the honest cost of the option not existing. Two did:
-// `.control-list` keeps 16px and `.gate-card .gate-list` keeps 6px. One declaration is the price; a silent
+// AND THE OTHER FIVE HAD TO SAY SO, which was the honest cost of the option not existing. One still
+// does: `.control-list` keeps 16px in a declaration of its own. One declaration is the price; a silent
 // 2px is not.
 //
-// `.gate-card .gate-list`'s EXTRA WEIGHT IS NOW REDUNDANT AND THE REASON WRITTEN HERE IS STALE. It was
-// bought at (0,2,0) specifically to outrank `.vb-list` from a sheet imported BEFORE it; the templates phase
-// moved `list.css` above every surface sheet (see `styles.ts`), so `.gate-list` alone would win on order.
-// Left as it is: it is harmless weight, and (0,2,0) is what keeps it correct if the order ever moves back.
-// The declaration is what is load-bearing, not the descendant.
+// THE PROJECT PICKER'S 6px IS THE CASE THIS PARAGRAPH USED TO BE ABOUT, and it is a `gap` prop at the
+// one call site now — `.gate-list` is gone, class name included, and the record of why is in
+// `pages/gate/gate.css` where the rule was. Two paragraphs stood here narrating that class's (0,2,0)
+// specificity against `.vb-list`; they described a selector no stylesheet contains.
 // `'nav'` IS THE FOURTH TAG AND IT IS NOT A WIDENING FOR CONVENIENCE. `ControlFileList` renders the file
 // list as a `<nav>` — it is the page's navigation between files, and the element is the accessibility
 // claim — and with no `nav` here it hand-wrote `className="vb-list control-list"`, which is a caller

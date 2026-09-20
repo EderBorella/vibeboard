@@ -9,6 +9,41 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+// Force a project name toward the VibeBoard pattern (dash-separated, lowercase) as the user types.
+// Leading dashes are stripped; a trailing dash is tolerated so separators can be typed mid-word.
+// `slugify` above produces the final canonical form on submit.
+export function toNamePattern(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '');
+}
+
+export interface ProjectTarget {
+  // A RELATIVE PARENT IS NOT A PLACE, and this is the half that answers while the person is still
+  // typing. The field is free text and its value is concatenated straight into a path, so
+  // `data/projects` — one missing leading slash — asked the server to create `data/projects/calculator`,
+  // which Node resolved against the SERVER's working directory. The project landed inside the VibeBoard
+  // install: docker refused its box (to `-v`, a relative string is a volume NAME), auto-pilot's
+  // pre-flight commit ran in VibeBoard's own repository and stopped the run over a failure in
+  // VibeBoard's test suite, and the project never got the `.git/hooks` pin its box needs.
+  // The endpoint refuses it too and THAT is the enforcement; this is so the answer arrives before the
+  // request rather than as a 400 after it.
+  relative: boolean;
+  // Empty until there is a whole place to name: no parent, no name, or a parent that is not absolute.
+  // The button that writes is disabled on this, and the preview line is drawn from it.
+  path: string;
+}
+
+// Where a new project would land, from the two boxes the person fills in. It was module-local to the
+// project gate until the gate became two doors; the wizard's identity step asks the same two questions,
+// and a second copy of the rule above would drift from this one. decision 76.
+export function projectTarget(parentInput: string, nameSlug: string): ProjectTarget {
+  const parent = parentInput.replace(/\/+$/, '');
+  const relative = parent !== '' && !parent.startsWith('/');
+  return { relative, path: parent && nameSlug && !relative ? `${parent}/${nameSlug}` : '' };
+}
+
 // Whether a drop should actually move the card. Two things are not moves: a card dropped on a
 // different board (links cross boards, cards do not), and a card dropped exactly where it sits.
 export function canPlace(card: Card | null, board: BoardName, beforeId: string | null): card is Card {

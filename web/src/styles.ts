@@ -2,7 +2,7 @@
 // layer surface now, plus the primitive layer above them, and this is the only list of them that exists:
 // the app loads it, the Storybook preview loads it and `test/css-box.tsx` resolves boxes through it.
 //
-// 41 SHEETS WHERE THERE WERE 59, AND THAT IS THE LAYER TREE FINALLY ARRIVING — docs/design-system.md,
+// 42 SHEETS WHERE THERE WERE 59, AND THAT IS THE LAYER TREE FINALLY ARRIVING — docs/design-system.md,
 // *The atomic revamp: the layer tree*. The 47 parts the split
 // produced were an artefact of the BYTE-IDENTITY CONTIGUITY CONSTRAINT and never of the tree: a rule could
 // only leave `styles.css` at the byte position it already held, so a surface whose rules were scattered
@@ -20,7 +20,7 @@
 // `ui/primitives.css` moved to the end put a 15.5px span in a 14.0px flex row on all three themes, which
 // is 21 failing checks.
 //
-// ONE LIST RATHER THAN TWO, and that is the whole reason this is a module and not 41 imports in
+// ONE LIST RATHER THAN TWO, and that is the whole reason this is a module and not 42 imports in
 // `main.tsx`. `.storybook/preview.tsx` already carried a second copy of the four-line version with a
 // comment saying the order was load-bearing; a second copy would have drifted from the app's cascade
 // silently, and a workbench showing a cascade the app does not have is worse than one showing nothing.
@@ -127,10 +127,15 @@ import './organisms/topbar/topbar.css';
 import './templates/work-area.css';
 import './organisms/board/board.css';
 import './pages/gate/gate.css';
+// BESIDE THE SURFACE IT GREW OUT OF, which is where its position argues for itself: the wizard is the
+// picker's create form after it left the picker, and its card is `.gate-card`'s box under its own name.
+// Nothing in the two sheets contends — the names are disjoint — so this is placement by meaning rather
+// than by cascade, and the meaning is that whoever edits one should be looking at the other.
+import './pages/wizard/wizard.css';
 // `organisms/settings/settings.css` WAS IMPORTED HERE AND IS DELETED. It reached zero rules in the sweep:
 // Settings is the first surface in this tree that draws nothing of its own — every box on it is an atom, a
 // molecule or a shared organism. Its history moved to `organisms/shared/shared.css`, which holds what it
-// still shares. 41 sheets now, not 42.
+// still shares. That deletion took the list from 42 to 41; the wizard's sheet above is a new 42nd.
 import './organisms/copilot/copilot.css';
 import './organisms/cards/cards.css';
 import './organisms/diary/diary.css';

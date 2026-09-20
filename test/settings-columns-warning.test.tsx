@@ -53,6 +53,10 @@ const show = (autopilot: boolean) =>
       onSaved={() => {}}
       autopilot={null}
       onAutopilotChanged={() => {}}
+      // No half-finished setup on this fixture: the way back into the wizard is the panel's own test,
+      // and an offer rendered here would be one more thing in a file about column warnings.
+      setupPending={false}
+      onResumeSetup={() => {}}
       // Nothing in this file asks anything, and a confirmer that resolved true would let a stray click
       // sign this browser out mid-test. Resolving false makes that a no-op instead.
       confirm={async () => false}

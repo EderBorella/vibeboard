@@ -16,9 +16,9 @@ import {
 // cannot be answered at all.
 //
 // Testing this by mounting the shell would mean mocking a dozen hooks to assert on markup; testing it
-// here costs four booleans.
+// here costs five booleans.
 
-type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'work';
+type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'wizard' | 'work';
 
 interface ShellState {
   signedIn: boolean;
@@ -27,6 +27,9 @@ interface ShellState {
   ready: boolean;
   showGate: boolean;
   hasSnapshot: boolean;
+  // Whether setup is being walked through right now. Not "is there a wizard file" — a person who skips
+  // keeps the file, so the two answers differ from the moment they do.
+  wizard: boolean;
 }
 
 // Whether signing in has just happened, and everything keyed on the project counter therefore has to
@@ -48,8 +51,22 @@ export function chooseContent(state: ShellState): ShellContent {
   if (!state.signedIn) return 'signin';
   if (!state.ready) return 'loading';
   if (state.showGate) return 'gate';
+  // Before the snapshot check, because the identity step runs with no project open at all — and after
+  // the gate, because Switch Project must always win over a wizard in progress. decision 76.
+  if (state.wizard) return 'wizard';
   if (!state.hasSnapshot) return 'empty';
   return 'work';
+}
+
+// WHAT THE BLANK PANE SAYS, which is two different facts and not one. "No project open." is an answer;
+// "Connecting…" is the absence of one, and saying the first while the socket is still opening tells
+// somebody their project is gone when it is merely not here yet.
+//
+// Here rather than as a ternary in the shell's JSX for this file's own reason: nothing in the repository
+// mounts `App`, so a rule written there is a rule nothing can test. It also keeps the shell under the
+// cognitive-complexity ceiling it sits exactly on.
+export function emptyMessage(conn: ConnState): string {
+  return conn === 'open' ? 'No project open.' : 'Connecting…';
 }
 
 // EVERY LIGHT PROP THE TOP BAR TAKES, DERIVED IN ONE PLACE — and it exists because the hop it replaces

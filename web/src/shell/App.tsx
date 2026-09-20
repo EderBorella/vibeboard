@@ -10,7 +10,13 @@ import {
   resolveRunRecord,
   setLinks,
 } from '../lib/api';
-import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from '../lib/shared';
+import {
+  BOARDS,
+  type BoardName,
+  type Card,
+  type CardFrontmatterPatch,
+  type ScaffoldMode,
+} from '../lib/shared';
 import { useAutopilot } from '../lib/useAutopilot';
 import { useConfirm } from '../lib/useConfirm';
 import { useCopilotChoice } from '../lib/useCopilotChoice';
@@ -19,6 +25,7 @@ import { usePendingSignins } from '../lib/usePendingSignins';
 import { useSandbox } from '../lib/useSandbox';
 import { useSignin } from '../lib/useSignin';
 import { useSnapshot } from '../lib/useSnapshot';
+import { useWizard } from '../lib/useWizard';
 import { canPlace, presentTags, tagCounts, toggleTag } from '../lib/viewmodel';
 import { AutopilotBar } from '../organisms/autopilot/AutopilotBar';
 import { HaltOverlay } from '../organisms/autopilot/HaltOverlay';
@@ -35,7 +42,8 @@ import { useSkills } from '../organisms/skills/useSkills';
 import { type MainTab, TopBar } from '../organisms/topbar/TopBar';
 import { ProjectGate } from '../pages/gate/ProjectGate';
 import { SignIn } from '../pages/signin/SignIn';
-import { chooseContent, lightProps, rebindOnSignIn } from '../templates/shell';
+import { WizardView } from '../pages/wizard/WizardView';
+import { chooseContent, emptyMessage, lightProps, rebindOnSignIn } from '../templates/shell';
 import { WorkArea } from './WorkArea';
 
 export function App() {
@@ -68,6 +76,9 @@ export function App() {
   // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
   // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
   const autopilot = useAutopilot(bump, signin.signedIn);
+  // Setup: what is on screen, and what this project still has waiting. Two questions, because skipping
+  // keeps the file — see the hook, which owns that policy and is where it is tested.
+  const setup = useWizard(signin.signedIn, snapshot?.root);
 
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
@@ -187,6 +198,32 @@ export function App() {
     cards.clear(); // the open tabs all belong to the project being left
   }
 
+  // Entering setup is leaving the picker: see the note at the door below. A door always starts at the
+  // identity step — pressing New project with another project still open asks for a new one, it does
+  // not drop somebody into the middle of setting up the one they were already in.
+  function enterWizard(mode: ScaffoldMode): void {
+    setShowGate(false);
+    setup.show({ mode, step: 'identity' });
+  }
+
+  // Leaving it before a project exists goes back to the picker rather than to the shell's empty state:
+  // with nothing open, "No project open." has no way back — the top bar hides Switch project until
+  // there is a project to switch away from. With one open this re-states the false the gate already
+  // holds, because the wizard only renders while the picker is down.
+  function leaveWizard(): void {
+    setup.leave();
+    setShowGate(snapshot === null);
+  }
+
+  // Back into setup from the readiness wall, which is where somebody who skipped meets the documents
+  // the assistant would have written. Settings closes with it: the wizard is a CONTENT state and this
+  // modal renders above the content, so re-entering without this would put the screen they asked for
+  // behind the one they asked to leave.
+  function resumeSetup(): void {
+    setSettingsOpen(false);
+    setup.resume();
+  }
+
   // The dock's occupants. Cards is the only one today; a terminal would be one more entry here
   // and one more component, with no change to UtilityDock.
   // A flat chain rather than nested ternaries in the JSX: same four outcomes, and cognitive
@@ -198,6 +235,7 @@ export function App() {
     ready,
     showGate,
     hasSnapshot: Boolean(snapshot),
+    wizard: setup.entry !== null,
   });
   let content: ReactNode;
   if (which === 'signin') content = <SignIn phase={signin.phase} onRetry={signin.retry} />;
@@ -207,11 +245,32 @@ export function App() {
         Loading…
       </Text>
     );
-  else if (which === 'gate') content = <ProjectGate onOpened={onOpened} />;
+  else if (which === 'gate')
+    content = (
+      <ProjectGate
+        onOpened={onOpened}
+        // A DOOR DISMISSES THE GATE AS IT OPENS THE WIZARD. `chooseContent` gives the gate precedence, on
+        // purpose — Switch Project must win over a setup somebody left half-finished — so a wizard opened
+        // with the gate still up would never be seen at all.
+        onNewProject={() => enterWizard('greenfield')}
+        onMapProject={() => enterWizard('brownfield')}
+      />
+    );
+  else if (which === 'wizard' && setup.entry !== null)
+    content = (
+      <WizardView
+        mode={setup.entry.mode}
+        start={setup.entry.step}
+        snapshot={snapshot}
+        bump={bump}
+        onOpened={onOpened}
+        onExit={leaveWizard}
+      />
+    );
   else if (which === 'empty' || !snapshot)
     content = (
       <Text lead className="empty">
-        {conn === 'open' ? 'No project open.' : 'Connecting…'}
+        {emptyMessage(conn)}
       </Text>
     );
   else
@@ -320,6 +379,8 @@ export function App() {
           onSaved={() => setSettingsOpen(false)}
           autopilot={autopilot.state}
           onAutopilotChanged={autopilot.refresh}
+          setupPending={setup.pending}
+          onResumeSetup={resumeSetup}
           confirm={confirm}
         />
       )}

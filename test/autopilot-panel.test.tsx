@@ -419,3 +419,32 @@ describe('the gate acknowledgement, in Settings', () => {
     expect(screen.queryByTestId('ap-panel-review-gates')).toBeNull();
   });
 });
+
+// THE WAY BACK INTO SETUP, BESIDE THE WALL YOU HIT WITHOUT IT. Somebody who skipped the wizard meets
+// these blockers the moment they try to start auto-pilot — most of them are documents the setup
+// assistant would have written — so the offer to finish belongs here and not only on the first screen.
+describe('finishing setup from the readiness wall', () => {
+  it('offers the way back, and hands it to the shell to open', async () => {
+    api.getReadiness.mockResolvedValue(
+      readiness({ ok: false, blockers: ['foundation/TESTING.md has not been written yet.'] }),
+    );
+    const resume = vi.fn();
+    render(panel(configWith(true), { setupPending: true, onResumeSetup: resume }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish setting up' }));
+    expect(resume).toHaveBeenCalledTimes(1);
+    // The blockers it stands beside are still the answer to "what is missing"; this is the shortcut.
+    expect(screen.getByText(/TESTING\.md has not been written yet/)).toBeTruthy();
+  });
+
+  it('says nothing on a project with no setup waiting', async () => {
+    // The flag is the FILE's answer, not this panel's guess: a project whose setup was finished or
+    // abandoned has nothing to go back to, and a button that re-opened the wizard there would be
+    // re-offering exactly what "Stop offering this" was pressed to end.
+    api.getReadiness.mockResolvedValue(readiness({ ok: false, blockers: ['This project has no README.'] }));
+    render(panel(configWith(true), { setupPending: false, onResumeSetup: vi.fn() }));
+
+    await screen.findByText(/has no README/);
+    expect(screen.queryByRole('button', { name: 'Finish setting up' })).toBeNull();
+  });
+});

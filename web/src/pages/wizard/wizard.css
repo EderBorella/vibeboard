@@ -1,0 +1,12 @@
+/* ---------- The setup wizard ---------- */
+/* ONE CLASS, AND THE FRAME IS NOT IT. The full-area box this card sits in — `flex: 1`, centred, padded,
+   scrolling — is `<Stack fill scroll justify="center" align="start" pad={[7, 6]}>`, which is the four
+   declarations `.gate` writes by hand and the atom already says. What no atom can say is a MEASURE, so
+   that is what is left here.
+   NOT `.gate-card`, THOUGH IT IS THE SAME BOX. The wizard renders with a project open and the browser
+   harness proves the board by counting the picker's frame at zero; a surface that borrows the picker's
+   names makes that proof answer for two screens. Same shape, its own name, and `check:class-budget`'s
+   ceiling went up by exactly one for it.
+   The padding and the gap are the card's own because `Surface`'s `raised` variant deliberately has
+   neither — a column pads its body, which is the same reason `.archive-drawer` and `.exec-column` do. */
+.wizard-card { width: 100%; max-width: var(--measure); padding: var(--s-7); gap: var(--s-5); }

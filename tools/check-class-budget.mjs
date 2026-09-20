@@ -258,6 +258,19 @@ const PRIMITIVE_LAYER = [
 // The departure is `.msg-running`, the copilot's `…working` line, deleted with the element it styled
 // when `ThinkingIndicator` replaced it. Net −1, and the ceiling is the count with ZERO SLACK: a
 // ratchet sitting above the tree is one that would not notice the next class.
+// 220 -> 221 ON 2026-09-18, FOR `.wizard-card`, under the ruling recorded above: a legitimate class must
+// not be blocked by this ratchet. The setup wizard is a new surface (`pages/wizard/`) and it spends ONE
+// name. Its frame declares nothing — `Stack fill scroll justify="center" align="start" pad={[7, 6]}` is
+// the four declarations `.gate` writes by hand — and the one thing no atom in this tree can say is a
+// MEASURE, so `max-width: var(--measure)` on the card is the whole of it. It could have worn `.gate-card`,
+// which is the same box, and that is exactly what it must not do: the browser harness proves the board by
+// counting the picker's frame at zero, and a screen that renders with a project OPEN while wearing the
+// picker's names would make that proof answer for two screens. Zero slack is restored at 221.
+// 221 -> 220 ON 2026-09-19, WITHOUT A CLASS BEING MERGED INTO ANYTHING: `.gate-list` stopped being a
+// selector when `gate.css`'s `.gate button:not(.gate-list button)` went — a surface repainting the
+// `Button` atom over every button in the picker's frame, which is what erased the doors' variants. The
+// name survives as a `className` on the recents list and styles nothing, so the union is one smaller and
+// the ceiling follows it down: slack is what stops this noticing the next class.
 const CLASS_CEILING = 220;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said

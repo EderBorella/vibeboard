@@ -100,6 +100,20 @@ export interface TickInput {
   // Only `finished` reads them, and only to compare two strings — the RESULT of running either is not the
   // tick's business, and nothing here spawns anything.
   commands: DeclaredCommands;
+  // THE SEND-BACKS THE LOOP HAD NOWHERE TO WRITE DOWN, by card id (decision 82). A story that skipped its
+  // break-down because it arrived carrying tasks (decision 50) has no work run, and the gates run BEFORE any
+  // dispatch — so when they fail there is no review record either, and the verdict has nothing on the card to
+  // land on. Without this the next tick reads no verdict, judges again, runs the whole gate suite again, and
+  // never dispatches: `MAX_IDLE_TICKS` then halts the PROJECT over one card, which is exactly what the fix
+  // budget and `capReached` exist to prevent.
+  //
+  // REQUIRED, for the same reason `commands` and `problems` are, and the direction matters more here than for
+  // either: the case this exists for is invisible on disk, so an absent field reads as "nothing was sent back"
+  // — which is precisely the halt.
+  //
+  // THE LOOP'S MEMORY OF ONE TICK AND NO LONGER. The fix it buys IS a work run, so from the tick after it the
+  // ordinary verdict path carries the story and `judgeStory` never reads this again.
+  unrecordedSendBacks: string[];
 }
 
 const stop = (reason: StopReason, detail?: string): TickAction => ({
@@ -467,12 +481,22 @@ function fixPhase(
   input: TickInput,
   name: 'task-fix' | 'story-fix',
   card: Card,
-  carrying: RunRecord,
+  // THE RUN THE FINDING IS ON, and it is what the fix is HANDED: a fix told to go and look is a fix guessing.
+  // Absent for exactly one caller — a send-back nothing could record (decision 82) — where there is no run on
+  // the card at all to point at. That fix reads the gate commands out of its own prompt and runs them, which
+  // is a thinner brief than every other fix gets and is the price of the card not being halted over.
+  carrying: RunRecord | undefined,
 ): TickAction | undefined {
   const skill = phase(name).skill;
   if (skill === undefined) return undefined;
   if (attemptsUsed(input.runs, card.id, skill) < input.ap.attemptCap) {
-    return { kind: 'dispatch', phase: name, skill, card, previous: carrying.run };
+    return {
+      kind: 'dispatch',
+      phase: name,
+      skill,
+      card,
+      ...(carrying === undefined ? {} : { previous: carrying.run }),
+    };
   }
   return (
     noBlockedColumn(input, card, `${card.id} has used all ${input.ap.attemptCap} attempts at ${skill}`) ??
@@ -506,6 +530,11 @@ function fixPhase(
 // write it had never attempted. The review run is a record too, and `reviewVerdictRun` is where that
 // verdict goes. SECOND to the work run, never instead of it — once a fix has answered, the fix is the run
 // under judgement.
+//
+// AND WHEN THE GATES REFUSED IT, THERE IS NO RECORD OF EITHER KIND (decision 82). Decision 81 left that half
+// open and said so: the gates run before any dispatch, so on a story with no work run a gate failure has no
+// review record to fall back on either. The evidence arrives on the input instead of off the board, which is
+// the same shape `commands` already has — the service ran the commands, the tick decides what they mean.
 function judgeStory(input: TickInput, story: Card): TickAction | undefined {
   const judging = latestWorkRun(input.runs, story.id);
   const carrying = judging ?? reviewVerdictRun(input.runs, story.id);
@@ -518,6 +547,18 @@ function judgeStory(input: TickInput, story: Card): TickAction | undefined {
   // The fix is handed whichever record carries the finding, which for a story with no work run is the
   // review's own — and that is where its words are anyway.
   if (already !== undefined && carrying !== undefined) return fixPhase(input, 'story-fix', story, carrying);
+  // NOTHING ON THE CARD, AND A SEND-BACK THAT HAPPENED ANYWAY (decision 82). The same row P5 as the branch
+  // above, reached on the loop's own evidence because the board holds none. Guarded on `carrying` being
+  // absent so it can only ever fire in the gap it was written for: the moment any record exists, that record
+  // is the answer and this is stale by construction.
+  //
+  // THROUGH `fixPhase` AND NOT STRAIGHT TO `blocked`: this story gets the same three attempts every other
+  // send-back gets, and blocking it on its FIRST gate failure would deny them for no reason except where
+  // its verdict happened to be stored. The cap is never reached from here — the fix it dispatches is itself
+  // a work run, so the branch above answers every judgement after it, and that is where this story blocks.
+  if (carrying === undefined && input.unrecordedSendBacks.includes(story.id)) {
+    return fixPhase(input, 'story-fix', story, undefined);
+  }
   // `judging` AND NOT `carrying`: a review is told which run it is JUDGING, and an earlier review is a
   // record of a judgement rather than work to judge.
   return reviewPhase(input, story, judging);

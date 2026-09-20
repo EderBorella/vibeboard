@@ -182,11 +182,17 @@ async function judge(
 // none, because it skipped its break-down having arrived with tasks attached — the review's own record
 // (decision 81). The caller decides which; this writes it.
 //
-// STILL OPTIONAL, and the one remaining absent case is the GATES path on such a story: the gates run before
-// any dispatch, so when they fail there is no review record either and nothing at all on the card to write
-// onto. The move is then made on its own, which for a send-back is a move to where the story already stands
-// — so that verdict is lost and the next tick runs the gates again. It is a real hole and it is named here
-// because the fix is not a line of code: nothing the loop may create can carry it.
+// STILL OPTIONAL, and the case it is optional FOR is the GATES path on such a story: the gates run before any
+// dispatch, so when they fail there is no review record either and nothing at all on the card to write onto.
+// The verdict cannot be stored, so the ACTION reports it instead — `unrecordedSendBack`, which the loop hands
+// to the next tick and `judgeStory` routes to `story-fix` on (decision 82). That is one tick's worth of memory
+// and no more: the fix is a work run, and every judgement after it lands on a record like any other.
+//
+// Before decision 82 this was a project halt rather than a hole with a name. The verdict went nowhere, the
+// move was to the column the story already stood in, and nothing was dispatched — so the next tick decided
+// the same thing, ran the whole gate suite again, and `MAX_IDLE_TICKS` ended the project 240 ticks later
+// with a reason that described none of it. Reproduced end to end in test/lifecycle-trace.test.ts before it was
+// changed: 57 gate-suite runs and 57 identical diary lines inside one 60-tick budget.
 async function recordVerdict(
   deps: ActDeps,
   card: Card,
@@ -195,6 +201,10 @@ async function recordVerdict(
   to: string | undefined,
   what: { why: string; line: string; dispatches: number; iteration: number },
 ): Promise<ActResult> {
+  // A PASS WITH NOWHERE TO LAND IS NOT A SEND-BACK, and `judge` never reaches here with one anyway — it
+  // writes onto the review's own record when the story has none of its own. Asked of the two values rather
+  // than of the caller, so a third one cannot grow a different answer.
+  const nowhere = onto === undefined && !verification.passed ? { unrecordedSendBack: card.id } : {};
   if (onto !== undefined) {
     const recorded = await deps.client.verdict(card.board, card.id, onto, verification);
     if (!recorded.ok) {
@@ -213,13 +223,16 @@ async function recordVerdict(
   if (to !== undefined && card.columnSlug !== to) {
     const stamped = await stamp(deps, card, to, what.why);
     if (!stamped.ok) {
-      return refused(
+      // THE REFUSAL CARRIES IT TOO. A move the endpoint would not make repeats on every tick, so a send-back
+      // dropped here is the same halt reached one branch over.
+      const refusal = await refused(
         deps,
         `could not move ${card.id} to ${to}`,
         stamped.reason,
         stamped.fatal,
         what.dispatches,
       );
+      return { ...refusal, ...nowhere };
     }
   }
   await deps.client.log('run', what.line, {
@@ -228,5 +241,5 @@ async function recordVerdict(
     board: card.board,
     skill: phase('story-review').skill,
   });
-  return { dispatches: what.dispatches };
+  return { dispatches: what.dispatches, ...nowhere };
 }

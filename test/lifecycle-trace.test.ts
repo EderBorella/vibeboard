@@ -680,6 +680,110 @@ for (const mode of MODES) {
       await assertHierarchy(started.project);
     });
 
+    // THE STORY THAT ARRIVED CARRYING ITS TASKS, AND WHOSE GATES THEN FAIL — decision 82, and a project
+    // halt until it. It skipped its break-down (decision 50), so it has no work run; the gates run BEFORE
+    // any dispatch, so a failure leaves no review run either. There was nothing on the card to write the
+    // verdict onto, `exitFail` named the column the story already stood in, and nothing was dispatched — so
+    // every tick decided the same thing and re-ran the whole gate suite. Driven against this harness before
+    // the fix: **57 executions of the gate command and 57 identical diary lines inside one 60-tick budget**,
+    // one run in the entire project, and `MAX_IDLE_TICKS` waiting at 240 to end it with a reason that
+    // described none of that.
+    //
+    // THE HAND-PLACED SHAPE IS THE POINT and is what an imported board produces: a story carrying tasks
+    // nobody's break-down made. Every other trace in this file reaches its stories through a break-down,
+    // which is exactly why none of them could see this.
+    it('blocks a story that arrived with its tasks and cannot pass its gates', async () => {
+      const started = await start({ gates: `echo ran >> ${GATE_LOG}; exit 1` });
+      const task = await place(started.project, 'engineering', 'backlog', 'A task');
+      const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
+      await place(started.project, 'features', 'backlog', 'A feature', [story]);
+
+      const ended = await drive(started);
+
+      // The project FINISHES, naming what it left behind, which is the rule the fix budget and `capReached`
+      // already embody everywhere else: a halt is never the answer to one bad card.
+      expect(ended.reason).toBe('complete');
+      expect(ended.detail).toContain('P-001');
+      expect(await columnOf(started.project, 'P-001')).toBe('blocked');
+      expect(await columnOf(started.project, 'F-001')).toBe('done');
+      // THE FIX BUDGET IS SPENT, which is what the first send-back buys: three attempts, the same three any
+      // other refused story gets, and then the card is left for a person.
+      const fixes = (await runs(started.project)).filter((r) => r.skill === 'fix');
+      expect(fixes).toHaveLength(3);
+      // AND THE FIRST ONE IS THE ONE WITH NO RUN TO NAME. The gates refused a story with nothing on it, so
+      // that fix is dispatched on the loop's own evidence; the three after it are handed the run carrying
+      // the verdict, because by then there is one.
+      expect(fixes.filter((r) => r.previous === undefined)).toHaveLength(1);
+      // FOUR GATE RUNS, not fifty-seven: the judgement, then one after each fix.
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(4);
+      // THE WHOLE TRACE past the project's own creation line, not a suffix of it. A slice starting at the
+      // first dispatch cannot see the two SKIPS in front of it, which are half of what this shape is — both
+      // cards arrived carrying their children, so each is stamped in with no run behind it.
+      expect((await trace(started.project)).slice(1)).toEqual([
+        'move features/F-001 in-progress',
+        'move product/P-001 in-progress',
+        'move engineering/E-001 in-progress',
+        'move engineering/E-001 done',
+        'ran E-001 implement',
+        // The gate refuses a story with nothing on it to record the refusal against, and the fix goes anyway.
+        'gates P-001 fail',
+        'ran P-001 fix',
+        'gates P-001 fail',
+        'ran P-001 fix',
+        'gates P-001 fail',
+        'ran P-001 fix',
+        'gates P-001 fail',
+        // Four judgements and three fixes: the budget, spent, and then the card left for a person.
+        'move product/P-001 blocked',
+        'smoke F-001 pass',
+        'move features/F-001 done',
+        'ran F-001 checkup-feature',
+        'stopped complete',
+      ]);
+      await assertHierarchy(started.project);
+    });
+
+    // THE NEIGHBOUR, pinned because nothing did: the same shape whose gates PASS first time. It must reach
+    // its judgement, close on the verdict written onto the review's own record (decision 81), and close its
+    // feature — one gate run and one review, with no fix anywhere.
+    it('closes a story that arrived with its tasks and passes its gates first time', async () => {
+      const started = await start();
+      const task = await place(started.project, 'engineering', 'backlog', 'A task');
+      const story = await place(started.project, 'product', 'backlog', 'A story', [task]);
+      await place(started.project, 'features', 'backlog', 'A feature', [story]);
+
+      const ended = await drive(started);
+
+      expect(ended.reason).toBe('complete');
+      expect(ended.detail).toBeUndefined();
+      expect((await trace(started.project)).slice(1)).toEqual([
+        // Two skips, one after the other: neither card's break-down runs, and both are stamped in with no
+        // run behind them (decision 50).
+        'move features/F-001 in-progress',
+        'move product/P-001 in-progress',
+        'move engineering/E-001 in-progress',
+        'move engineering/E-001 done',
+        'ran E-001 implement',
+        // One judgement, and the verdict lands on the review's own record because there is no work run
+        // (decision 81) — which is what lets the story close rather than be judged again.
+        'move product/P-001 done',
+        'review P-001 pass',
+        'smoke F-001 pass',
+        'move features/F-001 done',
+        'ran F-001 checkup-feature',
+        'stopped complete',
+      ]);
+      // Neither break-down ran — both cards arrived with their children — and nothing was fixed. Newest
+      // first, which is the order `GET /api/runs` answers in.
+      expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual([
+        'F-001 checkup-feature',
+        'P-001 review-story',
+        'E-001 implement',
+      ]);
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
+      await assertHierarchy(started.project);
+    });
+
     // THE FEATURE CHECKUP'S OTHER EXIT (the L1 loop). A checkup that created stories has not finished its
     // feature: it stays OPEN and L2 walks what appeared under it. Stamped `done` regardless, those stories are
     // ORPHANS — `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is

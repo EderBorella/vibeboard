@@ -969,6 +969,48 @@ describe('decideTick — the story judgement', () => {
     expect(action.kind === 'dispatch' && action.previous).toBeUndefined();
   });
 
+  // AND WHEN THE GATES REFUSED IT THERE IS NO RECORD OF EITHER KIND (decision 82) — the half decision 81
+  // left open and named. The gates run before any dispatch, so a story with no work run whose gates fail has
+  // no review run either: the verdict went nowhere, `exitFail` named the column the story already stood in,
+  // and nothing was dispatched. Every later tick decided the same thing and re-ran the whole gate suite,
+  // until `MAX_IDLE_TICKS` ended the PROJECT over one card it had a budget to fix.
+  it('fixes a story whose gates failed with no record anywhere on the card to say so', () => {
+    const action = decideTick(input({ cards: settledStory(), unrecordedSendBacks: ['P-001'] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix', skill: 'fix' });
+    // NO `previous`: there is no run on this card, which is the whole of what this branch is about. The fix
+    // is handed the gate commands in its prompt and runs them itself.
+    expect(action.kind === 'dispatch' && action.previous).toBeUndefined();
+  });
+
+  // AND IT IS THE NARROWEST POSSIBLE BRANCH. The moment the card carries a record, that record is the
+  // answer — otherwise a fact true of one tick would send a story back on a finding a fix had already
+  // answered, for the rest of the session.
+  it('judges a story named as unrecorded once it has a work run to read instead', () => {
+    const brokeDown = storyWork('break-down');
+    const action = decideTick(
+      input({ cards: settledStory(), runs: [brokeDown], unrecordedSendBacks: ['P-001'] }),
+    );
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.previous).toBe(brokeDown.run);
+  });
+
+  it('judges a story named as unrecorded once its review carries the verdict instead', () => {
+    const refused = selfRecorded(false);
+    const action = decideTick(
+      input({ cards: settledStory(), runs: [refused], unrecordedSendBacks: ['P-001'] }),
+    );
+    // The review's own verdict is a record, so P5 is reached through it and the fix is handed the findings.
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix' });
+    expect(action.kind === 'dispatch' && action.previous).toBe(refused.run);
+  });
+
+  // ANOTHER STORY'S GATE FAILURE IS NOT THIS ONE'S. Keyed by card id, and a fixture naming a different card
+  // is what tells "the loop remembered something" from "the loop remembered THIS".
+  it('judges a story when the unrecorded send-back belongs to another card', () => {
+    const action = decideTick(input({ cards: settledStory(), unrecordedSendBacks: ['P-009'] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+  });
+
   // AND THAT JUDGEMENT HAS SOMEWHERE TO LAND (decision 81). The review run is itself a record, so a story
   // with none of its own carries the verdict on the review that gave it. Without that the send-back was
   // written nowhere: every later tick read no verdict, dispatched the judgement again, and `story-fix` was

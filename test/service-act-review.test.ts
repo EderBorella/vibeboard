@@ -244,6 +244,62 @@ describe('the story judgement', () => {
     expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
   });
 
+  // AND THE GATES' OWN SEND-BACK, WHICH HAS NOTHING TO LAND ON AT ALL (decision 82). They run before any
+  // dispatch, so on this story there is no review record either — the verdict cannot be written anywhere, so
+  // the ACTION reports it and the loop hands it to the next tick, which sends the story to `story-fix`.
+  //
+  // Without it the tick decided the same thing every time: 57 gate-suite runs and 57 identical diary lines
+  // inside one 60-tick budget, end to end, and `MAX_IDLE_TICKS` would have ended the project at 240.
+  it('reports a gate send-back it had nowhere to record, so the next tick can act on it', async () => {
+    const r = recorder();
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      noWorkRun(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(result.unrecordedSendBack).toBe('P-001');
+    // Everything else is unchanged: nothing written, nothing moved, nothing dispatched, and the diary still
+    // carries the command so a person reads why without opening a run record.
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves).toEqual([]);
+    expect(r.requests).toHaveLength(0);
+    expect(result.dispatches).toBe(0);
+    expect(r.diary.find((d) => d.kind === 'run')?.text).toContain('npm test');
+  });
+
+  // AND ONLY THEN. A story with a work run has its verdict ON that run, which is a record the next tick
+  // reads off the board — reporting it here as well would be a second answer to a question already settled.
+  it('reports nothing when the gate send-back was recorded on a run', async () => {
+    const r = recorder();
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      REVIEW(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.verdicts[0]).toMatchObject({ run: 'WORK-1', mode: 'gates', passed: false });
+    expect(result.unrecordedSendBack).toBeUndefined();
+  });
+
+  // NOR FOR A PASS. `judge` writes onto the review's own record when the story has none of its own, so a
+  // verdict with nowhere to land is a gates failure and nothing else — asked of the two values rather than
+  // of the caller, so this holds however `recordVerdict` is called next.
+  it('reports nothing for a story with no work run whose gates passed', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      noWorkRun(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(result.unrecordedSendBack).toBeUndefined();
+    expect(r.verdicts[0]).toMatchObject({ run: 'REV-1', passed: true });
+  });
+
   it('sends a story back on a sent-back verdict', async () => {
     const r = recorder({ settle: [reviewRun({ verdict: 'sent-back', summary: 'the flag is not parsed' })] });
     await reviewStory(

@@ -20,6 +20,10 @@ interface Step {
   cards: Card[];
   runs: RunRecord[];
   phases: string[];
+  // WHICH CARD each dispatch was about, alongside the phase. The phase list alone cannot see the thing D2
+  // changes: three implement dispatches against three different tasks and three against one story read the
+  // same there, and the unit of work is exactly what moves.
+  on: string[];
 }
 
 const move = (cards: Card[], id: string, to: string): Card[] =>
@@ -79,6 +83,7 @@ function walk(start: Card[], runs: RunRecord[], until: string, verdicts: boolean
   let at = { cards: start, runs: [...runs] };
   const answers = [...verdicts];
   const phases: string[] = [];
+  const on: string[] = [];
   for (let n = 1; n <= 20; n += 1) {
     const settled = at.cards.find((c) => c.id === until);
     if (settled && (settled.columnSlug === 'done' || settled.columnSlug === 'blocked')) break;
@@ -92,15 +97,16 @@ function walk(start: Card[], runs: RunRecord[], until: string, verdicts: boolean
       at = { ...at, cards: move(at.cards, action.card.id, action.to) };
       continue;
     }
-    const on = action.card;
-    if (!on) break;
+    const about = action.card;
+    if (!about) break;
     phases.push(action.phase);
+    on.push(about.id);
     // The queue is consumed only by a judgement, so a scenario naming one verdict does not silently spend
     // it on the implement run that came first.
     const passed = phase(action.phase).bounded !== 'review' || (answers.shift() ?? true);
-    at = applyDispatch(at, action, on, n, passed);
+    at = applyDispatch(at, action, about, n, passed);
   }
-  return { ...at, phases };
+  return { ...at, phases, on };
 }
 
 // A story already broken down: two tasks in the backlog and the break-down run that made them. Two and not
@@ -128,6 +134,36 @@ describe('what one healthy story costs', () => {
     expect(at('P-001')).toBe('done');
     expect(at('E-001')).toBe('done');
     expect(at('E-002')).toBe('done');
+  });
+});
+
+// AND WHAT THREE TASKS COST, which is the size the D2 experiment measured. Two cannot tell "one run per
+// task" from "one run per story" by the LENGTH of the walk alone — a two-task story pays two implements
+// either way if the second is a group of one — so the unit is pinned here at three, and `on` is what says
+// which card each run was about.
+const threeTasks = (): Card[] => [
+  card('F-001', 'features', 'in-progress', 10, ['P-001']),
+  card('P-001', 'product', 'todo', 10, ['F-001', 'E-001', 'E-002', 'E-003']),
+  task('E-001', 'backlog', 10),
+  task('E-002', 'backlog', 20),
+  task('E-003', 'backlog', 30),
+];
+
+describe('what one story with three tasks costs', () => {
+  it('pays one implement dispatch per task, then one judgement', () => {
+    const walked = walk(threeTasks(), brokeDown(), 'P-001');
+    expect(walked.phases).toEqual(['task-implement', 'task-implement', 'task-implement', 'story-review']);
+  });
+
+  it('gives each task a run of its own, and judges the story once', () => {
+    const walked = walk(threeTasks(), brokeDown(), 'P-001');
+    expect(walked.on).toEqual(['E-001', 'E-002', 'E-003', 'P-001']);
+  });
+
+  it('leaves the story and all three tasks in done', () => {
+    const walked = walk(threeTasks(), brokeDown(), 'P-001');
+    const at = (id: string): string | undefined => walked.cards.find((c) => c.id === id)?.columnSlug;
+    expect([at('P-001'), at('E-001'), at('E-002'), at('E-003')]).toEqual(['done', 'done', 'done', 'done']);
   });
 });
 

@@ -335,6 +335,10 @@ describe('the lifecycle skills', () => {
   it('does not tell the story judgement auto-pilot ran the gates, which is false for a hand dispatch', () => {
     // The prompt says nobody ran them when nobody did. The obligation — read what it says — survives; the
     // claim about what happened does not.
+    // BOTH PATTERNS, and the first is the one that predates the body it guards. Migrating a negative
+    // assertion in the same change as its subject buys nothing: whatever the new wording is, the new
+    // pattern was chosen to miss it. The retired `review` skill's own sentence stays asserted here.
+    expect(body('review-story')).not.toMatch(/auto-pilot runs the gates/i);
     expect(body('review-story')).not.toMatch(/auto-pilot ran every command/i);
     expect(body('review-story')).toContain('This prompt tells you what the gates did');
     expect(body('review-story')).toContain('Do not assume');

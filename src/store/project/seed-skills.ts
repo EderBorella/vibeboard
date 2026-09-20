@@ -173,6 +173,13 @@ finishes, and your credential grants nothing that could.
 `,
   },
   {
+    // `boards: [engineering, product]` SINCE DECISION 80, and an existing project's `fix.md` still says
+    // `[engineering]`: `seedSkills` writes only into a project whose skills folder is absent, so nothing
+    // rewrites it. Readiness is silent about that on purpose. `boards` decides which skills the CARD's
+    // hand-dispatch menu offers (`skillsForCard`) and nothing else — `POST /api/runs` does not consult it —
+    // so a stale list narrows a menu on a product card and cannot stop the loop, which is the bar
+    // `phaseSkillProblems` is set at. The `review-story` migration it does name is a skill that does not
+    // EXIST, where the dispatch 404s and the card can never advance.
     slug: 'fix',
     content: `---
 name: Fix

@@ -122,6 +122,13 @@ function gateEvidence(review: NonNullable<PromptInputs['review']>): string[] {
 // A REVIEW's contract: `done` or `sent back with findings`, and no number anywhere. Decision 51 puts a model
 // here for exactly one question — does this do what the card asked — because a gate proves the suite passes
 // and cannot prove the suite tests the criterion the card states.
+//
+// AND `created`, which this frontmatter did not have. `story-review` keeps the checkup's authority to write
+// sibling stories (decision 80) and its skill body asks it to "list by id any cards you created" — an
+// obligation the contract gave it no field to discharge, so the run pane showed no created cards for the one
+// phase authorised to create them (`ActiveReport` filters on `record.created`). The BOUND never depended on
+// it and must not: `creatingRoundSpent` reads `Card.createdBy`, stamped by the endpoint, because a run's own
+// list is the agent's claim about itself (ruling 58).
 export function reviewLines(
   review: NonNullable<PromptInputs['review']>,
   judged: PromptInputs['previous'],
@@ -144,6 +151,7 @@ export function reviewLines(
     'outcome: success        # or: attention, if you could not judge it at all',
     'verdict: done           # or: sent-back',
     'summary: "one line saying why it got that verdict"   # quote it: a bare colon breaks the YAML',
+    'created: [P-041]        # ids of any cards you created; leave it out if you created none',
     '---',
     '## What I judged',
     '',

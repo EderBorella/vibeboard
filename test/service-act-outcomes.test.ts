@@ -95,8 +95,9 @@ describe('a run that produced nothing', () => {
     expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
   });
 
-  // THE WORST CASE THE CLAUSE NAMES: a checkup's `exitPass` is `done`, so a dead `checkup-feature` closed the
-  // feature and a dead `checkup-story` closed the story.
+  // THE WORST CASE THE CLAUSE NAMES HERE: a checkup's `exitPass` is `done`, so a dead `checkup-feature`
+  // closed the feature. The story's judgement has the same exit and no longer comes through `afterCardRun`
+  // at all — `reviewStory` asserts the clause for itself, and test/service-act-review.test.ts pins it there.
   it('does not let a dead checkup close its feature', async () => {
     const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: [] };
     const r = recorder({

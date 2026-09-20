@@ -115,6 +115,18 @@ describe('a checkup’s evidence', () => {
     expect(r.requests[0]?.checkup?.feature).toBeUndefined();
   });
 
+  // AND THE OTHER FLAG IS A FEATURE'S QUESTION TOO. `isLastOpenFeature` is written about a feature from end
+  // to end; handed a STORY it counts every live feature as "other", so a board whose features are all
+  // settled answers true and the story's judgement was told the smoke result may refuse its close. It
+  // cannot arise while a story's own feature is open, which is why nothing was wrong — so the fixture
+  // closes the feature, which is the only board state that tells the guard from its absence.
+  it('does not tell a story judgement the smoke result may refuse its close', async () => {
+    const closed = { ...feature, columnSlug: 'done' };
+    const r = recorder({ boardCards: [closed, story, story2, task] });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_REVIEW, context);
+    expect(r.requests[0]?.checkup?.smokeGates).toBeUndefined();
+  });
+
   // NOT KEYED ON THE SMOKE RESULT. A failed smoke command is the case that matters most — the feature
   // demonstrably does not run — so it is the case where the question must certainly still be asked.
   //

@@ -294,6 +294,28 @@ const isFlag = oneOf(FLAGS);
 // offers it keeps inviting the bug.
 type CreateCardBody = CreateCardInput & { links?: string[] };
 
+// THE ONE FIELD ON A CREATE WHOSE TYPE IS CHECKED HERE, and it is checked because it is the only one the
+// machine later executes something on the strength of (decision 85). The body is spread into the card, so
+// `satisfiedBy: {cmd: 'npm test'}` was answered 200 and written into the frontmatter as a YAML map — under a
+// key the frozen on-disk format says is `string | undefined`, and one `criterionCommand` calls `.trim()` on.
+//
+// REFUSED RATHER THAN DROPPED, which is the rule the PATCH route below already follows and the reason it
+// gives: an agent told 200 over a field this endpoint discarded has no reason to try the other spelling, and
+// a break-down that thinks it named the criterion has written a story nothing can skip.
+//
+// `null` IS A WRONG TYPE, not an absent field. It is what a JSON encoder emits for a value the agent did not
+// have, so it is the one that arrives by accident — and `typeof null` is `'object'`, which is how a check
+// written to exclude objects lets it through. `undefined` is the absent field, and the only one.
+//
+// AND THE PARAMETER IS `unknown` RATHER THAN `CreateCardBody`, which is the whole point: the route CASTS `req.body` to that type, so
+// the declared `satisfiedBy?: string` is a claim about what should arrive rather than a fact about what did.
+// Reading it through the declared type is how the field got here unexamined.
+function wrongSatisfiedBy(body: unknown): string | undefined {
+  const value = ((body ?? {}) as Record<string, unknown>).satisfiedBy;
+  if (value === undefined || typeof value === 'string') return undefined;
+  return 'Cannot set satisfiedBy: expected a string naming one of the gate commands this project declares in foundation/CODE-QUALITY.md, exactly as that document writes it.';
+}
+
 // Always for a run credential: the machine derives the hierarchy from links — the position it works from and
 // the checkup that advances a parent once its children are settled — and an agent has no way to know which of
 // two links a person meant as "see also". For the browser and the copilot it is the project's choice:
@@ -337,6 +359,11 @@ async function createForRequest(
   // `config.boards[board]` and an unknown name dereferences undefined — a stack trace and a 500, handed to the
   // caller least able to interpret one. Decision 10 says the board is validated; it was not.
   if (!BOARDS.includes(input.board)) return { code: 400, error: 'Unknown board' };
+  // BEFORE THE LIFECYCLE RULES AND FOR EVERY CALLER, because this is the shape of the on-disk format rather
+  // than a rule about who may create what: a person at the browser writing a map here would produce exactly
+  // the same unreadable card as a run would.
+  const mistyped = wrongSatisfiedBy(body);
+  if (mistyped) return { code: 400, error: mistyped };
   // A run is held to the lifecycle; a person at the browser is not.
   const ruled = cred?.run
     ? await lifecycleRulesForCreate(ctx, cred, input)

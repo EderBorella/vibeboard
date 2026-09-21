@@ -65,10 +65,17 @@ const RULES: Record<string, Rule> = {
   // sometimes be missing. Every rule this endpoint enforces for a run still applies to it — the credential
   // carries a run id, so `lifecycleRulesForCreate` runs — and the loop is already the caller that stamps
   // `setup: true` and moves cards, so this grants no authority it does not have one door along.
+  //
+  // AND `satisfiedBy` IS ON IT (decision 85), because the seeded `break-down` skill tells an agent to send
+  // that key on the create and this list is where the same prompt says what the create takes. The two
+  // disagreed: the field was absent here, so an agent reading the catalogue it was handed had no reason to
+  // send it and the check would never have fired on a real project. Written here rather than in the skill
+  // for the reason the whole table exists — the payload shape has one home, and three hand-written copies
+  // is what this generator replaced.
   'POST /api/cards': {
     scopes: ['work', 'service', ...BOARD_SCOPES],
     describe:
-      '`{ board, columnSlug, title, description?, body? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
+      '`{ board, columnSlug, title, description?, body?, satisfiedBy? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id. `satisfiedBy` names a gate command this project already declares, copied exactly, and only when that gate IS the card’s one acceptance criterion; it must be a string, and anything else is refused.',
   },
   'PATCH /api/cards/:board/:id': {
     scopes: ['work', ...BOARD_SCOPES],

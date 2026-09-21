@@ -19,6 +19,11 @@ export interface CreateCardInput {
   // create that carries links goes through `createLinkedCard`, which is the only door onto `setCardLinks`.
   group?: string;
   body?: string;
+  // The command that already decides this card's acceptance criterion, when there is one (decision 85).
+  // WRITTEN ONLY AT CREATE, by the break-down that authors the card: the PATCH route refuses it by name
+  // (`PATCH_OWNERS` in core/card.ts), because changing what a machine may close a card on after the fact
+  // changes the card without changing its criterion.
+  satisfiedBy?: string;
   // The run that created this card (ruling 58). Stamped by the endpoint from the credential it already
   // holds, never accepted from a caller — but it has to travel through here, because `createCard` builds
   // its `Card` field by field rather than spreading its input, so a field absent from this interface is
@@ -72,6 +77,7 @@ export async function createCard(
     links: [],
     group: input.group,
     created: today,
+    satisfiedBy: input.satisfiedBy,
     createdBy: input.createdBy,
     board: input.board,
     columnSlug: input.columnSlug,

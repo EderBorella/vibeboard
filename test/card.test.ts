@@ -6,7 +6,9 @@ import {
   pickCardPatch,
   serializeCard,
 } from '../src/core/card.js';
-import type { CardFrontmatter } from '../src/core/types.js';
+import { criterionCommand } from '../src/core/satisfied.js';
+import type { Card, CardFrontmatter } from '../src/core/types.js';
+import type { DeclaredCommands } from '../src/store/project/foundation.js';
 
 const fm: CardFrontmatter = {
   id: 'E-010',
@@ -174,6 +176,7 @@ describe('pickCardPatch', () => {
       'id',
       'links',
       'order',
+      'satisfiedBy',
       'setup',
     ]);
   });
@@ -233,5 +236,49 @@ describe('pickCardPatch', () => {
       patch: { description: '', tags: [] },
       rejected: [],
     });
+  });
+});
+
+// THE GUARD THAT MAKES A CARD CARRYING JUNK INERT RATHER THAN FATAL (decision 85), and it was untested: the
+// whole suite passed with `typeof d.satisfiedBy === 'string' ?` deleted from `parseCardContent`.
+//
+// DRIVEN ALL THE WAY INTO `criterionCommand` rather than stopping at the parsed value, because the consumer
+// is the reason the guard exists — it calls `.trim()` on this field. Without the guard a card carrying
+// `satisfiedBy: 42` reaches that call as a number and throws `story.satisfiedBy?.trim is not a function`,
+// inside `runLoop`, which has no try/catch: the auto-pilot process ends, over one card.
+//
+// AND THE CARD FILE IS THE FIXTURE, not a hand-built object. `POST /api/cards` now refuses a non-string
+// (test/app.cards-lifecycle.test.ts), so the only way one of these reaches the board today is a file
+// somebody edited or a project written by an earlier build of that endpoint — and the on-disk format is
+// frozen, so both stay reachable forever. This is the half that has to hold for a card already on disk.
+describe('a card file whose satisfiedBy is not a string', () => {
+  const GATES: DeclaredCommands = { gates: ['npm test'] };
+
+  const asCard = (data: CardFrontmatter): Card => ({
+    ...data,
+    board: 'product',
+    columnSlug: 'backlog',
+    body: '',
+    filePath: '/projects/example/boards/product/backlog/P-001.md',
+  });
+
+  it.each([
+    ['a number', 'satisfiedBy: 42'],
+    ['a boolean', 'satisfiedBy: true'],
+    ['a map', 'satisfiedBy:\n  cmd: npm test'],
+    ['a list', 'satisfiedBy:\n  - npm test'],
+  ])('reads %s as no criterion at all, and the rule answers over it without throwing', (_what, line) => {
+    const { data } = parse(`---\nid: P-001\ntitle: x\ncreated: 2026-07-23\n${line}\n---\n\nbody\n`);
+    expect(data.satisfiedBy).toBeUndefined();
+    expect(criterionCommand(asCard(data), [], GATES)).toBeUndefined();
+  });
+
+  // The value that is not junk, alongside them: a fixture that only ever answers `undefined` cannot tell
+  // "the guard works" from "the rule is broken".
+  it('still reads a declared gate a card really does name', () => {
+    const { data } = parse(
+      '---\nid: P-001\ntitle: x\ncreated: 2026-07-23\nsatisfiedBy: npm test\n---\n\nb\n',
+    );
+    expect(criterionCommand(asCard(data), [], GATES)).toBe('npm test');
   });
 });

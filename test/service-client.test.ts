@@ -280,6 +280,10 @@ describe('the loop’s sequencing', () => {
       // Nothing declared. Every test in this file is about SEQUENCING — which tick read the state, what was
       // dispatched — and reaches no ending that compares a smoke command to a gate.
       commands: async () => ({ gates: [] }),
+      // And nothing already satisfied: no card here carries a criterion, so the real checker would spawn
+      // nothing either. Present rather than absent because the dependency is required — a loop that could
+      // be built without it would be one that silently never checks.
+      satisfied: async () => [],
       act: async (action): Promise<ActResult> => {
         acted.push(action);
         return { dispatches: action.kind === 'dispatch' ? 1 : 0 };

@@ -1,0 +1,52 @@
+name: Legacy
+boards:
+  features:
+    columns:
+      - Backlog
+      - Todo
+      - In Progress
+      - Done
+  product:
+    columns:
+      - Backlog
+      - Todo
+      - In Progress
+      - Blocked
+      - Done
+  engineering:
+    columns:
+      - Backlog
+      - In Progress
+      - Review
+      - Blocked
+      - Done
+miniatureChars: 140
+idPadding: 3
+keepChats: 20
+contextBudget: 200000
+maxConcurrentRuns: 3
+autopilot:
+  maxIterations: 250
+  budgetUsd: 20
+  runTimeoutMs: 1800000
+  attemptCap: 3
+  terminal:
+    features:
+      - done
+    product:
+      - done
+    engineering:
+      - done
+  blockedColumn: blocked
+  mode: standard
+box:
+  kind: web
+copilot:
+  backend: claude-code
+  backends:
+    claude-code:
+      model: opus
+      effort: high
+    opencode:
+      model: opencode/deepseek-v4-flash-free
+      effort: high

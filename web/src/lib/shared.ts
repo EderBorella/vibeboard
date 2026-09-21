@@ -147,6 +147,11 @@ export const CARD_FIELDS_NOT_MIRRORED = [
   // nothing on screen shows it, and a run id on a tile would invite reading it as provenance the user is
   // meant to act on.
   'createdBy',
+  // The command that already decides a story's criterion (decision 85). A machine field like the one
+  // above: the loop runs it before a break-down and the diary line names it when it closes the card, so a
+  // person reads the command in the sentence that acted on it rather than as a chip on a tile. The card's
+  // own file carries it for anyone who wants to look.
+  'satisfiedBy',
 ] as const;
 
 // A frontmatter field on the interface above that `CARD_FIELDS` does not name. `never` when every one is

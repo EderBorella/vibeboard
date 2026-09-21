@@ -33,6 +33,16 @@ export interface CardFrontmatter {
   links: string[]; // ids of related cards on either board (symmetric)
   group?: string; // optional visual grouping label
   created: string; // ISO date "YYYY-MM-DD"
+  // THE COMMAND THAT DECIDES WHETHER THIS CARD'S CRITERION ALREADY HOLDS (decision 85). A story whose one
+  // acceptance criterion IS a command the project declares as a gate can be answered before anything is
+  // dispatched: four cards in one measured trial asked for work the tree had already done, and each cost a
+  // full implement and a full review to find that out.
+  //
+  // IT NAMES A COMMAND, IT DOES NOT CARRY ONE. An agent writes this field through `POST /api/cards`, so the
+  // loop runs it only when the string matches a gate `foundation/CODE-QUALITY.md` declares — `criterionCommand`
+  // in core/satisfied.ts is the one place that comparison is made. Anything else is inert: never run, never
+  // trusted, and the story is broken down exactly as it would have been.
+  satisfiedBy?: string;
   // The setup feature: a project-level barrier. While it is unfinished, no card outside its subtree
   // is eligible, so the shared architectural decisions are made once rather than per feature.
   //
@@ -71,6 +81,7 @@ export const CARD_FRONTMATTER_KEYS = [
   'links',
   'group',
   'created',
+  'satisfiedBy',
   'setup',
   'followUp',
   'createdBy',

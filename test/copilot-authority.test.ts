@@ -445,9 +445,17 @@ describe('the generated endpoint catalogue', () => {
   // break-down was told it had linked its children and left orphans. The payload shape is asserted as EXACT
   // BYTES because that string IS the contract an agent reads — a substring match on "links" would pass on a
   // description that still offered it.
+  //
+  // `satisfiedBy?` is in the bytes (decision 85), and it is the field this row was MISSING rather than one
+  // it wrongly offered: the seeded `break-down` skill tells an agent to send it on the create, and while the
+  // catalogue in the same prompt did not name it an agent had no reason to. Whether the endpoint honours
+  // what this row advertises is asserted against the running route in test/app.cards-lifecycle.test.ts;
+  // exact bytes here are about the contract an agent reads.
   it('offers a run no links field on the create, and keeps the link route it does have', () => {
     const work = endpointsFor('work', 'E-042').join('\n');
-    expect(work).toContain('`{ board, columnSlug, title, description?, body? }` — create a card.');
+    expect(work).toContain(
+      '`{ board, columnSlug, title, description?, body?, satisfiedBy? }` — create a card.',
+    );
     // `PUT …/links` is confined to the run's own card, which is why it survives: parent↔child is the only link
     // a run can mean, and the far side is written for it there.
     expect(work).toContain('PUT /api/cards/:board/:id/links');

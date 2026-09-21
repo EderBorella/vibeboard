@@ -36,7 +36,14 @@ export function criterionCommand(story: Card, tasks: Card[], commands: DeclaredC
   // Surrounding whitespace only. `readGates` already trims what the document declares and a card carries
   // whatever its author typed; anything looser — a prefix match, a fold — is the guess that closes a story
   // on a command nobody declared.
-  return commands.gates.some((gate) => gate.trim() === named) ? named : undefined;
+  //
+  // AND THE DOCUMENT'S STRING IS WHAT COMES BACK, never the card's, though the equality above makes the two
+  // the same characters today. It is the data flow that matters rather than the value: what the loop spawns
+  // then provably originates in `foundation/CODE-QUALITY.md`, so no weakening of this comparison can put a
+  // card's own text in front of a shell. Returning `named` left that resting entirely on the comparison —
+  // loosen it to a prefix match and the card's whole string, second command and all, became the thing run.
+  const declared = commands.gates.find((gate) => gate.trim() === named);
+  return declared?.trim();
 }
 
 // THE ONE STORY A TICK MAY SPEND A COMMAND ON, for the service that has to run it.

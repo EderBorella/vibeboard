@@ -10,6 +10,10 @@ import { COMMAND_TIMEOUT_MS } from './commands.js';
 // the opposite decision from `commands.ts`, deliberately: a project's gate command IS a line a person
 // typed and has to reach a shell, and it earns that by coming from a file agents cannot write.
 //
+// A CARD MAY NOW SELECT ONE OF THOSE LINES (decision 85), and selecting is the whole of what it may do:
+// `criterionCommand` matches a story's `satisfiedBy` against the declared gates for exact equality and
+// hands back the DOCUMENT'S string, so the file is still the only author of anything a shell is given.
+//
 // Nothing here throws. The caller is a loop, and an exception would end the run instead of the step.
 // `execFile` validates its arguments SYNCHRONOUSLY and throws on a NUL byte, inside the promise
 // executor where a rejection is indistinguishable from a bug — so the call is wrapped, and a name or

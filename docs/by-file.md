@@ -44,7 +44,7 @@ machine's closure, and it is why the purity gate is still unarmed.
 | `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61`, `decision 80`, `decision 83`, `decision 85` |
 | `position.ts` | `decisions.md` | `decision 38`, `decision 39` |
 | `runs/types.ts` | `decisions.md` — the record's shape; `runs.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `S11` |
-| `satisfied.ts` | `decisions.md` — whether a story's acceptance criterion is one a machine can already answer, and the one place the loop and the tick agree on WHICH command that is. The bound on it is a security property rather than a scope: the key names a declared gate, it never carries a command | `decision 85` |
+| `satisfied.ts` | `decisions.md` — whether a story's acceptance criterion is one a machine can already answer, and the one place the loop and the tick agree on WHICH command that is. The bound on it is a security property rather than a scope: the key names a declared gate, it never carries a command — and what comes back is the DOCUMENT'S string, so only a declared command can be executed by data flow rather than by the comparison holding | `decision 39`, `decision 51`, `decision 85`, `ruling 66` |
 | `setup-feature.ts` | `decisions.md` | `decision 50`, `decision 51` |
 | `smoke-declaration.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 66`, `decision 67` |
 | `suggestions.ts` | `decisions.md` | `decision 49` |
@@ -62,8 +62,9 @@ than it closes, so the code moved to where both callers legitimately sit. Nothin
 
 | file | pages | cites |
 |---|---|---|
-| `commands.ts` | `decisions.md`, `security/containment.md` — gate commands run unsandboxed in the loop's own process, deliberately | `decision 7`, `decision 13`, `C4` |
+| `commands.ts` | `decisions.md`, `security/containment.md` — gate commands run unsandboxed in the loop's own process, deliberately. Also states the one exception to "never a command read from a card": a `satisfiedBy` SELECTS a declared gate and the document's own string is what runs | `decision 7`, `decision 13`, `decision 85`, `C4` |
 | `git-measure.ts` | `decisions.md` | `S11` |
+| `git-work.ts` | `decisions.md` — the only module that writes history, and why it is `execFile` where `commands.ts` is a shell. `headRevision` is here because the loop keys a criterion's answer on the committed tree | `decision 85` |
 | `process-group.ts` | `decisions.md` | `decision 13` |
 
 ## `src/store/` — the filesystem is the database
@@ -185,7 +186,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66` |
 | `loop.ts` | `decisions.md` — and the one fact it carries from one tick to the next, which is why `Progress` holds a set of card ids | `decision 8`, `decision 20`, `decision 39`, `decision 66`, `decision 82`, `decision 85` |
 | `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20`, `decision 85` |
-| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the three silent refusals, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick | `decision 51`, `decision 82`, `decision 85` |
+| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the four silent refusals, the diary lines that are the only record a command ran, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick. The first refusal is the in-flight one — measuring a tree an agent is editing caches an answer the edits falsify, against a HEAD they do not move | `decision 51`, `decision 73`, `decision 82`, `decision 85` |
 | `stamp.ts` | `decisions.md` | `decision 10`, `decision 38` |
 
 ## `web/src/` — the React front end
@@ -193,7 +194,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | file | pages | cites |
 |---|---|---|
 | `lib/api.ts` | `decisions.md` | `decision 48`, `S10` |
-| `lib/shared.ts` | `decisions.md` — a deliberate hand-mirror of `src/core/`, guarded by `test/mirror.test.ts`; never deduplicated | `decision 46`, `decision 49`, `decision 52` |
+| `lib/shared.ts` | `decisions.md` — a deliberate hand-mirror of `src/core/`, guarded by `test/mirror.test.ts`; never deduplicated | `decision 46`, `decision 49`, `decision 52`, `decision 85` |
 | `styles.ts` | THE CASCADE — the one ordered list of the 42 stylesheets the app loads, imported by `main.tsx` and by `.storybook/preview.tsx` so the workbench cannot show a cascade the app does not have. 59 became 41 in the organism phase: the 47 parts the split produced were an artefact of the byte-identity contiguity constraint, and §5.1 asks for one sheet per component and per organism directory. It also records where each of the seven misfiled strays went | — |
 | `organisms/shared/modal.css` | `Modal` — four hand-built dialogs and 21 classes in five, with the measure, the colour and the dismissability as ATTRIBUTES rather than classes | — |
 | `organisms/shared/list.css` | `List` + `Row` — the nineteen list-and-row families in five classes, and the one place `--rule` and `--tone` meet | `decision 48` |

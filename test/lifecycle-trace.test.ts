@@ -213,6 +213,10 @@ async function driveOnce(
     // also what makes the cache assertable — 60 ticks over one unchanging tree must run the command once.
     satisfied: satisfiedChecker({
       root: project.root,
+      // THE REAL BOARD CLIENT, so the diary lines it writes go through `POST /api/log` into the project's own
+      // PROJECT-LOG.md and are read back off disk below. This is the only measurement in the loop that can
+      // occupy minutes without a run record, so the record it does leave is worth asserting unfaked.
+      client,
       state: () => readAutopilotState(project.root, new Date().toISOString()),
       head: async () => 'trace-head',
     }),
@@ -1155,6 +1159,17 @@ describe('a story whose criterion the tree already satisfies', { timeout: 60_000
       `P-001 moved to done: its acceptance criterion \`${tally(GATE_LOG)}\` already passes, so there was nothing to break down and no work was done.`,
     );
 
+    // AND IT SAID SO BEFORE IT SPENT THE TIME. This command is instant; a project's real gate suite is
+    // minutes, during which there is no run in flight, no dispatch and no accounting movement — so without
+    // this line the product looks frozen and nothing afterwards says a command was ever run.
+    const entries = await diary(started.project);
+    expect(entries.filter((e) => e.text.startsWith('Measuring P-001')).map((e) => e.text)).toEqual([
+      `Measuring P-001's acceptance criterion before its break-down: \`${tally(GATE_LOG)}\`.`,
+    ]);
+    // Nothing about a criterion that HELD: that story is the move above, written by the stamp in the same
+    // tick, and a second line would be one fact recorded twice.
+    expect(entries.filter((e) => e.text.includes('does not pass yet'))).toEqual([]);
+
     // THE CACHE, COUNTED FROM WHAT THE COMMAND ITSELF WROTE. Two ticks had P-001 as their candidate — the
     // feature's skipped break-down and the story's own close — and the command ran once. Nothing else in
     // this project runs a gate: the story never reaches a review, and the feature's checkup runs the smoke
@@ -1189,6 +1204,18 @@ describe('a story whose criterion the tree already satisfies', { timeout: 60_000
     expect(await columnOf(started.project, 'P-001')).toBe('blocked');
     expect(ended.reason).toBe('complete');
     expect(ended.detail).toContain('P-001');
+
+    // AND THE DIARY SAYS A COMMAND RAN AND CAME BACK NO. This is the branch that left no trace at all: no
+    // card moves, no run is recorded against the measurement, and the break-downs that follow look like an
+    // ordinary story. Exactly one pair, because the answer is cached — a line per tick is decision 82's
+    // incident, which flooded the diary the checkup has to read.
+    const texts = (await diary(started.project)).map((e) => e.text);
+    expect(texts.filter((t) => t.startsWith('Measuring P-001'))).toEqual([
+      `Measuring P-001's acceptance criterion before its break-down: \`${failing}\`.`,
+    ]);
+    expect(texts.filter((t) => t.includes('does not pass yet'))).toEqual([
+      `P-001's acceptance criterion \`${failing}\` does not pass yet, so it is being broken down as usual.`,
+    ]);
 
     // ONE EXECUTION ACROSS THE WHOLE SESSION. Uncached, this command runs on every tick that has a
     // break-down candidate: the skipped feature break-down, three break-down attempts and the block — five

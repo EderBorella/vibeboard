@@ -243,6 +243,12 @@ async function gather(
   // Read in the same gather as the board, so the commands the tick compares are the ones declared while
   // this board was true.
   const commands = await deps.commands();
+  // Hoisted out of the input below because the criterion check reads it too: a run in flight means the tick
+  // is about to wait, and measuring a criterion against a tree an agent is editing is both wasted and wrong
+  // (see `satisfied.ts`). One list, so the two cannot be told different things about one board.
+  const inFlight = runs.value.runs
+    .filter((r) => r.status === 'queued' || r.status === 'running')
+    .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill }));
 
   return {
     input: {
@@ -256,9 +262,7 @@ async function gather(
       // Identities, not a count. `attemptsUsed` deliberately does not count an unfinished run, so the card
       // being worked stays eligible — and above a concurrency of one the pick would otherwise hand out the
       // same card twice.
-      inFlight: runs.value.runs
-        .filter((r) => r.status === 'queued' || r.status === 'running')
-        .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill })),
+      inFlight,
       problems: board.value.problems,
       commands,
       unrecordedSendBacks: [...unrecorded],
@@ -268,6 +272,7 @@ async function gather(
       satisfied: await deps.satisfied({
         cards,
         commands,
+        inFlight,
         ...(ap.focus === undefined ? {} : { focus: ap.focus }),
       }),
     },

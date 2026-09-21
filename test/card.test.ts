@@ -174,6 +174,7 @@ describe('pickCardPatch', () => {
       'id',
       'links',
       'order',
+      'satisfiedBy',
       'setup',
     ]);
   });

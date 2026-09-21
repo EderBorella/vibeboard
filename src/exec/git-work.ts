@@ -220,6 +220,23 @@ async function currentBranch(root: string, opts: GitOptions): Promise<string | u
   return name === '' ? undefined : name;
 }
 
+// WHAT THE COMMITTED TREE IS, as one opaque string, for a caller that needs to know whether it has
+// changed rather than what it is (decision 85). The loop caches the result of running a story's criterion
+// against this: it commits before every dispatch, so the revision moves exactly when the tree it measured
+// can have moved.
+//
+// `undefined` FOR EVERY FAILURE, including the ordinary one — a repository with no commit yet, which is a
+// project's state until its first dispatch. The caller treats that as "do not check" rather than as "do
+// not cache": an uncached check runs a project's whole gate suite on every tick.
+//
+// UNSCOPED BY `PROJECT_ONLY`, unlike the commands around it, because a revision is not a path: this is
+// asking git which commit HEAD is, and a pathspec on `rev-parse` would be read as a revision.
+export async function headRevision(root: string, opts: GitOptions = {}): Promise<string | undefined> {
+  const result = await git(root, ['rev-parse', 'HEAD'], { ...opts, timeoutMs: PROBE_TIMEOUT_MS });
+  if (!result.ok) return undefined;
+  return result.stdout.trim() || undefined;
+}
+
 // Scoped by `PROJECT_ONLY`, like every other command here.
 async function porcelain(root: string, opts: GitOptions): Promise<string> {
   const result = await git(root, ['status', '--porcelain', ...PROJECT_ONLY], {

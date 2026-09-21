@@ -11,6 +11,7 @@ import type { BoardName, Card } from '../src/core/types.js';
 import { type ActDeps, performAction } from '../src/service/act.js';
 import { BoardClient } from '../src/service/board-client.js';
 import { type LoopEnded, runLoop } from '../src/service/loop.js';
+import { satisfiedChecker } from '../src/service/satisfied.js';
 import {
   readAutopilotState,
   updateAutopilotState,
@@ -203,6 +204,18 @@ async function driveOnce(
     // OFF DISK, exactly as main.ts wires it: the collision refusal (ruling 66) reads what the foundation
     // documents declare, and every test here writes real ones through `putFoundation`.
     commands: () => declaredCommands(project.root),
+    // THE REAL CHECKER, running the project's REAL gate command through the REAL shell (decision 85) — the
+    // rule that picks the command is `core/satisfied.ts` on both ends, unfaked, so what this drives is the
+    // pair rather than two stubs agreeing.
+    //
+    // ONE SEAM, and it is the same fiction as the commit stub above: a scaffolded temp folder is no
+    // repository, so nothing here can move HEAD, and a constant is exactly what that tree looks like. It is
+    // also what makes the cache assertable — 60 ticks over one unchanging tree must run the command once.
+    satisfied: satisfiedChecker({
+      root: project.root,
+      state: () => readAutopilotState(project.root, new Date().toISOString()),
+      head: async () => 'trace-head',
+    }),
     act: (action, context) => performAction(actDeps, action, context),
     // Nothing sleeps: the idle wait is five seconds in production and there is nothing to wait for here.
     wait: async () => {},
@@ -318,6 +331,10 @@ async function dispatches(project: TestProject, argsLog: string): Promise<string
 // THE BODY IS PART OF IT, because `break-down` is the one skill this file never seeds: its behaviour travels
 // in the CARD (see `seedSkillBodies`), so a hand-placed story with no marker is a break-down that creates
 // nothing — which is exactly the run that produced decision 45's correction.
+//
+// AND `satisfiedBy` TRAVELS THROUGH THE ENDPOINT TOO (decision 85), rather than being written into the file:
+// a break-down names it on `POST /api/cards` exactly like this, so a test that wrote the frontmatter by hand
+// would prove the tick reads a key nothing can actually set.
 async function place(
   project: TestProject,
   board: BoardName,
@@ -325,11 +342,18 @@ async function place(
   title: string,
   links: string[] = [],
   body?: string,
+  satisfiedBy?: string,
 ): Promise<string> {
   const res = await project.app.inject({
     method: 'POST',
     url: '/api/cards',
-    payload: { board, columnSlug, title, ...(body === undefined ? {} : { body }) },
+    payload: {
+      board,
+      columnSlug,
+      title,
+      ...(body === undefined ? {} : { body }),
+      ...(satisfiedBy === undefined ? {} : { satisfiedBy }),
+    },
   });
   expect(res.statusCode).toBe(200);
   const card = res.json() as Card;
@@ -1089,6 +1113,90 @@ for (const mode of MODES) {
 // SIXTEEN IS THE SMALLEST BOARD THAT SHOWS IT: `TASKS_PER_RUN × attemptCap` is fifteen, and fifteen closed
 // perfectly well while sixteen was blocked FOR SUCCEEDING — three successful groups, the sixteenth task
 // stranded in `backlog`, `story-review` never dispatched, so the gates never ran over any of the work.
+// DECISION 85, END TO END. The evidence it comes from is on the board two tests up: "node:test framework is
+// set up", a story satisfied by an earlier story's scaffold, which nothing could know deterministically —
+// blocked after three break-downs that created nothing. Four cards like it in one 219-dispatch trial cost a
+// full implement and a full review each.
+//
+// THE REAL COMMAND, THROUGH THE REAL SHELL, and the project's own `foundation/CODE-QUALITY.md` declares it:
+// the gate document is written through the endpoint, `declaredCommands` reads it off disk, and the loop
+// spawns it. What is faked is the git revision and nothing else — a scaffolded temp folder is no repository.
+describe('a story whose criterion the tree already satisfies', { timeout: 60_000 }, () => {
+  it('closes it with no run of any kind, and says so in the diary', async () => {
+    const started = await start();
+    const story = await place(
+      started.project,
+      'product',
+      'backlog',
+      'The test command exits 0',
+      [],
+      'Already true of the tree, and a command can say so.\n',
+      // THE PROJECT'S OWN GATE, named on the card through `POST /api/cards` exactly as a break-down would
+      // name it. Anything else and the loop would not run it at all.
+      tally(GATE_LOG),
+    );
+    await place(started.project, 'features', 'backlog', 'A test runner', [story]);
+
+    const ended = await drive(started);
+    expect(ended.reason).toBe('complete');
+
+    // NOTHING WAS DISPATCHED FOR IT. Not a break-down, not an implement, not a review — which is the whole
+    // of what this decision buys, and `runs` is where it is spent.
+    const all = await runs(started.project);
+    expect(all.filter((r) => r.card === 'P-001')).toEqual([]);
+    expect(await columnOf(started.project, 'P-001')).toBe('done');
+    expect(await columnOf(started.project, 'F-001')).toBe('done');
+
+    // AND THE BOARD SAYS SO RATHER THAN LOOKING LIKE WORK THAT HAPPENED. A story in `done` with nothing
+    // under it and no run against it is indistinguishable from a story somebody built, and this line is the
+    // only thing that tells them apart.
+    const moved = (await diary(started.project)).find((e) => e.text.startsWith('P-001 moved to done'));
+    expect(moved?.text).toBe(
+      `P-001 moved to done: its acceptance criterion \`${tally(GATE_LOG)}\` already passes, so there was nothing to break down and no work was done.`,
+    );
+
+    // THE CACHE, COUNTED FROM WHAT THE COMMAND ITSELF WROTE. Two ticks had P-001 as their candidate — the
+    // feature's skipped break-down and the story's own close — and the command ran once. Nothing else in
+    // this project runs a gate: the story never reaches a review, and the feature's checkup runs the smoke
+    // command instead.
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
+    await assertHierarchy(started.project);
+  });
+
+  // THE SAFETY DIRECTION, end to end and with the real shell: a criterion that does NOT hold changes
+  // nothing at all. This is also where the cache earns its keep — five ticks in a row have this story as
+  // their candidate, and `MAX_IDLE_TICKS` would allow 240.
+  it('breaks it down as before when the criterion does not hold, and measures the tree once', async () => {
+    const failing = `echo ran >> ${GATE_LOG}; exit 1`;
+    const started = await start({ gates: failing });
+    const story = await place(
+      started.project,
+      'product',
+      'backlog',
+      'The test command exits 0',
+      [],
+      'Not true of the tree yet, so this is ordinary work.\n',
+      failing,
+    );
+    await place(started.project, 'features', 'backlog', 'A test runner', [story]);
+
+    const ended = await drive(started);
+
+    // BROKEN DOWN, three times, exactly as it would have been before decision 85 — the card body carries no
+    // create marker, so each attempt creates nothing and the story blocks at the cap (decision 45).
+    const all = await runs(started.project);
+    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'break-down')).toHaveLength(3);
+    expect(await columnOf(started.project, 'P-001')).toBe('blocked');
+    expect(ended.reason).toBe('complete');
+    expect(ended.detail).toContain('P-001');
+
+    // ONE EXECUTION ACROSS THE WHOLE SESSION. Uncached, this command runs on every tick that has a
+    // break-down candidate: the skipped feature break-down, three break-down attempts and the block — five
+    // runs of a project's suite to learn the same thing five times.
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
+  });
+});
+
 describe('a story with more tasks than one cap could pay for', { timeout: 60_000 }, () => {
   it('delivers it in groups and closes it, rather than blocking the story that succeeded', async () => {
     const started = await start({

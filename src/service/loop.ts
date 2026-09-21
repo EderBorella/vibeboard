@@ -9,6 +9,7 @@ import { decideTick, type TickAction } from '../core/tick.js';
 import { BOARDS, type BoardName, type Card } from '../core/types.js';
 import type { DeclaredCommands } from '../store/project/foundation.js';
 import type { BoardClient, Failed } from './board-client.js';
+import type { SatisfiedWorld } from './satisfied.js';
 
 // The loop, and it holds no decisions of its own. Every tick is: read the world, hand it to `decideTick`,
 // carry the one action out, write down what happened. The reasoning is in `src/core/tick.ts`, which is pure
@@ -44,6 +45,11 @@ export interface LoopDeps {
   // credential. FRESH EVERY TICK, never captured — an agent rewrites both documents while the loop runs, and
   // the whole point of the comparison is to see what the project says NOW.
   commands: () => Promise<DeclaredCommands>;
+  // WHICH BREAK-DOWN CANDIDATE'S CRITERION ALREADY PASSES (decision 85), off the same disk the commands
+  // above come from and for the same reason: there is no route that runs a command for a `service`
+  // credential, and the tick may not spawn anything. FRESH EVERY TICK like the commands — what it caches,
+  // and what makes that safe, is `satisfied.ts`'s own business rather than this file's.
+  satisfied: (world: SatisfiedWorld) => Promise<string[]>;
   // Carrying out one action. Task 8's `act.ts`; injected so this file's sequencing is testable on its own,
   // and so the loop cannot quietly grow a second place where work happens.
   act: (action: TickAction, context: TickContext) => Promise<ActResult>;
@@ -233,10 +239,14 @@ async function gather(
   const cards: Card[] = BOARDS.flatMap((name) => board.value.boards[name] ?? []);
   const columns = {} as Record<BoardName, string[]>;
   for (const name of BOARDS) columns[name] = boardColumnSlugs(board.value.config, name);
+  const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
+  // Read in the same gather as the board, so the commands the tick compares are the ones declared while
+  // this board was true.
+  const commands = await deps.commands();
 
   return {
     input: {
-      ap: board.value.config.autopilot ?? DEFAULT_AUTOPILOT,
+      ap,
       cards,
       columns,
       runs: runs.value.runs,
@@ -250,10 +260,16 @@ async function gather(
         .filter((r) => r.status === 'queued' || r.status === 'running')
         .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill })),
       problems: board.value.problems,
-      // Read in the same gather as the board, so the commands the tick compares are the ones declared while
-      // this board was true.
-      commands: await deps.commands(),
+      commands,
       unrecordedSendBacks: [...unrecorded],
+      // AFTER the board and the commands and from both, because that is what it is about: the story this
+      // board says the machine is in the middle of, and the gates this project says it runs. A command is
+      // spawned only where those two meet on a break-down candidate.
+      satisfied: await deps.satisfied({
+        cards,
+        commands,
+        ...(ap.focus === undefined ? {} : { focus: ap.focus }),
+      }),
     },
   };
 }

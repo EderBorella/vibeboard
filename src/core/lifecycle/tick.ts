@@ -32,6 +32,7 @@ import { ARCHIVE_SLUG } from '../layout.js';
 import { type PhaseName, phase } from '../phases.js';
 import { derivePosition, type Position } from '../position.js';
 import { isProjectRun, type RunRecord } from '../runs.js';
+import { criterionCommand } from '../satisfied.js';
 import type { BoardName, Card } from '../types.js';
 import {
   focusFinishedSentence,
@@ -113,6 +114,20 @@ export interface TickInput {
   // THE LOOP'S MEMORY OF ONE TICK AND NO LONGER. The fix it buys IS a work run, so from the tick after it the
   // ordinary verdict path carries the story and `judgeStory` never reads this again.
   unrecordedSendBacks: string[];
+  // THE BREAK-DOWN CANDIDATES WHOSE ACCEPTANCE CRITERION ALREADY PASSES, by card id (decision 85). The
+  // service ran the command — `satisfied.ts` beside the loop — and this is its exit code, reduced to the
+  // only thing the machine needs from it. Nothing here spawns anything, exactly as with `commands`.
+  //
+  // WHAT PASSED, NEVER WHAT FAILED, and the direction is the safety property rather than a preference: an
+  // empty list skips nothing, so a loop that checked nothing, refused to run a command, or could not read
+  // the tree breaks every story down exactly as it did before this existed. The inverse field would close
+  // every story on a board the moment it arrived empty.
+  //
+  // REQUIRED, for the reason `commands` and `unrecordedSendBacks` are, with one difference worth stating
+  // rather than glossing: an absent field here would fail SHUT, not open — it would quietly switch the
+  // check off and go on paying for the break-downs it exists to save. There is no board state that says
+  // "the loop forgot to look", so the obligation is carried by the type and pinned in test/tick-satisfied.test.ts.
+  satisfied: string[];
 }
 
 const stop = (reason: StopReason, detail?: string): TickAction => ({
@@ -458,12 +473,38 @@ function checkupPhase(input: TickInput, card: Card): TickAction | undefined {
 // since the judgement moved up (decision 80), and row P3 since the work did (decision 83): a task is no
 // longer a position the machine stands in, it is the record of what one dispatch was asked for.
 function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
-  if (tasks.length === 0) return dispatchPhase(input, 'story-breakdown', story);
+  if (tasks.length === 0) {
+    return alreadySatisfied(input, story, tasks) ?? dispatchPhase(input, 'story-breakdown', story);
+  }
   if (ENTERING.includes(story.columnSlug)) {
     return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
   }
   if (allSettled(input.ap, tasks)) return judgeStory(input, story);
   return implementStory(input, story, tasks);
+}
+
+// ROW P2, ANSWERED BEFORE IT IS ASKED (decision 85). A story whose one acceptance criterion IS a command
+// this project declares as a gate, and which already passes, has nothing to break down: four cards in a
+// 219-dispatch trial asked for work an earlier story's scaffold had already done, and each paid a full
+// implement and a full review to discover it.
+//
+// BOTH HALVES ARE REQUIRED AND BOTH ARE READ HERE. `criterionCommand` says whether this card names a
+// command a machine may act on at all — a declared gate, on a story with nothing under it — and
+// `input.satisfied` says the service ran it and it exited 0. Asking the first question here as well as in
+// the service is deliberate rather than defensive duplication: it is the same call into the same module,
+// so a loop that ran something a card named cannot close a story the machine would not have closed.
+//
+// AND THE SENTENCE IS THE WHOLE VISIBLE PART OF THIS. A story in `done` with nothing under it and no run
+// against it looks exactly like work that happened; naming the command is what says it did not, and it
+// leaves a claim the reader can check by hand.
+function alreadySatisfied(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
+  const command = criterionCommand(story, tasks, input.commands);
+  if (command === undefined || !input.satisfied.includes(story.id)) return undefined;
+  return skipPhase(
+    'story-satisfied',
+    story,
+    `its acceptance criterion \`${command}\` already passes, so there was nothing to break down and no work was done.`,
+  );
 }
 
 // A phase the loop carries out alone, to a column the CALLER names. The two send-back destinations and the

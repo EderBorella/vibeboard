@@ -16,6 +16,7 @@ export type PhaseName =
   | 'feature-breakdown-skip'
   | 'story-breakdown'
   | 'story-breakdown-skip'
+  | 'story-satisfied'
   | 'story-implement'
   | 'story-fix'
   | 'story-review'
@@ -66,6 +67,25 @@ export const PHASES: readonly Phase[] = [
     name: 'story-breakdown-skip',
     board: 'product',
     exitPass: 'in-progress',
+    bounded: 'none',
+  },
+  // THE OTHER WAY A BREAK-DOWN DOES NOT HAPPEN (decision 85), and the difference from the skip above is
+  // the exit. That one says "this story already has its tasks, work them"; this one says "this story's one
+  // acceptance criterion is a command the project declares as a gate, and it already passes" — so there is
+  // nothing to break down, nothing to implement, and nothing for a judge to add that the exit code has not
+  // already said.
+  //
+  // `exitPass: done` FOR THAT REASON, and it is the only phase that closes a story without a run. Four
+  // cards in a measured trial asked for work an earlier story's scaffold had already done, and each paid a
+  // full implement and a full review to find out.
+  //
+  // No skill: the loop carries it out alone, exactly as it does the two skips. The evidence is a command's
+  // exit code, which is the most deterministic thing in this design, and handing that to an agent would
+  // make a settled fact a judgement.
+  {
+    name: 'story-satisfied',
+    board: 'product',
+    exitPass: 'done',
     bounded: 'none',
   },
   // THE WORK OF A WHOLE STORY, IN ONE RUN (decision 83). It replaces the per-task implement and the per-task

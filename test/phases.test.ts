@@ -79,9 +79,20 @@ describe('the phase table', () => {
   });
 
   it('has no skill for the phases the loop carries out alone', () => {
-    for (const name of ['feature-breakdown-skip', 'story-breakdown-skip'] as const) {
+    for (const name of ['feature-breakdown-skip', 'story-breakdown-skip', 'story-satisfied'] as const) {
       expect(phase(name).skill, name).toBeUndefined();
     }
+  });
+
+  // DECISION 85, AS THE TABLE STATES IT. The difference from the skip beside it is the EXIT: a skipped
+  // break-down leaves a story to be worked, and this one closes it — the criterion is a declared gate
+  // command and it already passes, so there is nothing to implement and nothing for a judge to add.
+  it('closes a story whose criterion already passes, with no run of any kind', () => {
+    expect(phase('story-satisfied')).toMatchObject({ board: 'product', exitPass: 'done', bounded: 'none' });
+    expect(phase('story-satisfied').skill).toBeUndefined();
+    expect(phase('story-satisfied').entry).toBeUndefined();
+    // No `creates`: nothing is written, which is the whole point of the phase.
+    expect(phase('story-satisfied').creates).toBeUndefined();
   });
 
   it('gives the bootstrap no board and no stamps', () => {

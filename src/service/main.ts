@@ -4,6 +4,7 @@ import { declaredCommands } from '../store/project/foundation.js';
 import { commitTail, performAction } from './act.js';
 import { BoardClient } from './board-client.js';
 import { runLoop } from './loop.js';
+import { satisfiedChecker } from './satisfied.js';
 
 // The auto-pilot loop, as a process. Spawned by the server (`src/server/autopilot/service-process.ts`), which hands it
 // everything below in its environment and supervises it.
@@ -78,6 +79,11 @@ const ended = await runLoop({
   // The same carve-out, for the same reason: the foundation documents are on disk and no route serves them to a
   // `service` credential.
   commands: () => declaredCommands(root),
+  // The same carve-out again, and the same state reader the gates run behind: this spawns a command out of
+  // `foundation/CODE-QUALITY.md` before a break-down, so it refuses while a gate document is unread exactly
+  // as `act` does (decision 85). One checker for the whole session, because the cache that makes it
+  // affordable lives inside it.
+  satisfied: satisfiedChecker({ root, state: actDeps.state, log }),
   addToCounters: async (dispatches) => {
     await updateAutopilotState(root, new Date().toISOString(), (current) => ({
       ...current,

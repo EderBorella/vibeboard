@@ -40,14 +40,15 @@ machine's closure, and it is why the purity gate is still unarmed.
 | `harness-feature.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 44`, `decision 66`, `decision 67` |
 | `layout.ts` | `decisions.md`, `security/containment.md` (`SUGGESTIONS_DIR`'s comment names the dead profile; the rule is now a read-only mount). `RESUMABLE_DOCUMENTS` is the six documents setup writes — the five foundation ones plus the README — and it is here rather than beside either caller because it is a security boundary read from two places: the résumé route refuses a name outside it, and the wizard frame drops an attachment naming one | `decision 20`, `decision 78` |
 | `lifecycle/stop-sentences.ts` | `decisions.md` — the sentences a stop carries, and what each one used to say: most are corrections that named a mechanism the product no longer has | `decision 44`, `decision 45`, `decision 52`, `decision 55`, `decision 66`, `decision 74`, `decision 84` |
-| `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 54`, `decision 58`, `decision 59`, `decision 80`, `decision 81`, `decision 82`, `decision 83`, `decision 84` |
-| `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61`, `decision 80`, `decision 83` |
+| `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 54`, `decision 58`, `decision 59`, `decision 80`, `decision 81`, `decision 82`, `decision 83`, `decision 84`, `decision 85` |
+| `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61`, `decision 80`, `decision 83`, `decision 85` |
 | `position.ts` | `decisions.md` | `decision 38`, `decision 39` |
 | `runs/types.ts` | `decisions.md` — the record's shape; `runs.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `S11` |
+| `satisfied.ts` | `decisions.md` — whether a story's acceptance criterion is one a machine can already answer, and the one place the loop and the tick agree on WHICH command that is. The bound on it is a security property rather than a scope: the key names a declared gate, it never carries a command | `decision 85` |
 | `setup-feature.ts` | `decisions.md` | `decision 50`, `decision 51` |
 | `smoke-declaration.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 66`, `decision 67` |
 | `suggestions.ts` | `decisions.md` | `decision 49` |
-| `types.ts` | `decisions.md` | `decision 50`, `decision 58` |
+| `types.ts` | `decisions.md` | `decision 50`, `decision 58`, `decision 85` |
 | `verify.ts` | `decisions.md` | `decision 18`, `decision 57` |
 
 ## `src/exec/` — spawns a process against the working tree
@@ -84,12 +85,12 @@ groups write through it.
 | file | pages | cites |
 |---|---|---|
 | `cards/links.ts` | `decisions.md` | `decision 65` |
-| `cards/mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
+| `cards/mutations.ts` | `decisions.md` | `decision 58`, `decision 65`, `decision 85` |
 | `project/config.ts` | `decisions.md` | `decision 45`, `C1`, `C2`, `C3`, `C4` |
 | `project/control-files.ts` | `security/containment.md` — the path sandbox behind Project Control: the `..` rejection, the symlink realpath walk and the category allow-list. It reaches `store/fs-sandbox.ts` for the first two halves | — |
 | `project/foundation.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 66`, `decision 67` |
 | `project/seed-docs.ts` | `foundation-bootstrap.md` — it is what seeds it, and it resolves the bundled folder by **climbing** to the package root rather than counting `..` segments. The count was wrong the moment this file moved, and a wrong path here throws nothing and fails no type check: the reader treats an unreadable source as a packaging problem and carries on. `test/seed-docs.test.ts` asserts the resolved directory exists on disk | — |
-| `project/seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51`, `decision 80`, `decision 83` |
+| `project/seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51`, `decision 80`, `decision 83`, `decision 85` |
 | `autopilot-store.ts` | `decisions.md` — the loop's one deliberate direct-write carve-out, and the reason `src/service/main.ts` may import it | `S13` |
 | `run-store.ts` | `decisions.md`, `security/containment.md` — the agent writes a report under `runs/`; this folds it in | `decision 13` |
 | `suggestion-store.ts` | `security/containment.md` — the agent cannot write here, so the endpoint is the only way in | — |
@@ -182,8 +183,9 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `act/sentences.ts` | `decisions.md` — every sentence a person reads afterwards, including the run summary agents cannot append themselves | `decision 10` |
 | `act/settle.ts` | — the wait for a dispatched run, and the clamps that make it terminate | — |
 | `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66` |
-| `loop.ts` | `decisions.md` — and the one fact it carries from one tick to the next, which is why `Progress` holds a set of card ids | `decision 8`, `decision 20`, `decision 39`, `decision 66`, `decision 82` |
-| `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20` |
+| `loop.ts` | `decisions.md` — and the one fact it carries from one tick to the next, which is why `Progress` holds a set of card ids | `decision 8`, `decision 20`, `decision 39`, `decision 66`, `decision 82`, `decision 85` |
+| `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20`, `decision 85` |
+| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the three silent refusals, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick | `decision 51`, `decision 82`, `decision 85` |
 | `stamp.ts` | `decisions.md` | `decision 10`, `decision 38` |
 
 ## `web/src/` — the React front end

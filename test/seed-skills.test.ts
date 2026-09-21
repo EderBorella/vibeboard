@@ -127,6 +127,20 @@ describe('the phase skills the phase table names', () => {
     expect(content).toContain('POST /api/suggestions');
   });
 
+  // DECISION 85. The KEY has to be named, because a break-down that does not send it writes a card no
+  // machine can answer — and the BOUND has to be named with it, or an agent reads "send a command" and
+  // sends one the project never declared. Exact bytes, because this is a prompt and the wording IS the
+  // behaviour: `toContain('satisfiedBy')` would pass over a sentence telling it to invent a command.
+  it('tells break-down to name a declared gate when that gate IS the card', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).toContain(
+      "**If a card's one criterion IS one of the gate commands** this project declares —\nthey are quoted in full in this prompt — then say so: send `satisfiedBy` on the\ncreate, carrying that command copied exactly.",
+    );
+    expect(content).toContain(
+      'A string that is not one of the declared gates is\nignored, so this is never a way to get something else run.',
+    );
+  });
+
   // SUPERSEDED BY RULING 65, and recorded rather than quietly dropped. This asserted
   // `PUT /api/cards/:board/:id/links` — the obligation to attach each new card to this one — and the endpoint
   // now writes that link itself, from the credential it is already holding. Leaving the instruction would be

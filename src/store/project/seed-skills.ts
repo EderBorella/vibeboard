@@ -110,6 +110,14 @@ one nobody asked for is not free.
 test can express whether it is done. Two criteria means two cards. This is the
 rule that keeps the project a proof of concept rather than a product.
 
+**If a card's one criterion IS one of the gate commands** this project declares —
+they are quoted in full in this prompt — then say so: send \`satisfiedBy\` on the
+create, carrying that command copied exactly. Auto-pilot runs it before it breaks
+that card down, and closes the card with no work and no cost if it already exits
+0. Say it on the card as well, in words, so a person reading the board knows what
+it was measured against. A string that is not one of the declared gates is
+ignored, so this is never a way to get something else run.
+
 - Create each card with \`POST /api/cards\`, one card per call — never a shell loop
   whose result you cannot check.
 - The board a card may go on, the column it enters, its \`group\` and the card it

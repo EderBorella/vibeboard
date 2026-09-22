@@ -33,6 +33,17 @@ export function allSettled(ap: AutopilotConfig, cards: Card[]): boolean {
   return cards.length > 0 && cards.every((c) => isSettled(ap, c));
 }
 
+// THE STRICTER OF THE TWO, and the distinction at the head of this file is the whole of why it exists
+// separately: a blocked card SETTLES the level above it, because it is waiting for a person and must not
+// hold up its parent — but nothing about it has been DONE. `creatingRoundStop` asks the second question
+// (decision 86): a feature's checkup may look again once the work it created has been finished, and a
+// story of its own that nobody could finish is precisely the case whose sentence says a person is needed.
+//
+// Same vacuity guard as above, and the same reason.
+export function allTerminal(ap: AutopilotConfig, cards: Card[]): boolean {
+  return cards.length > 0 && cards.every((c) => isTerminalColumn(ap, c.board, c.columnSlug));
+}
+
 // THE ONE HOME FOR DECISION 46, and the emptiness of this list IS the status. There was a `derivedStatus`
 // beside it answering `clean` / `carrying-a-problem` over the same walk, and nothing called it: the wire
 // computes the fact from here because it needs the IDS, not an enum — a badge saying "carrying a problem"

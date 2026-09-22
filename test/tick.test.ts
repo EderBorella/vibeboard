@@ -517,19 +517,88 @@ describe('decideTick — the feature loop', () => {
   // rather than out of the run's own report. Once it is spent, a checkup that has already had its
   // close-or-stop turn and left the feature open has answered — asking again is asking a model to change
   // its mind, which is no exit condition.
-  it('stops stalled when the feature checkup has spent its creating round and still will not close', () => {
+  //
+  // THE CREATED STORY IS BLOCKED, and it used to be `done` — which is the fixture that made this test
+  // pin the bug decision 86 removes. Blocked SETTLES the feature (decision 45), so the checkup is still
+  // reached, and nothing the round asked for has been delivered: the sentence's "needs a person now" is
+  // exactly true of a card nobody could finish. It is also the termination case — a feature whose
+  // checkup creates work that is never completed must stop rather than go round again.
+  it('stops stalled when the work its creating round made was never completed', () => {
     const creating = run('F-001', 'features', 'checkup-feature', 'success');
     const second = run('F-001', 'features', 'checkup-feature', 'attention');
     const cards = [
       card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
       card('P-001', 'product', 'done', 10, ['F-001']),
-      // The card that spent the round, stamped by the endpoint with the run that created it, and now settled.
-      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+      // The card that spent the round, stamped by the endpoint with the run that created it.
+      { ...card('P-002', 'product', 'blocked', 20, ['F-001']), createdBy: creating.run },
     ];
     const action = decideTick(input({ cards, runs: [creating, second] }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('F-001');
     expect(detailOf(action)).toContain('creating');
+  });
+
+  // AND THE HATCH CANNOT SPIN, which is the half a board fixture cannot show on its own: every round it
+  // re-opens still spends a `checkup-feature` attempt, so the cap is what ends it however much work
+  // lands. Three spent attempts, the latest of which created a story that is now done — the hatch opens,
+  // and `capReached` is what answers.
+  it('stops at the attempt cap however much of the created work is done', () => {
+    const runs = threeRunsOf('F-001', 'features', 'checkup-feature');
+    const last = runs[runs.length - 1] as RunRecord;
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: last.run },
+    ];
+    const action = decideTick(input({ cards, runs }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('has used all 3 attempts at checkup-feature');
+  });
+
+  // DECISION 86, AND THE BOARD IT WAS MEASURED ON. A feature whose fourteen stories were all `done` had a
+  // checkup that found one real gap, created a story for it, and that story was then implemented, reviewed
+  // and closed. The feature was finished and the loop could not say so: `fixedSince` is the only hatch
+  // `creatingRoundStop` has, a feature has no fix phase, so the hatch is unreachable for one by
+  // construction. The feature-level analogue of "something answered since the round" is that the work the
+  // round CREATED has since been done.
+  it('checks the feature again once the work its creating round made is done', () => {
+    const creating = run('F-001', 'features', 'checkup-feature', 'success');
+    const second = run('F-001', 'features', 'checkup-feature', 'success');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    expect(decideTick(input({ cards, runs: [creating, second] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+    });
+  });
+
+  // ONLY THE LATEST ROUND IS READ, and this pins it because the comment on `answeredSince` used to say
+  // otherwise — that a created story left BLOCKED keeps the stop, stated without qualification. It does
+  // while it is the last thing the point created; `creatingRun` answers with `latest`, so a second round
+  // whose work landed replaces it as the round that gets asked about, and the blocked card from the first
+  // no longer holds the hatch shut.
+  //
+  // CHARACTERISATION, not an endorsement. The behaviour is defensible — a person is still needed by the
+  // blocked card, and the feature has visibly moved since — and it is bounded either way by the attempt
+  // cap, which is what the test above this one asserts. What was wrong was the claim, not the code.
+  it('re-opens on the latest round even while an earlier round’s story is still blocked', () => {
+    const first = run('F-001', 'features', 'checkup-feature', 'success');
+    const second = run('F-001', 'features', 'checkup-feature', 'success');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002', 'P-003']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      // The first round's story, which nobody could finish.
+      { ...card('P-002', 'product', 'blocked', 20, ['F-001']), createdBy: first.run },
+      // The second round's, which was.
+      { ...card('P-003', 'product', 'done', 30, ['F-001']), createdBy: second.run },
+    ];
+    expect(decideTick(input({ cards, runs: [first, second] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+    });
   });
 
   it('still dispatches the checkup that follows the creating round, so it can close', () => {

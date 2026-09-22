@@ -27,6 +27,7 @@ import { AutopilotHelp } from './AutopilotHelp';
 import { FocusPicker } from './FocusPicker';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { LifecyclePicker } from './LifecyclePicker';
+import { ResetCard } from './ResetCard';
 import { ReviewFeatures } from './ReviewFeatures';
 import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
@@ -577,6 +578,14 @@ export function AutopilotBar({
           the result on its own line under the button. */}
       <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
+        {/* THE SAME RESET THE CARD PANE OFFERS, ADDRESSED FROM THE STOP SENTENCE (decision 86).
+            `ForgiveDerivation` answers the position with no card; this answers a card the loop has just
+            named, and it takes `detail` for that reason — the control comes up aimed at whatever that
+            sentence mentioned, so nobody has to go and find the card first. The remedy itself is NOT
+            confined to here: `ResetAttempts` sits on the card's own ledger line, because this one
+            renders while the loop reports `stalled` and a stranded card must be recoverable whatever
+            auto-pilot last said. */}
+        <ResetCard reason={state?.reason} detail={state?.detail} runs={runs} onReset={onChanged} />
         {/* DECISION 74 — the other thing that can be beside a stop sentence, and the only one that is not a
             repair. It sits here for the reason the row above it cannot take it: three controls do not fit on
             a bar that already wants 1504px of the 1277 it has. */}

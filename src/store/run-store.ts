@@ -322,6 +322,38 @@ export async function forgiveCardRuns(
   return spent.length;
 }
 
+// THE ONE THAT CLEARS A SUCCESS (decision 86), and it is a second function rather than a flag on the first
+// because the two are different decisions with different costs.
+//
+// `forgiveCardRuns` above spares a success deliberately, and that restraint is right for what it is for:
+// the user is clearing failures, and clearing a `break-down` that WORKED frees the loop to break the card
+// down again and hang a second set of children off it.
+//
+// But a card can be stopped by its successes alone, and then that button clears nothing at all. Measured on
+// F-003: every story done, the feature checkup run four times — three `success` and one `attention` already
+// forgiven — so the card sat at three of three attempts with every remaining record a success, and the
+// product offered no route back. A state a person cannot get out of is worse than a remedy with a cost, so
+// long as the cost is stated: the confirmation on this one says plainly that a cleared creating run lets the
+// loop create children again.
+//
+// FILTERED ON `burnsAttempt` ALONE, which is exactly the difference. Everything else it excludes still
+// applies and for the same reasons — a cancelled or interrupted run costs the card nothing, an in-flight one
+// has not ended, a classified fault is not the card's doing, and an already-forgiven record must not have
+// its timestamp rewritten by a second click.
+//
+// STAMPS, deletes nothing, like every other way out of a spent card: the history is the point, and a run
+// cleared this way still reads as the success it was.
+export async function resetCardRuns(
+  root: string,
+  board: BoardName,
+  card: string,
+  at: string,
+): Promise<number> {
+  const spent = (await listCardRuns(root, board, card)).filter(burnsAttempt);
+  for (const record of spent) await writeRun(root, withForgiveness(record, at));
+  return spent.length;
+}
+
 // THE SAME WAY OUT FOR THE POSITION THAT HAS NO CARD.
 //
 // An empty board plus a README is derived by a CARD-LESS run of the bootstrap skill, and its cap is counted

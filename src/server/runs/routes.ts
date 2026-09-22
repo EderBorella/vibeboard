@@ -15,6 +15,7 @@ import {
   listProjectRuns,
   listRuns,
   readRun,
+  resetCardRuns,
   resolveProjectRun,
   resolveRun,
   writeRun,
@@ -347,6 +348,36 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // a card the caps had stopped dispatchable again, and months later "why did this card get four
     // tries" is a question only this line answers.
     req.log.info({ board, card, forgiven, by: req.credential?.scope }, "a person cleared a card's attempts");
+    return { forgiven };
+  });
+
+  // "NONE OF THIS CARD'S HISTORY SHOULD STILL BE COUNTING" (decision 86). The route above spares a run
+  // that SUCCEEDED, for the reason written on `forgiveCardRuns`; this one does not, and that is the whole
+  // difference between them. A card whose spent runs are all successes — a feature whose checkup ran,
+  // created work, and closed cleanly three times — is at its cap with nothing the other route will touch,
+  // and until this existed the product offered no way out of it at all.
+  //
+  // A SEPARATE ROUTE AND NOT A FLAG ON THE ONE ABOVE. The two are different decisions with different costs,
+  // so they are different verbs with different names, and the cost of this one is stated in its
+  // confirmation rather than hidden behind a checkbox on the milder action.
+  //
+  // ADMIN-ONLY BY ABSENCE from the scope table in auth/auth.ts, exactly as the forgive above is, and here
+  // the reason is stronger rather than merely the same: an agent that could reset its own card's attempts
+  // would have unlimited retries AND could clear the record of the creating run that bounds it, which is
+  // every counter this loop keeps undone from inside a run.
+  api.post('/runs/:board/:card/reset', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { board, card } = req.params as { board: string; card: string };
+    if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
+    const runs = await listCardRuns(ctx.session.root, board, card);
+    // The same refusal as the forgive, from the records rather than from the runner, and for the same
+    // reason: a dispatch already decided lands as an attempt moments later and puts the count back.
+    const refusal = forgiveRefusal(runs.filter((r) => isInFlight(r.status)).length);
+    if (refusal) return reply.code(409).send({ error: refusal });
+    const forgiven = await resetCardRuns(ctx.session.root, board, card, nowIso());
+    // Its own message, not the forgive's. This is the write that can re-open a creating run, so "why did
+    // this feature grow a second set of stories" is a question only this line answers.
+    req.log.info({ board, card, forgiven, by: req.credential?.scope }, 'a person reset a card');
     return { forgiven };
   });
 

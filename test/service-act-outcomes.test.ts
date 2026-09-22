@@ -205,7 +205,10 @@ describe('a creating run that created nothing', () => {
 // THE FEATURE CHECKUP'S TWO EXITS (the L1 loop). Created stories → the feature stays OPEN and L2 walks them;
 // created nothing → `done`. Stamped `done` regardless, everything a checkup creates is an ORPHAN:
 // `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is never
-// re-entered — and `creatingRoundSpent`, which bounds the second round, is then unreachable through the loop.
+// re-entered — and `creatingRoundStop`, which bounds the second round, is then unreachable through the loop.
+// Named `creatingRoundSpent` here until 2026-09-22, which is the predicate rather than the stop and has no
+// production caller at all; since `decision 86` the stop also RE-OPENS once the created work is done, so the
+// bound on a feature whose rounds keep landing is the `checkup-feature` attempt cap.
 describe('a feature checkup that created work', () => {
   const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: ['P-001'] };
   const story = CARD('P-001', 'product');

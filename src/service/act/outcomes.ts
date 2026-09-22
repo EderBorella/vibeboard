@@ -114,7 +114,8 @@ export async function afterCardRun(
   if (emptied) return emptied;
 
   // AND A FEATURE CHECKUP THAT DID GROW IT takes its other exit: the feature stays open and L2 walks the
-  // stories it created (decision 47 allows that once, and `creatingRoundSpent` is what bounds it).
+  // stories it created (decision 47 allows that once; `creatingRoundStop` in core/lifecycle/tick.ts is what
+  // bounds it, and since decision 86 it re-opens only once that created work is itself finished).
   if (grew === true && HOLDS_OPEN_HAVING_CREATED.includes(action.phase)) {
     return await heldOpen(deps, action, card, settled, context);
   }
@@ -135,8 +136,11 @@ export async function afterCardRun(
   // DECISION 69, AND IT REVERSES HALF OF RULING 55. That ruling made the smoke result EVIDENCE rather than a
   // gate, so a failing one could not stall a project — and the consequence was a feature closing over a product
   // that does not run, which is the whole of decision 66's incident. What has changed since is that the
-  // objection is answered elsewhere: `creatingRoundSpent` already stops a feature after one round of created
-  // work, with a sentence asking for a person, so refusing the close here cannot loop forever.
+  // objection is answered elsewhere: `creatingRoundStop` stops a feature whose created work nobody finished,
+  // with a sentence asking for a person, and the `checkup-feature` attempt cap ends it in every other case —
+  // so refusing the close here cannot loop forever. NAMED AS TWO BOUNDS since decision 86, because it is: the
+  // creating round re-opens when the work it asked for lands, and what stops a feature whose smoke keeps
+  // failing over work that keeps landing is the cap rather than that stop.
   //
   // THE MACHINE DECIDES, NOT THE MODEL, which is the point. Asked to judge a failing smoke, a model reads the
   // output and talks itself into "environmental" — observed twice on 2026-09-03, once correctly and once from a

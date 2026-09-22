@@ -341,6 +341,12 @@ export function registerAuth(
     // here would refuse every run in the project.
     if (!bearer && !sameOrigin(req)) return reply.code(403).send({ error: CROSS_ORIGIN });
     req.credential = cred;
+    // `:id` AND NOTHING ELSE, which is a naming convention rather than a rule. The run routes spell their
+    // card segment `:card`, so one of those reaches `allows` with no card and an `ownCard` row on it would
+    // DENY every agent rather than confine one. That direction is safe, and it is still an accident — the
+    // bound on `/runs/:board/:card/reset` and `/forgive` is their absence from the table above, asserted
+    // row by row in test/auth.test.ts, and never this. Widening the read to `:card` would make the table
+    // able to express a confinement it has never been asked for; the comment is the cheaper answer.
     const { id } = req.params as { id?: string };
     if (!allows(cred, req.method, req.routeOptions.url ?? '', openProject(), id)) {
       return reply.code(403).send({ error: 'Forbidden' });

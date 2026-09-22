@@ -112,8 +112,11 @@ export function reviewVerdictRun(runs: RunRecord[], card: string): RunRecord | u
 // next judgement" — one event while a task's review could not fail, two since decision 80 gave the story's
 // judgement an `exitFail`.
 //
-// A FEATURE HAS NO FIX PHASE, so this is false for every feature by construction — which is what leaves
-// decision 47's bound on the feature checkup exactly where it was.
+// A FEATURE HAS NO FIX PHASE, so this is false for every feature by construction. That used to be the
+// whole of the story and it left the feature checkup with NO hatch at all — a finished feature whose
+// checkup had created one story, and whose story was then delivered, could not be closed by anything
+// (decision 86). The feature's analogue is `cardsCreatedBy` below, read as terminal; this one stays the
+// story's, and says so.
 export function fixedSince(runs: RunRecord[], card: string, since: RunRecord): boolean {
   return runs.some((r) => r.card === card && isFixRun(r) && inOrder(r, since) > 0);
 }
@@ -208,4 +211,21 @@ export function creatingRun(
 ): RunRecord | undefined {
   const creators = new Set(cards.map((c) => c.createdBy).filter((id) => id !== undefined));
   return latest(runs.filter((r) => r.card === card && r.skill === skill && creators.has(r.run)));
+}
+
+// WHAT THAT ROUND ACTUALLY MADE, as it stands on the board now — the other half of the question
+// `creatingRun` answers, and the feature's substitute for `fixedSince` (decision 86). A story's
+// send-back is answered by a FIX RUN; a feature's checkup is answered by the work it asked for being
+// finished, and there is no run on the feature to read that off.
+//
+// HERE RATHER THAN AT THE CALL SITE, so `Card.createdBy` is read in one module. Ruling 58's whole point
+// is that the board answers this and the run's own `created` list — the agent's claim about itself —
+// does not, and a second reading of the field somewhere else is a second chance to reach for the wrong
+// one.
+//
+// The LIVE board, like `creatingRoundSpent`: `readBoard` walks the configured columns only, so a card
+// somebody archived is not here. That direction is the safe one — an archived card cannot hold the
+// hatch shut over work that no longer exists.
+export function cardsCreatedBy(cards: Card[], run: RunRecord): Card[] {
+  return cards.filter((c) => c.createdBy === run.run);
 }

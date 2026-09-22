@@ -10,6 +10,7 @@ import { FigureRow } from '../../molecules/FigureRow';
 import { Row } from '../shared/Row';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
+import { ResetAttempts } from './ResetAttempts';
 
 interface Props {
   // The card these runs belong to. The records name it too, but the ledger offers an action ON the
@@ -139,6 +140,14 @@ function CardLedger({
         <>
           <Readout>{used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}</Readout>
           <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
+          {/* AND THE STRONGER ONE BESIDE IT (decision 86). The button to its left spares a run that
+              SUCCEEDED, so a card stopped by its own successes gets nothing from it — and the only other
+              reset in the product is on the auto-pilot bar, which renders while the loop reports
+              `stalled` and not otherwise. Offered on the same condition rather than only when the forgive
+              would clear nothing: answering that would mean writing `burnsAttempt`'s four clauses a second
+              time in the browser, and the server already tells the truth for the inert case by replying
+              with a count of zero. */}
+          <ResetAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
         </>
       )}
     </FigureRow>

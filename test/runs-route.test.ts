@@ -42,6 +42,27 @@ async function productCard(project: TestProject): Promise<string> {
   return state.snapshot.boards.product[0].id;
 }
 
+// NO AGENT IS TOLD THIS ROUTE EXISTS, checked against the pattern the app REALLY serves.
+//
+// `not.toContain('/reset')` was the shape this replaced, and it goes inert the moment somebody renames
+// the route: the new path cannot contain the old segment, so the assertion passes over a catalogue it is
+// no longer describing. So the pattern is looked up in Fastify's own route table first — that table is
+// what hands `req.routeOptions.url` to `allows`, and it is what the scope table is keyed on, so a rename
+// fails here and has to be answered rather than absorbed.
+//
+// A CARD IS PASSED TO `endpointsFor`, and that is not decoration: with none, it SKIPS every own-card row,
+// so a planted rule granting `work` confined to its own card would be invisible to this check while
+// `allows` returned true for it.
+async function namedInNoCatalogue(pattern: string): Promise<void> {
+  const app = testApp(new ProjectSession());
+  await app.ready();
+  expect(app.hasRoute({ method: 'POST', url: pattern }), pattern).toBe(true);
+  await app.close();
+  for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
+    expect(endpointsFor(scope, 'E-001').join('\n'), scope).not.toContain(pattern);
+  }
+}
+
 // The prompt the shim was spawned with: the last line of the args log, last argument of the call.
 async function promptFrom(argsLog: string): Promise<string> {
   const line = (await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string;
@@ -926,15 +947,12 @@ describe('POST /api/runs/:board/:card/forgive', () => {
     await app.close();
   });
 
-  // NOT A TEST OF THE AUTH ROW, and it cannot be: `testApp` fills an admin bearer into every request,
-  // so nothing driven through it can tell an admin-only route from an open one. What is asserted is the
-  // fact the row depends on — that no rule exists for this endpoint — because the scope table's default
-  // is that a route it does not name is admin-only. An agent able to forgive its own card's attempts
-  // would be an agent granting itself unlimited retries.
-  it('is absent from the scope table, which is what makes it admin-only', () => {
-    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
-      expect(endpointsFor(scope).join('\n')).not.toContain('forgive');
-    }
+  // NOT THE TEST OF THE AUTH ROW — that is the grid in test/auth.test.ts, which drives `allows` itself.
+  // `testApp` fills an admin bearer into every request, so nothing driven through this app can tell an
+  // admin-only route from an open one. What is asserted here is the other half: an agent is not TOLD it
+  // may call this, which is what keeps it from trying and reading the 403 as a broken tool.
+  it('is named in no agent’s endpoint catalogue', async () => {
+    await namedInNoCatalogue('/api/runs/:board/:card/forgive');
   });
 });
 
@@ -1040,16 +1058,11 @@ describe('POST /api/runs/:board/:card/reset', () => {
     expect(line?.by).toBe('admin');
   });
 
-  // NOT A TEST OF THE AUTH ROW, and it cannot be — `testApp` fills an admin bearer into every request.
-  // What is asserted is the fact the row depends on: no rule exists for this endpoint, and the scope
-  // table's default is that a route it does not name is admin-only. An agent that could reset its own
-  // card would have unlimited retries AND could clear the creating run that bounds it.
-  it('is absent from the scope table, which is what makes it admin-only', () => {
-    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
-      // The PATH, not the bare word: `reset` appears in ordinary English and a substring match on it
-      // would pass over a catalogue that really had granted the route.
-      expect(endpointsFor(scope).join('\n')).not.toContain('/reset');
-    }
+  // NOT THE TEST OF THE AUTH ROW — that is the grid in test/auth.test.ts, and an agent that could reset
+  // its own card would have unlimited retries AND could clear the creating run that bounds it. This is
+  // the catalogue half: nothing tells an agent the route is there.
+  it('is named in no agent’s endpoint catalogue', async () => {
+    await namedInNoCatalogue('/api/runs/:board/:card/reset');
   });
 });
 

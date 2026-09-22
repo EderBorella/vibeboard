@@ -578,11 +578,13 @@ export function AutopilotBar({
           the result on its own line under the button. */}
       <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
-        {/* AND THE WAY OUT OF A CARD THE OTHER TWO CANNOT REACH (decision 86). `ForgiveDerivation`
-            answers the position with no card and the card pane's own button spares a run that
-            SUCCEEDED, so a card stopped by its own successes had no remedy anywhere. It is here rather
-            than on the card because the sentence above names the card, and it takes `detail` for that
-            reason: the control comes up aimed at whatever that sentence named. */}
+        {/* THE SAME RESET THE CARD PANE OFFERS, ADDRESSED FROM THE STOP SENTENCE (decision 86).
+            `ForgiveDerivation` answers the position with no card; this answers a card the loop has just
+            named, and it takes `detail` for that reason — the control comes up aimed at whatever that
+            sentence mentioned, so nobody has to go and find the card first. The remedy itself is NOT
+            confined to here: `ResetAttempts` sits on the card's own ledger line, because this one
+            renders while the loop reports `stalled` and a stranded card must be recoverable whatever
+            auto-pilot last said. */}
         <ResetCard reason={state?.reason} detail={state?.detail} runs={runs} onReset={onChanged} />
         {/* DECISION 74 — the other thing that can be beside a stop sentence, and the only one that is not a
             repair. It sits here for the reason the row above it cannot take it: three controls do not fit on

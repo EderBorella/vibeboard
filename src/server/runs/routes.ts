@@ -351,11 +351,11 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     return { forgiven };
   });
 
-  // "NONE OF THIS CARD'S HISTORY SHOULD STILL BE COUNTING." The route above spares a run that SUCCEEDED,
-  // for the reason written on `forgiveCardRuns`; this one does not, and that is the whole difference
-  // between them. A card whose spent runs are all successes — a feature whose checkup ran, created work,
-  // and closed cleanly three times — is at its cap with nothing the other route will touch, and until this
-  // existed the product offered no way out of it at all.
+  // "NONE OF THIS CARD'S HISTORY SHOULD STILL BE COUNTING" (decision 86). The route above spares a run
+  // that SUCCEEDED, for the reason written on `forgiveCardRuns`; this one does not, and that is the whole
+  // difference between them. A card whose spent runs are all successes — a feature whose checkup ran,
+  // created work, and closed cleanly three times — is at its cap with nothing the other route will touch,
+  // and until this existed the product offered no way out of it at all.
   //
   // A SEPARATE ROUTE AND NOT A FLAG ON THE ONE ABOVE. The two are different decisions with different costs,
   // so they are different verbs with different names, and the cost of this one is stated in its

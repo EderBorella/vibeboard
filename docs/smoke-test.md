@@ -229,7 +229,14 @@ Runs, and everything that judges them.
 - **Cancel a run** mid-flight (`POST /api/runs/:run/cancel`). It must record `cancelled`, and a
   cancellation must not burn an attempt.
 - **Forgive attempts** on a card (`POST /api/runs/:board/:card/forgive`) and the project-level one
-  (`/runs/project/forgive`). Both are the human override for a card the machine has cornered.
+  (`/runs/project/forgive`). Both spare a run that SUCCEEDED, deliberately: clearing a break-down that
+  worked frees the loop to hang a second set of children off the card.
+- **Reset a card** (`POST /api/runs/:board/:card/reset`), the third override and the only one that clears
+  a success. It is the button beside the forgive on the ledger line — *Reset all*, against that one's *Clear failed tries*. Read the
+  confirmation: it has to say the loop may create that work again, because that is the price. Make a card
+  whose only spent runs are successes, watch *Clear failed tries* report **nothing was cleared**, then
+  reset it and watch the count go to zero. That card is the state this control exists for, and the forgive
+  cannot reach it by design.
 - **Resolve** a run that needs it — the card version and the project version are different routes on
   purpose (`/runs/:board/:card/:run/resolve`, `/project-runs/:run/resolve`).
 - **The verdict on a run** (`…/:run/verification`) is written by the loop that judged it and is
@@ -331,6 +338,10 @@ reach them by accident.
 - **Restart** (`/restart`) clears the halt and the overlay.
 - **Gates reviewed** (`/autopilot/gates-reviewed`) — a person confirming they have read commands an agent
   wrote. An agent must not be able to clear it.
+- **Reset the card the stop names**, under a `stalled` bar. The picker offers only cards this project has
+  RUN something on, and comes up already aimed at the id the stop sentence mentions — a sentence naming two
+  preselects neither. It is the same write as the card pane's, addressed from where the problem is met, and
+  it must not appear on `complete`, on `stopped` or while the loop is running.
 - **Kill in one tab raises the overlay in another.** Open two, and check.
 
 ## B8. Settings

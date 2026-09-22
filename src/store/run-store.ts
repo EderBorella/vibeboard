@@ -322,8 +322,8 @@ export async function forgiveCardRuns(
   return spent.length;
 }
 
-// THE ONE THAT CLEARS A SUCCESS, and it is a second function rather than a flag on the first because the
-// two are different decisions with different costs.
+// THE ONE THAT CLEARS A SUCCESS (decision 86), and it is a second function rather than a flag on the first
+// because the two are different decisions with different costs.
 //
 // `forgiveCardRuns` above spares a success deliberately, and that restraint is right for what it is for:
 // the user is clearing failures, and clearing a `break-down` that WORKED frees the loop to break the card

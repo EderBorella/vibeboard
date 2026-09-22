@@ -104,6 +104,15 @@ describe('the scope table', () => {
     // verification would advance itself on self-assessment, and one that could stop auto-pilot could stop the
     // thing supervising it.
     ['/api/runs/:board/:card/:run/verification', 'POST', false, false, true],
+    // THE TWO WAYS TO CLEAR A CARD'S SPENT ATTEMPTS, admin-only BY ABSENCE and named here so the absence
+    // is asserted rather than merely true (decision 86). The attempt cap is the only thing that stops a
+    // card being retried for ever, so an agent that could clear its own card's attempts would have
+    // unlimited retries; the reset is worse again, because it clears a SUCCESS — including the creating
+    // run that bounds a feature's checkup. test/runs-route.test.ts asks the other half — whether an agent
+    // is TOLD the route exists — and these two lines are the enforcement: `allows` is what answers the
+    // request, and until 2026-09-22 nothing exercised it for either route.
+    ['/api/runs/:board/:card/forgive', 'POST', false, false, false],
+    ['/api/runs/:board/:card/reset', 'POST', false, false, false],
     ['/api/autopilot/stopped', 'POST', false, false, true],
     ['/api/config', 'PATCH', false, false, false],
     ['/api/explorer/file', 'PUT', false, false, false],
@@ -135,6 +144,25 @@ describe('the scope table', () => {
 
   it('denies a route it has never heard of', () => {
     expect(allows(cred('service'), 'POST', '/api/something-new', PROJECT)).toBe(false);
+  });
+
+  // THE FOURTH AGENT SCOPE, which the grid above does not carry a column for. `assist` is the copilot and
+  // holds board verbs `work` does not, so a row granting it would pass every line of that grid. Asserted
+  // for the two attempt-clearing routes because those are the ones whose whole bound is the absence.
+  it('refuses both ways of clearing a card’s attempts to the copilot as well', () => {
+    for (const route of ['/api/runs/:board/:card/forgive', '/api/runs/:board/:card/reset']) {
+      expect(allows(cred('assist', 'E-001'), 'POST', route, PROJECT, 'E-001'), route).toBe(false);
+    }
+  });
+
+  // THE OWN-CARD ROW'S CLOSED DIRECTION, and it is named here because something else leans on it. The
+  // preHandler reads `req.params.id` and nothing else, so a route whose card segment is `:card` — every
+  // run route — hands `allows` no card at all and an `ownCard` row on one would deny outright rather than
+  // confine. That is FAIL-CLOSED and it is an accident of two naming conventions, so nothing may be built
+  // on it as a grant: the rows above are what make the reset and the forgive admin-only, not this.
+  it('denies an own-card row when the request produced no card, whatever the credential holds', () => {
+    expect(allows(cred('work', 'E-001'), 'PATCH', '/api/cards/:board/:id', PROJECT, undefined)).toBe(false);
+    expect(allows(cred('work'), 'PATCH', '/api/cards/:board/:id', PROJECT, 'E-001')).toBe(false);
   });
 });
 

@@ -431,10 +431,6 @@ describe('resolveCardRuns', () => {
   });
 });
 
-// The way out of a card the machine spent. Attempts are DERIVED by counting run records, so there is
-// no counter to reset — a card that reached the cap stayed there for ever, and the only remedy was to
-// move its result files out of the folder by hand, which destroys the history explaining why it was
-// blocked. This stamps instead.
 // THE CARD THE EXISTING BUTTON CANNOT REACH, measured before anything was built for it. F-003 on a real
 // board: every story done, its feature checkup run four times — three `success` and one `attention` that
 // had already been forgiven — so `forgiveCardRuns`, which spares a success on purpose, had nothing left to
@@ -469,6 +465,10 @@ describe('the state no forgive could clear', () => {
   });
 });
 
+// The way out of a card the machine spent. Attempts are DERIVED by counting run records, so there is
+// no counter to reset — a card that reached the cap stayed there for ever, and the only remedy was to
+// move its result files out of the folder by hand, which destroys the history explaining why it was
+// blocked. This stamps instead.
 describe('forgiveCardRuns', () => {
   it('clears the endings the card is answerable for, and counts them', async () => {
     const root = await tempDir();

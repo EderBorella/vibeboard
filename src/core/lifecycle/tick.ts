@@ -435,6 +435,13 @@ function skipPhase(name: PhaseName, card: Card, why: string): TickAction | undef
 // the card is itself waiting for a person, which is what the sentence says. Opening the hatch on it
 // would buy a model turn to re-read a fact the board already states.
 //
+// OF THE LATEST ROUND, AND ONLY THAT ONE. `creatingRun` answers with `latest`, so what is inspected is
+// what the most recent creating round made — a blocked story from an EARLIER round does not go on holding
+// the hatch shut once a later round's work has landed. That is deliberate rather than overlooked: the
+// feature has visibly moved since, the blocked card is still waiting for its person either way, and the
+// rounds are bounded by `capReached` whatever the board does. Written down because the sentence above it
+// read as unconditional and is not (test/tick.test.ts pins the two-round case).
+//
 // IT TERMINATES ON THE ATTEMPT CAP rather than on this branch: each re-opened round still spends a
 // `checkup-feature` attempt, so `capReached` stops the feature after `attemptCap` of them whatever the
 // board does. What the hatch buys is that each of those rounds follows real work landing.

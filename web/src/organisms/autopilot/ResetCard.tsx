@@ -42,8 +42,11 @@ const PICK = '';
 // class of problem as the dead end it fixes.
 //
 // BESIDE THE STOP SENTENCE, where `ForgiveDerivation` is, because that sentence is where the problem is
-// met and it is the sentence that names the card. The card pane's own button is for the ordinary case;
-// this is for the case in which the loop has stopped and is telling you which card it stopped on.
+// met and it is the sentence that names the card — so the control can come up already aimed, which is
+// the whole of what this position adds. It is NOT the only way to the reset and must not be: this one
+// renders on `stalled` alone, and a card stranded on a project the loop last reported `complete` would
+// then be recoverable only by restarting auto-pilot until it stalled again. `ResetAttempts` on the
+// card's own ledger line is the unconditional route; this is the shortcut from the sentence.
 export function ResetCard({ reason, detail, runs, onReset }: Props) {
   const { busy, error, run } = useAction();
   const { confirm, dialog } = useConfirm();

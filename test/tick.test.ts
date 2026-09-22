@@ -575,6 +575,32 @@ describe('decideTick — the feature loop', () => {
     });
   });
 
+  // ONLY THE LATEST ROUND IS READ, and this pins it because the comment on `answeredSince` used to say
+  // otherwise — that a created story left BLOCKED keeps the stop, stated without qualification. It does
+  // while it is the last thing the point created; `creatingRun` answers with `latest`, so a second round
+  // whose work landed replaces it as the round that gets asked about, and the blocked card from the first
+  // no longer holds the hatch shut.
+  //
+  // CHARACTERISATION, not an endorsement. The behaviour is defensible — a person is still needed by the
+  // blocked card, and the feature has visibly moved since — and it is bounded either way by the attempt
+  // cap, which is what the test above this one asserts. What was wrong was the claim, not the code.
+  it('re-opens on the latest round even while an earlier round’s story is still blocked', () => {
+    const first = run('F-001', 'features', 'checkup-feature', 'success');
+    const second = run('F-001', 'features', 'checkup-feature', 'success');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002', 'P-003']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      // The first round's story, which nobody could finish.
+      { ...card('P-002', 'product', 'blocked', 20, ['F-001']), createdBy: first.run },
+      // The second round's, which was.
+      { ...card('P-003', 'product', 'done', 30, ['F-001']), createdBy: second.run },
+    ];
+    expect(decideTick(input({ cards, runs: [first, second] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+    });
+  });
+
   it('still dispatches the checkup that follows the creating round, so it can close', () => {
     // The other half of decision 47: what it created is settled, and THIS visit may close the feature. Only
     // once this one has come back without closing it is the point exhausted.

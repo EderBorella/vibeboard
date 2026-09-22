@@ -27,6 +27,7 @@ import { AutopilotHelp } from './AutopilotHelp';
 import { FocusPicker } from './FocusPicker';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { LifecyclePicker } from './LifecyclePicker';
+import { ResetCard } from './ResetCard';
 import { ReviewFeatures } from './ReviewFeatures';
 import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
@@ -577,6 +578,12 @@ export function AutopilotBar({
           the result on its own line under the button. */}
       <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
+        {/* AND THE WAY OUT OF A CARD THE OTHER TWO CANNOT REACH (decision 86). `ForgiveDerivation`
+            answers the position with no card and the card pane's own button spares a run that
+            SUCCEEDED, so a card stopped by its own successes had no remedy anywhere. It is here rather
+            than on the card because the sentence above names the card, and it takes `detail` for that
+            reason: the control comes up aimed at whatever that sentence named. */}
+        <ResetCard reason={state?.reason} detail={state?.detail} runs={runs} onReset={onChanged} />
         {/* DECISION 74 — the other thing that can be beside a stop sentence, and the only one that is not a
             repair. It sits here for the reason the row above it cannot take it: three controls do not fit on
             a bar that already wants 1504px of the 1277 it has. */}

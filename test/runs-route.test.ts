@@ -692,6 +692,7 @@ describe('every run route refuses when no project is open', () => {
     ['POST', '/api/runs'],
     ['POST', '/api/runs/engineering/E-001/r1/resolve'],
     ['POST', '/api/runs/engineering/E-001/forgive'],
+    ['POST', '/api/runs/engineering/E-001/reset'],
     ['POST', '/api/runs/r1/cancel'],
   ])('%s %s', async (method, url) => {
     const app = testApp(new ProjectSession());
@@ -933,6 +934,121 @@ describe('POST /api/runs/:board/:card/forgive', () => {
   it('is absent from the scope table, which is what makes it admin-only', () => {
     for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
       expect(endpointsFor(scope).join('\n')).not.toContain('forgive');
+    }
+  });
+});
+
+// THE WAY OUT OF A CARD ITS OWN SUCCESSES STOPPED, which the route above cannot reach by design: it
+// spares a run that succeeded, and a feature whose checkup ran, created work and closed cleanly three
+// times is at its cap with nothing left for it to clear.
+describe('POST /api/runs/:board/:card/reset', () => {
+  const worked = (card: string, run: string, over: Partial<RunRecord> = {}): RunRecord => ({
+    run,
+    card,
+    board: 'engineering',
+    skill: 'execute',
+    status: 'success',
+    started: '2026-09-20T09:00:00.000Z',
+    backend: 'claude-code',
+    model: 'opus',
+    effort: 'high',
+    mode: 'bypassPermissions',
+    report: 'done, and it created two cards',
+    ...over,
+  });
+
+  const reset = (project: TestProject & { card: string }) =>
+    project.app.inject({ method: 'POST', url: `/api/runs/engineering/${project.card}/reset` });
+
+  it('clears the successes the forgive spares, and takes the card back to zero', async () => {
+    const project = await projectWithCard();
+    for (const n of [1, 2, 3]) await writeRun(project.root, worked(project.card, `r-${n}`));
+
+    // THE PREMISE FIRST, through the route a person actually has: it clears nothing at all.
+    const forgave = await project.app.inject({
+      method: 'POST',
+      url: `/api/runs/engineering/${project.card}/forgive`,
+    });
+    expect([forgave.statusCode, forgave.json()]).toEqual([200, { forgiven: 0 }]);
+
+    const res = await reset(project);
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 3 }]);
+    // FROM DISK, through the ledger the pane reads, rather than from the reply: a count assembled and
+    // never written is the exact shape a plant found on the verification route.
+    const account = (
+      await project.app.inject({ method: 'GET', url: `/api/runs/engineering/${project.card}` })
+    ).json() as { runs: RunRecord[]; account: { attempts: Record<string, number> } };
+    expect(account.account.attempts.execute).toBe(0);
+    // Nothing is deleted, and each record still reads as the success it was.
+    expect(account.runs).toHaveLength(3);
+    expect(account.runs.map((r) => r.status)).toEqual(['success', 'success', 'success']);
+    expect(account.runs.every((r) => r.forgiven !== undefined)).toBe(true);
+    expect(account.runs[0].report).toBe('done, and it created two cards');
+  });
+
+  it('says nothing was counting rather than implying it fixed something', async () => {
+    const project = await projectWithCard();
+    const res = await reset(project);
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 0 }]);
+  });
+
+  it('refuses while a run on the card has not finished, and says why', async () => {
+    // Same reason as the forgive: the unfinished run lands as an attempt moments later and puts the
+    // count straight back, which reads as a button that did nothing.
+    const project = await projectWithCard();
+    await writeRun(project.root, worked(project.card, 'r-done'));
+    await writeRun(project.root, worked(project.card, 'r-live', { status: 'running' }));
+
+    const res = await reset(project);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/has not finished/);
+    // And it refused rather than half-doing it.
+    expect((await readRun(project.root, 'engineering', project.card, 'r-done'))?.forgiven).toBeUndefined();
+  });
+
+  it('refuses a board that is not one, rather than reading a folder by that name', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({ method: 'POST', url: '/api/runs/nonsense/E-001/reset' });
+    expect([res.statusCode, res.json()]).toEqual([400, { error: 'Unknown board' }]);
+  });
+
+  // Its own line and not the forgive's: this is the write that can re-open a creating run, so "why did
+  // this feature grow a second set of stories" is a question only this answers.
+  it('writes down who reset what, and how many', async () => {
+    const lines: Record<string, unknown>[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, cb) {
+        for (const line of String(chunk).split('\n').filter(Boolean)) {
+          lines.push(JSON.parse(line) as Record<string, unknown>);
+        }
+        cb();
+      },
+    });
+    const project = await openTestProject({ runBin: SHIM, logger: { level: 'info', stream } });
+    const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
+      snapshot: { boards: { engineering: { id: string }[] } };
+    };
+    const card = state.snapshot.boards.engineering[0].id;
+    await writeRun(project.root, worked(card, 'r-1'));
+    await writeRun(project.root, worked(card, 'r-2'));
+
+    await project.app.inject({ method: 'POST', url: `/api/runs/engineering/${card}/reset` });
+
+    const line = lines.find((l) => l.msg === 'a person reset a card');
+    expect(line).toBeDefined();
+    expect([line?.card, line?.board, line?.forgiven]).toEqual([card, 'engineering', 2]);
+    expect(line?.by).toBe('admin');
+  });
+
+  // NOT A TEST OF THE AUTH ROW, and it cannot be — `testApp` fills an admin bearer into every request.
+  // What is asserted is the fact the row depends on: no rule exists for this endpoint, and the scope
+  // table's default is that a route it does not name is admin-only. An agent that could reset its own
+  // card would have unlimited retries AND could clear the creating run that bounds it.
+  it('is absent from the scope table, which is what makes it admin-only', () => {
+    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
+      // The PATH, not the bare word: `reset` appears in ordinary English and a substring match on it
+      // would pass over a catalogue that really had granted the route.
+      expect(endpointsFor(scope).join('\n')).not.toContain('/reset');
     }
   });
 });

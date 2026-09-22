@@ -8,8 +8,10 @@ import { CARD, context, deps, recorder } from './service-act-fixtures.js';
 //
 // Ruling 55 made the smoke result evidence rather than a gate so a failure could not stall a project, and the
 // consequence was a feature closing over a product that does not run. What changed is that the objection now
-// has another answer: `creatingRoundSpent` already stops a feature after one round of created work, so the
-// refusal here cannot loop for ever.
+// has another answer: `creatingRoundStop` stops a feature whose created work nobody finished, and the
+// `checkup-feature` attempt cap ends it otherwise, so the refusal here cannot loop for ever. Two bounds and
+// not one since decision 86 — the creating round re-opens once the work it asked for is done, so a feature
+// whose smoke keeps failing over work that keeps landing is stopped by the cap.
 //
 // The reason it is the MACHINE and not the prompt is measured. Asked what a failed smoke meant, models read the
 // output and reasoned their way to "environmental" twice in one afternoon — once correctly, and once by quoting

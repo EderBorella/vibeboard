@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { creatingRoundSpent, inconclusiveReviews, latestWorkRun, reviewsRun } from '../src/core/bounds.js';
+import {
+  cardsCreatedBy,
+  creatingRoundSpent,
+  inconclusiveReviews,
+  latestWorkRun,
+  reviewsRun,
+} from '../src/core/bounds.js';
 import {
   type ReviewVerdict,
   type RunRecord,
@@ -326,5 +332,33 @@ describe('creatingRoundSpent', () => {
     );
     const cards = [story, card('product', 'P-010', { createdBy: elsewhere.run })];
     expect(creatingRoundSpent(cards, [elsewhere], 'P-001', 'review-story')).toBe(false);
+  });
+});
+
+// The feature's substitute for `fixedSince` reads this, so what it selects is what decides whether a
+// finished feature can be closed (decision 86).
+describe('cardsCreatedBy', () => {
+  const checkup = withReport(
+    base({ skill: 'checkup-feature', card: 'F-001', board: 'features' }),
+    { outcome: 'success', created: ['P-002'], body: '## Missing' },
+    'T',
+  );
+
+  it('answers the cards the board says that run made, and no other', () => {
+    // TWO CARDS THAT ARE NOT IT, not one: a card created by a DIFFERENT run and a card created by
+    // nothing are separate ways to be wrong, and a fixture with one of them cannot tell them apart.
+    const other = base({ skill: 'checkup-feature', card: 'F-002', board: 'features' });
+    const cards = [
+      card('product', 'P-002', { createdBy: checkup.run }),
+      card('product', 'P-003', { createdBy: other.run }),
+      card('product', 'P-004'),
+    ];
+    expect(cardsCreatedBy(cards, checkup).map((c) => c.id)).toEqual(['P-002']);
+  });
+
+  it('is empty for a run whose cards the agent only claimed', () => {
+    // Ruling 58 again, from the other side: `created: ['P-002']` is on the run's own report above, and
+    // with no card on the board stamped with its id the round produced nothing this can see.
+    expect(cardsCreatedBy([card('product', 'P-004')], checkup)).toEqual([]);
   });
 });

@@ -134,6 +134,7 @@ export {
   type RunRecord,
   type RunStatus,
   type RunUsage,
+  resetCardAttempts,
   resolveRun,
   resolveRunRecord,
   type Spend,

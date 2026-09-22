@@ -19,6 +19,7 @@ import {
   recordPath,
   reportContract,
   reportPath,
+  resetCardRuns,
   resolveCardRuns,
   resolveRun,
   takeAgentReport,
@@ -434,6 +435,40 @@ describe('resolveCardRuns', () => {
 // no counter to reset — a card that reached the cap stayed there for ever, and the only remedy was to
 // move its result files out of the folder by hand, which destroys the history explaining why it was
 // blocked. This stamps instead.
+// THE CARD THE EXISTING BUTTON CANNOT REACH, measured before anything was built for it. F-003 on a real
+// board: every story done, its feature checkup run four times — three `success` and one `attention` that
+// had already been forgiven — so `forgiveCardRuns`, which spares a success on purpose, had nothing left to
+// clear. The card was at its cap, the only control offered cleared zero, and there was no other route back.
+//
+// It is a CHARACTERISATION of the existing function, kept beside the remedy, because the remedy is only
+// worth anything if this stays true: the day `forgiveCardRuns` starts clearing successes is the day it has
+// quietly become the reset, and the reason it does not is written on it.
+describe('the state no forgive could clear', () => {
+  const checkup = (run: string, over: Partial<RunRecord> = {}): RunRecord =>
+    record({ run, card: 'F-003', board: 'features', skill: 'checkup-feature', status: 'success', ...over });
+
+  const poisoned = async (): Promise<string> => {
+    const root = await tempDir();
+    for (const n of [1, 2, 3]) await writeRun(root, checkup(`r-${n}`));
+    await writeRun(root, checkup('r-4', { status: 'attention', forgiven: 'LAST WEEK' }));
+    return root;
+  };
+
+  it('leaves the card at its cap, because every run that still burns succeeded', async () => {
+    const root = await poisoned();
+    expect(await forgiveCardRuns(root, 'features', 'F-003', 'T')).toBe(0);
+    const runs = await listCardRuns(root, 'features', 'F-003');
+    expect(attemptsUsed(runs, 'F-003', 'checkup-feature')).toBe(3);
+  });
+
+  it('is what the reset is for: the same card, back to zero', async () => {
+    const root = await poisoned();
+    expect(await resetCardRuns(root, 'features', 'F-003', 'T')).toBe(3);
+    const runs = await listCardRuns(root, 'features', 'F-003');
+    expect(attemptsUsed(runs, 'F-003', 'checkup-feature')).toBe(0);
+  });
+});
+
 describe('forgiveCardRuns', () => {
   it('clears the endings the card is answerable for, and counts them', async () => {
     const root = await tempDir();

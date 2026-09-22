@@ -18,6 +18,7 @@ import { shapeProblems } from '../autopilot-cover.js';
 import type { AutopilotState } from '../autopilot-state.js';
 import { byQueueOrder } from '../board/ordering.js';
 import {
+  cardsCreatedBy,
   creatingRun,
   fixedSince,
   inconclusiveReviews,
@@ -25,7 +26,7 @@ import {
   reviewsRun,
   reviewVerdictRun,
 } from '../bounds.js';
-import { allSettled, isSettled } from '../derived-status.js';
+import { allSettled, allTerminal, isSettled } from '../derived-status.js';
 import { mayDispatch, type StopReason } from '../dispatch-gate.js';
 import { childrenOf, liveCards } from '../hierarchy.js';
 import { ARCHIVE_SLUG } from '../layout.js';
@@ -417,6 +418,36 @@ function skipPhase(name: PhaseName, card: Card, why: string): TickAction | undef
   return to === undefined ? undefined : { kind: 'stamp', phase: name, card, to, why };
 }
 
+// HAS ANYTHING ANSWERED SINCE THE ROUND? The two judging points answer that differently because they
+// CREATE different things, which is the whole reason this is a branch rather than one predicate.
+//
+// A STORY'S REVIEW WRITES SIBLINGS. `creates: 'product'` on a product card is another story beside this
+// one, so a sibling reaching `done` says nothing about whether THIS story's finding was addressed. What
+// addresses it is the story's own fix run, which is `fixedSince` and is exactly right (decision 81).
+//
+// A FEATURE'S CHECKUP WRITES ITS OWN CHILDREN. `creates: 'product'` on a features card is a story UNDER
+// the feature (phases.ts says so on the row), and a feature has no work of its own but its stories — so
+// the only thing that can answer its checkup is that work being finished. There is no run to read it
+// off; the board is the record.
+//
+// TERMINAL AND NOT SETTLED, and the difference is the case the stop is about. A created story that is
+// BLOCKED settles its feature (decision 45), so the checkup is reached — but nothing has been done and
+// the card is itself waiting for a person, which is what the sentence says. Opening the hatch on it
+// would buy a model turn to re-read a fact the board already states.
+//
+// IT TERMINATES ON THE ATTEMPT CAP rather than on this branch: each re-opened round still spends a
+// `checkup-feature` attempt, so `capReached` stops the feature after `attemptCap` of them whatever the
+// board does. What the hatch buys is that each of those rounds follows real work landing.
+function answeredSince(
+  input: TickInput,
+  name: 'story-review' | 'feature-checkup',
+  card: Card,
+  created: RunRecord,
+): boolean {
+  if (name === 'story-review') return fixedSince(input.runs, card.id, created);
+  return allTerminal(input.ap, cardsCreatedBy(input.cards, created));
+}
+
 // EITHER POINT WHERE A CARD IS CLOSED BY A JUDGEMENT, and the one bound that is not an attempt count.
 // DECISION 47: such a point gets ONE round of creation, and after that it may only close the card or stop.
 //
@@ -432,8 +463,15 @@ function skipPhase(name: PhaseName, card: Card, why: string): TickAction | undef
 // run write a sibling and refuse the story together — so a story working steadily through its fix budget
 // reached this and halted the PROJECT with two of three attempts unspent, over a review that had answered
 // perfectly well. A fix run started since the creating round is work answering the finding, and there is
-// nothing here to stop. A feature has no fix phase, so `fixedSince` is false for one by construction and
-// the feature checkup's bound is exactly what decision 47 wrote.
+// nothing here to stop.
+//
+// NOR IS IT "ASKED FOR WORK, AND THE WORK IS DONE" (decision 86) — the same correction at the other
+// level, made separately because the evidence is a different fact. Decision 81 fixed the story and said
+// the feature's bound was untouched because `fixedSince` is false for a feature by construction. True,
+// and it is precisely why the feature was left with no hatch AT ALL: measured on a feature with fourteen
+// `done` stories, whose checkup found one genuine gap, created one story for it, and whose story was
+// then implemented, reviewed and closed. The feature was finished and nothing in the product could say
+// so. `answeredSince` below is where the two levels part.
 //
 // WHAT IS LEFT IS THE CASE THE SENTENCE DESCRIBES: the point created, nothing answered, and it is being
 // asked once more. That is the shape a verdict nobody could WRITE leaves behind — a refused exit stamp is
@@ -451,7 +489,7 @@ function creatingRoundStop(
 ): TickAction | undefined {
   const created = creatingRun(input.cards, input.runs, card.id, skill);
   if (created === undefined || attemptsUsed(input.runs, card.id, skill) <= 1) return undefined;
-  if (fixedSince(input.runs, card.id, created)) return undefined;
+  if (answeredSince(input, name, card, created)) return undefined;
   const what = name === 'feature-checkup' ? 'feature' : 'story';
   const after = name === 'feature-checkup' ? 'checkup' : 'review';
   return stop(

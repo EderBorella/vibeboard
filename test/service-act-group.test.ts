@@ -5,8 +5,9 @@ import { CARD, context, deps, IMPLEMENT, record, recorder, STORY } from './servi
 // THE CARDS ONE LEVEL DOWN A DISPATCH DELIVERS (decision 83): a story's implement run and the tasks it was
 // asked for. Two claims, and the machine rests on both — the tasks are stamped into `in-progress` BEFORE the
 // dispatch, because where they stand is the only way the run is told which are its own; and they are stamped
-// `done` TOGETHER when it succeeds, because a story is judged once every task under it is settled and a
-// partial stamp would leave one half-closed.
+// into `review` TOGETHER when it completes, because a story is judged once every task under it is delivered
+// or settled and a partial stamp would leave one half-judgeable. Never into `done`: that is the judgement's
+// to write (decision 87).
 //
 // The fixtures are the shared ones: `IMPLEMENT` is the story's implement action, and its second argument is
 // the group. Three tasks rather than two throughout, because "all of them" and "the first two" are the same
@@ -49,35 +50,38 @@ describe('the tasks a story’s implement run is given', () => {
     expect(r.diary.some((d) => d.text.includes('E-001 moved to in-progress'))).toBe(false);
   });
 
-  // AND NOT ONE A PERSON FINISHED WHILE THE TICK WAS DECIDING. The group is formed from what is outstanding,
-  // so this is the window between the board being read and the claim being written — and the guard above
-  // compares against `entry` alone, so without this one a task already in `done` is pulled back into
-  // `in-progress` and a run is asked to do work that has landed.
-  it('claims nothing for a task that is already settled', async () => {
+  // AND NOT ONE ALREADY DELIVERED. The tick forms a group out of what is outstanding, so the loop cannot
+  // hand it one — and the guard above compares against `entry` alone, so without this one a task already in
+  // `review` is pulled back into `in-progress` and a run is asked to do work that has landed.
+  it('claims nothing for a task that is already delivered', async () => {
     const r = recorder();
-    await performAction(deps(r.client), IMPLEMENT(STORY(), [task('E-001', 'done'), task('E-002')]), context);
+    await performAction(
+      deps(r.client),
+      IMPLEMENT(STORY(), [task('E-001', 'review'), task('E-002')]),
+      context,
+    );
     expect(r.moves.filter((m) => m.card === 'E-001')).toEqual([]);
     expect(r.diary.some((d) => d.text.includes('E-001 moved'))).toBe(false);
   });
 
   // THE SAME CARE AT THE OTHER END, and this was the one of the five stamps that did not take it: a move to
   // where a card already stands is a write for nothing and a diary line for an event that did not happen.
-  it('settles nothing for a task already standing in the settled column', async () => {
+  it('delivers nothing for a task already standing in the delivered column', async () => {
     const r = recorder();
     await performAction(
       deps(r.client),
-      IMPLEMENT(STORY(), [task('E-001', 'done'), task('E-002', 'in-progress')]),
+      IMPLEMENT(STORY(), [task('E-001', 'review'), task('E-002', 'in-progress')]),
       context,
     );
-    expect(r.moves).toEqual([{ card: 'E-002', to: 'done' }]);
-    expect(r.diary.some((d) => d.text.includes('E-001 moved to done'))).toBe(false);
+    expect(r.moves).toEqual([{ card: 'E-002', to: 'review' }]);
+    expect(r.diary.some((d) => d.text.includes('E-001 moved to review'))).toBe(false);
   });
 
   // THE ATOMICITY THE STORY'S JUDGEMENT DEPENDS ON. One act: every task, in the one call that followed the
   // run. Stamped one at a time — a tick each, or a group of one at a time — the story spends a window with
   // some tasks settled and some not, and a loop that died inside it would come back to a judgement firing
   // over work no run ever did.
-  it('settles all of them together when the run succeeds', async () => {
+  it('delivers all of them together when the run completes', async () => {
     const r = recorder();
     const result = await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
     expect(result.dispatches).toBe(1);
@@ -85,9 +89,45 @@ describe('the tasks a story’s implement run is given', () => {
       { card: 'E-001', to: 'in-progress' },
       { card: 'E-002', to: 'in-progress' },
       { card: 'E-003', to: 'in-progress' },
-      { card: 'E-001', to: 'done' },
-      { card: 'E-002', to: 'done' },
-      { card: 'E-003', to: 'done' },
+      { card: 'E-001', to: 'review' },
+      { card: 'E-002', to: 'review' },
+      { card: 'E-003', to: 'review' },
+    ]);
+  });
+
+  // THE INCIDENT, AT THE EXECUTOR (decision 87). A run that finished and SAID it could not do the work lands
+  // its tasks exactly where one that succeeded does — decision 40 forbids the loop reading which it claimed —
+  // and neither lands them in `done`: the diary line is not allowed to say the run delivered them.
+  it('delivers them when the run ended attention exactly as when it succeeded, and closes none', async () => {
+    const r = recorder({ settle: [record({ status: 'attention', outcome: 'attention', filesChanged: 0 })] });
+    await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
+    expect(r.moves.filter((m) => m.to === 'review').map((m) => m.card)).toEqual(['E-001', 'E-002', 'E-003']);
+    expect(r.moves.filter((m) => m.to === 'done')).toEqual([]);
+    expect(r.diary.find((d) => d.text.startsWith('E-001 moved to review'))?.text).toBe(
+      "E-001 moved to review: its story's implement-story run finished; whether the work landed is for the story's review to say.",
+    );
+  });
+
+  // THE FIX CARRIES A GROUP TOO: the tasks its send-back re-opened, already standing in `in-progress`, so
+  // nothing is claimed and every one of them is delivered back for the next judgement.
+  it('delivers back the tasks a fix was given, claiming none that already stand where it works', async () => {
+    const r = recorder();
+    const reopened = [task('E-001', 'in-progress'), task('E-002', 'in-progress')];
+    await performAction(
+      deps(r.client),
+      {
+        kind: 'dispatch',
+        phase: 'story-fix',
+        skill: 'fix',
+        card: STORY(),
+        previous: 'IMPL-1',
+        group: { cards: reopened, entry: 'in-progress', delivered: 'review' },
+      },
+      context,
+    );
+    expect(r.moves).toEqual([
+      { card: 'E-001', to: 'review' },
+      { card: 'E-002', to: 'review' },
     ]);
   });
 
@@ -104,28 +144,28 @@ describe('the tasks a story’s implement run is given', () => {
     expect(r.diary.find((d) => d.kind === 'run')?.text).toContain('it stayed where it is');
   });
 
-  // NOTHING IS SETTLED BY A RUN THAT DID NOT DELIVER. Each of these is a different ending and each already
+  // NOTHING IS DELIVERED BY A RUN THAT DID NOT COMPLETE. Each of these is a different ending and each already
   // holds the card itself; the tasks have to be held with it, or a story closes over work nobody did.
-  it('settles none of them when the run left nothing behind', async () => {
+  it('delivers none of them when the run left nothing behind', async () => {
     const r = recorder({ settle: [record({ status: 'failed', outcome: undefined, filesChanged: 0 })] });
     await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
-    expect(r.moves.filter((m) => m.to === 'done')).toEqual([]);
+    expect(r.moves.filter((m) => m.to !== 'in-progress')).toEqual([]);
   });
 
-  it('settles none of them when the run died', async () => {
+  it('delivers none of them when the run died', async () => {
     const r = recorder({ settle: [record({ status: 'failed', filesChanged: 3 })] });
     await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
-    expect(r.moves.filter((m) => m.to === 'done')).toEqual([]);
+    expect(r.moves.filter((m) => m.to !== 'in-progress')).toEqual([]);
   });
 
-  it('settles none of them when the run was cancelled', async () => {
+  it('delivers none of them when the run was cancelled', async () => {
     const r = recorder({ settle: [record({ status: 'cancelled' })] });
     await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
-    expect(r.moves.filter((m) => m.to === 'done')).toEqual([]);
+    expect(r.moves.filter((m) => m.to !== 'in-progress')).toEqual([]);
   });
 
   // A REFUSAL MID-GROUP STOPS THE ACT. Both endings leave a partial board — there is no transaction over
-  // three HTTP calls — and this one leaves it on the side the machine can recover from: fewer tasks settled
+  // three HTTP calls — and this one leaves it on the side the machine can recover from: fewer tasks delivered
   // means the story stays unjudgeable, and the next dispatch re-forms the group out of what is outstanding.
   //
   // The diary line about the RUN is what must not be written: it says the run completed, and a reader who
@@ -134,7 +174,7 @@ describe('the tasks a story’s implement run is given', () => {
     const r = recorder();
     const move = r.client.move;
     r.client.move = async (board, card, to) =>
-      card === 'E-002' && to === 'done'
+      card === 'E-002' && to === 'review'
         ? { ok: false as const, reason: 'refused with 409', fatal: false }
         : move(board, card, to);
 
@@ -142,18 +182,20 @@ describe('the tasks a story’s implement run is given', () => {
     // The dispatch HAPPENED and is counted: a real agent run reported as none at all is how both caps came
     // to be told nothing and the next tick re-dispatched over work that had already passed.
     expect(result.dispatches).toBe(1);
-    expect(r.moves.filter((m) => m.to === 'done')).toEqual([{ card: 'E-001', to: 'done' }]);
+    expect(r.moves.filter((m) => m.to === 'review')).toEqual([{ card: 'E-001', to: 'review' }]);
     expect(r.diary.some((d) => d.kind === 'run' && d.text.includes('for its story-implement phase'))).toBe(
       false,
     );
-    expect(r.diary.some((d) => d.kind === 'note' && d.text.includes('could not settle E-002'))).toBe(true);
+    expect(r.diary.some((d) => d.kind === 'note' && d.text.includes('could not deliver E-002'))).toBe(true);
   });
 
   it('stops the loop when the refusal is one it cannot recover from', async () => {
     const r = recorder();
     const move = r.client.move;
     r.client.move = async (board, card, to) =>
-      to === 'done' ? { ok: false as const, reason: 'refused with 401', fatal: true } : move(board, card, to);
+      to === 'review'
+        ? { ok: false as const, reason: 'refused with 401', fatal: true }
+        : move(board, card, to);
 
     const result = await performAction(deps(r.client), IMPLEMENT(STORY(), THREE), context);
     expect(result.stop?.reason).toBe('stalled');

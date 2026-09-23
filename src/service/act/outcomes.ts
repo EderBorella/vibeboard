@@ -8,7 +8,7 @@ import { BOARDS, type BoardName, type Card } from '../../core/types.js';
 import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
-import { settleGroup } from './group.js';
+import { deliverGroup } from './group.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused } from './refusals.js';
 import {
@@ -184,17 +184,18 @@ async function earnedItsExit(
 ): Promise<ActResult> {
   const p = phase(action.phase);
   // THE CARDS ONE LEVEL DOWN THIS RUN DELIVERED, stamped TOGETHER and before anything else in here
-  // (decision 83). What "together" buys is held by test/service-act-group.test.ts: a refusal part-way
-  // returns from this line, so no exit stamp is written and the diary does not report the run as completed
-  // — the side the machine recovers from, because the next dispatch re-forms the group out of what is left.
+  // (decision 83), into the column where they wait for their story's judgement (decision 87). What
+  // "together" buys is held by test/service-act-group.test.ts: a refusal part-way returns from this line, so
+  // no exit stamp is written and the diary does not report the run as completed — the side the machine
+  // recovers from, because the next dispatch re-forms the group out of what is left.
   //
   // BEING AHEAD OF THE EXIT STAMP IS DEFENSIVE, AND NOTHING EXERCISES IT — said plainly rather than as a
-  // live rule, because `story-implement` is the only phase that carries a group and its `exitPass` IS its
-  // `entry`, so `moved` below is always undefined and no test can tell the two orders apart. It is written
-  // this way for the table row that does not exist yet: a group-carrying phase whose exit differed from its
-  // entry would advance its card while a task under it was still outstanding, and the level above is judged
-  // on its children being settled.
-  const group = await settleGroup(deps, action, 1);
+  // live rule, because the two phases that carry a group never move their card here: `story-implement`'s
+  // `exitPass` IS its `entry`, and `story-fix` has none, so `moved` below is always undefined and no test can
+  // tell the two orders apart. It is written this way for the table row that does not exist yet: a
+  // group-carrying phase whose exit differed from its entry would advance its card while a task under it was
+  // still outstanding, and the level above is judged on its children.
+  const group = await deliverGroup(deps, action, 1);
   if (group) return group;
 
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.

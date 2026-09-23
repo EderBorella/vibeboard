@@ -44,26 +44,28 @@ if (process.env.VIBEBOARD_SHIM_ARGS) {
 // The contract puts the path on a line of its own inside a fenced block, so match a whole line
 // rather than a folder this shim would otherwise have to keep in step with core/layout.ts.
 const match = prompt.match(/^[\w./-]+\.report\.md$/m);
-// `[\w:]` and not `\w`: a behaviour may carry arguments, colon-separated, and `\w` excludes the colon — so
+// `[\w:-]` and not `\w`: a behaviour may carry arguments, colon-separated, and `\w` excludes the colon — so
 // `[[behaviour:create:features:2]]` matched NOTHING and fell through to the `?? 'success'` default. The
 // failure was silent and looked exactly like a machine bug: cards never appeared and the loop refused the
 // creating phase for producing nothing. Every existing single-word marker still matches, with no arguments.
+// The HYPHEN for the same reason, found the same way: `verdict:sent-back` is the only verdict that is not
+// `done`, and without it the judge's send-back fell through to a report with no verdict at all.
 // A marker may also be scoped to ONE CARD: `[[behaviour@E-004:create:engineering:1]]`, which only this shim's
 // own card obeys. It exists for a card whose BODY nobody can seed — the smoke-harness feature is created by the
 // loop with a canned body (src/core/harness-feature.ts), so the usual route of putting the chain in the card is
 // closed for it, and a marker in the SKILL body wins over every card's because the skill sits higher in the
 // prompt. Scoped, it drives exactly one card and every other card still falls through to its own.
 //
-// `@` is not in `[\w:]`, so the unscoped pattern below cannot see a scoped marker: a skill carrying only a
+// `@` is not in `[\w:-]`, so the unscoped pattern below cannot see a scoped marker: a skill carrying only a
 // scoped one leaves every other card reading its own body, which is what makes this additive.
 const scopedMarker = (id) => {
   if (id === undefined) return undefined;
   const escaped = id.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-  return (prompt.match(new RegExp(`\\[\\[behaviour@${escaped}:([\\w:]+)\\]\\]`)) ?? [])[1];
+  return (prompt.match(new RegExp(`\\[\\[behaviour@${escaped}:([\\w:-]+)\\]\\]`)) ?? [])[1];
 };
 const [behaviour = 'success', ...behaviourArgs] = (
   scopedMarker((prompt.match(/^## The card: (\S+)$/m) ?? [])[1]) ??
-  (prompt.match(/\[\[behaviour:([\w:]+)\]\]/) ?? [])[1] ??
+  (prompt.match(/\[\[behaviour:([\w:-]+)\]\]/) ?? [])[1] ??
   'success'
 ).split(':');
 

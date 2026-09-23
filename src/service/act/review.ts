@@ -1,3 +1,4 @@
+import type { Judged } from '../../core/actions.js';
 import { phase } from '../../core/phases.js';
 import { setupSubtreeIds } from '../../core/setup-feature.js';
 import { BOARDS, type Card } from '../../core/types.js';
@@ -62,7 +63,7 @@ export async function reviewStory(
   // never run. Installing the toolchain and the test runner is what a setup card is FOR, so it has no gates to
   // pass — and the judge is told to judge by reading instead.
   if (!gates.passed && !(opts.setupSubtree === true && nothingRan(gates))) {
-    return await recordVerdict(deps, card, action.previous, gates, p.exitFail, {
+    return await recordVerdict(deps, card, action.previous, gates, p.exitFail, action.judged, {
       why: 'its gates failed, so it goes back to be fixed.',
       line: gatesLine(card, gates),
       dispatches: 0,
@@ -165,6 +166,7 @@ async function judge(
     action.previous ?? settled.run,
     verification,
     passed ? p.exitPass : p.exitFail,
+    action.judged,
     {
       why: passed ? 'its review passed it.' : 'its review sent it back with findings.',
       line: reviewLine(card, settled, passed, context),
@@ -199,6 +201,7 @@ async function recordVerdict(
   onto: string | undefined,
   verification: Verification,
   to: string | undefined,
+  judged: Judged | undefined,
   what: { why: string; line: string; dispatches: number; iteration: number },
 ): Promise<ActResult> {
   // A PASS WITH NOWHERE TO LAND IS NOT A SEND-BACK, and `judge` never reaches here with one anyway — it
@@ -217,6 +220,12 @@ async function recordVerdict(
       );
     }
   }
+  // THE TASKS BEFORE THE STORY (decision 87), and after the verdict for the reason above. A pass closed over
+  // tasks still waiting in `review` would leave them where `derivePosition` never looks again once the story
+  // is done; refused part-way, the story is still open, its verdict is on the record, and the next tick
+  // finishes the moves — P4r for a pass, the fix for a send-back.
+  const tasks = await moveJudged(deps, card, judged, verification.passed, what.dispatches);
+  if (tasks) return { ...tasks, ...nowhere };
   // AND ONLY WHERE THE CARD IS NOT THERE ALREADY. A send-back's destination is the column the story is
   // judged from, so a refused story is told to move to where it is standing — a write for nothing and a
   // diary line about an event that did not happen, which is the same care `stampEntry` takes one file over.
@@ -242,4 +251,36 @@ async function recordVerdict(
     skill: phase('story-review').skill,
   });
   return { dispatches: what.dispatches, ...nowhere };
+}
+
+// WHERE THE VERDICT SENDS THE TASKS IT JUDGED: `done` on a pass, which is the only way a task gets there that
+// the machine writes — so `done` means judged — and back into `in-progress` on a send-back, so the fix after it
+// has real work to deliver and the board says the work is not delivered. Columns off the action, because the
+// tick names them (`Judged` in core/actions.ts); a task already standing there is not moved again.
+async function moveJudged(
+  deps: ActDeps,
+  story: Card,
+  judged: Judged | undefined,
+  passed: boolean,
+  dispatches: number,
+): Promise<ActResult | undefined> {
+  if (!judged) return undefined;
+  const to = passed ? judged.passed : judged.sentBack;
+  const why = passed
+    ? `its story ${story.id} passed its review.`
+    : `its story ${story.id} was sent back, so the work it asks for is outstanding again.`;
+  for (const task of judged.cards) {
+    if (task.columnSlug === to) continue;
+    const stamped = await stamp(deps, task, to, why);
+    if (!stamped.ok) {
+      return await refused(
+        deps,
+        `could not move ${task.id} to ${to}`,
+        stamped.reason,
+        stamped.fatal,
+        dispatches,
+      );
+    }
+  }
+  return undefined;
 }

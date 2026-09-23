@@ -45,8 +45,8 @@ export const STORY = (id = 'P-001'): Card => ({ ...CARD(id, 'product'), columnSl
 
 // THE STORY'S IMPLEMENT (decision 83), and the one phase left that takes the ordinary dispatch path with
 // both an entry column and an exit one. Its `group` is what the run is asked for: the tasks are stamped
-// into `in-progress` before it and `done` together after it, which is the whole of what a task's own
-// implement used to do one card at a time.
+// into `in-progress` before it and `review` together after it — delivered, never `done`, which only the
+// story's judgement writes (decision 87).
 //
 // ONE TASK BY DEFAULT, because most of this suite is about the path rather than the group — the suites
 // that are about the group name their own, and two is the smallest fixture that can tell "all of them"
@@ -56,7 +56,7 @@ export const IMPLEMENT = (card = STORY(), cards = [CARD()]): TickAction => ({
   phase: 'story-implement',
   skill: 'implement-story',
   card,
-  group: { cards, entry: 'in-progress', settled: 'done' },
+  group: { cards, entry: 'in-progress', delivered: 'review' },
 });
 
 // THE STORY'S JUDGEMENT (decision 80). It carries the run its verdict will be WRITTEN onto — a story's

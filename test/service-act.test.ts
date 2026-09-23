@@ -106,24 +106,27 @@ describe('one dispatch, end to end', () => {
     expect(commits[0]?.message).toContain('iteration 4');
   });
 
-  it('stamps the exit column through the endpoint once the run completes', async () => {
+  // THROUGH THE ENDPOINT, and into `review`: a completed run delivers its task and never closes it — that is
+  // the story's judgement to do (decision 87).
+  it('delivers its task through the endpoint once the run completes, and closes nothing', async () => {
     const r = recorder();
     const result = await performAction(deps(r.client), IMPLEMENT(), context);
     expect(result.dispatches).toBe(1);
     expect(r.moves).toEqual([
       { card: 'E-001', to: 'in-progress' },
-      { card: 'E-001', to: 'done' },
+      { card: 'E-001', to: 'review' },
     ]);
   });
 
   // DECISION 40. The loop reads its own record of how the run ended — `status`, which the runner assigns —
   // and never the `outcome` the agent wrote about itself. A run that finished saying it could not do the
-  // work still settles its task, where since decision 80 the STORY's gates and judgement take it as it
-  // stands — the claim cannot change where the card goes either way.
+  // work still delivers its task, into exactly the column a success does, and the STORY's gates and
+  // judgement take it as it stands — the claim cannot change where the card goes either way. What it can no
+  // longer do is close the task (decision 87): `done` is the judgement's to write.
   it('ignores what the agent said about its own work', async () => {
     const r = recorder({ settle: [record({ status: 'attention', outcome: 'attention' })] });
     await performAction(deps(r.client), IMPLEMENT(), context);
-    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'done' });
+    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'review' });
   });
 
   it('does not stamp on exit when the run did not settle', async () => {

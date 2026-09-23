@@ -21,16 +21,16 @@ import { settle } from './settle.js';
 // THE ORDINARY DISPATCH, which is every phase but one:
 //
 //   commit → stamp the entry column → claim the group → dispatch → wait for the record to settle
-//          → settle the group → stamp the exit column → diary
+//          → deliver the group → stamp the exit column → diary
 //
-// The two group steps are the story's implement alone (decision 83) and are no-ops everywhere else: it is
-// the one phase whose run delivers cards other than its own.
+// The two group steps are the story's implement and its fix (decisions 83 and 87) and are no-ops everywhere
+// else: they are the phases whose run delivers cards other than its own.
 //
 // AND THE STORY'S JUDGEMENT, which is deterministic first (decision 51) and so does not take that path at all:
 //
 //   commit → run the gates HERE, in this process → send-back with the command's own output if they fail
 //          → only if they pass, dispatch a `review-story` run → write its verdict onto the run it judged
-//          → stamp
+//          → move the tasks it judged → stamp
 //
 // Four rules, each of which is a decision rather than an implementation detail:
 //
@@ -133,7 +133,7 @@ type Stamp = Extract<TickAction, { kind: 'stamp' }>;
 export type Dispatch = Extract<TickAction, { kind: 'dispatch' }>;
 
 // A move the loop makes with no run behind it: the two break-down skips, the re-stamp of a story whose verdict
-// was already decided, and a card that has used every fix attempt. No dispatch and no cost — the judgement
+// was already decided and of each task it closes, and a card that has used every fix attempt. No dispatch and no cost — the judgement
 // either already happened or was never needed.
 async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
   const moved = await stamp(deps, action.card, action.to, action.why);

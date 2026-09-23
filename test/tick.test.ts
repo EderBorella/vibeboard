@@ -864,8 +864,8 @@ const gates = (passed: boolean): Verification =>
 
 // THE STORY'S OWN WORK RUNS: its break-down, the implement that does the tasks under it (decision 83) and
 // the fix that answers a send-back. All three are `bounded: 'skill'` phases on product, which is what
-// `isWorkRun` reads — so these are what a story-level verdict lands on and what `latestWorkRun` answers
-// with. There is no engineering equivalent any more: no phase sits on that board.
+// `isWorkRun` reads — so these are what a story-level verdict lands on and what `latestCompletedWorkRun`
+// answers with. There is no engineering equivalent any more: no phase sits on that board.
 type StorySkill = 'break-down' | 'implement-story' | 'fix';
 
 const storyWork = (skill: StorySkill, cardId = 'P-001'): RunRecord =>
@@ -916,35 +916,37 @@ describe("decideTick — the story's work", () => {
   });
 
   // THE TWO COLUMNS COME FROM THE TICK, because deciding which slug means "being worked" and which means
-  // "finished" is the machine's job and the executor holds no decisions of its own. `settled` is read off
-  // the config's own `terminal` list rather than written here.
-  it('names where the tasks are claimed and where they are settled', () => {
+  // "delivered" is the machine's job and the executor holds no decisions of its own. DELIVERED AND NOT DONE
+  // (decision 87): the run's own ending is the agent's word about itself, so its tasks wait in `review` and
+  // only the story's judgement closes them.
+  it('names where the tasks are claimed and where they are delivered, which is never done', () => {
     const cards = [...story(['E-001']), task('E-001', 'backlog')];
     const action = decideTick(input({ cards }));
-    expect(action.kind === 'dispatch' && action.group).toMatchObject({
+    expect(action.kind === 'dispatch' && action.group).toEqual({
+      cards: [expect.objectContaining({ id: 'E-001' })],
       entry: 'in-progress',
-      settled: 'done',
+      delivered: 'review',
     });
   });
 
-  // AND THE FIXTURE ABOVE CANNOT TELL THE CONFIG FROM THE LITERAL, because `DEFAULT_AUTOPILOT` calls the
-  // terminal column `done`: replacing the lookup with `'done'` passed the whole suite. A board that names
-  // another one distinguishes them — in BOTH directions, which is the half a `settled` assertion alone
-  // misses: `done` is then an ordinary column, so a task sitting in it is outstanding work and joins the
-  // group like any other.
-  it('reads the settled column off the config, on a board whose terminal column is not done', () => {
+  // AND WHERE THE JUDGEMENT CLOSES THEM IS READ OFF THE CONFIG, which the default fixture cannot tell from a
+  // literal because `DEFAULT_AUTOPILOT` calls the terminal column `done`. A board that names another one
+  // distinguishes them — in BOTH directions: `done` is then an ordinary column, so a task sitting in it is
+  // outstanding work and joins the group like any other, and a pass closes a task into `shipped`.
+  it('reads the column a judged task closes into off the config, on a board whose terminal is not done', () => {
     const ap = {
       ...DEFAULT_AUTOPILOT,
       terminal: { ...DEFAULT_AUTOPILOT.terminal, engineering: ['shipped'] },
     };
     const columns = { ...COLUMNS, engineering: [...COLUMNS.engineering, 'shipped'] };
     const cards = [...story(['E-001', 'E-002']), task('E-001', 'backlog', 10), task('E-002', 'done', 20)];
-    const action = decideTick(input({ ap, cards, columns }));
-    expect(action.kind === 'dispatch' && action.group).toMatchObject({
-      entry: 'in-progress',
-      settled: 'shipped',
+    expect(groupOf(decideTick(input({ ap, cards, columns })))).toEqual(['E-001', 'E-002']);
+    const delivered = [...story(['E-001']), task('E-001', 'review')];
+    const judging = decideTick(input({ ap, cards: delivered, columns }));
+    expect(judging.kind === 'dispatch' && judging.judged).toMatchObject({
+      passed: 'shipped',
+      sentBack: 'in-progress',
     });
-    expect(groupOf(action)).toEqual(['E-001', 'E-002']);
   });
 
   // THE FALL-THROUGH, which no fixture had ever observed. A board on which nothing can finish is refused
@@ -1006,21 +1008,23 @@ describe("decideTick — the story's work", () => {
     expect(groupOf(decideTick(input({ cards })))).toEqual(['E-003']);
   });
 
-  // A TASK THE OLD MACHINE LEFT IN `review`, which is every board mid-flight when the judgement moved up.
-  // It used to be stamped `done` on the strength of its column alone; there is no per-task row to stamp it
-  // from now, and `review` is neither terminal nor blocked — so it is outstanding work, and the story's run
-  // is given it like any other task. A run handed work that has already landed says so and costs a reading
-  // of one card; leaving it unsettled would make its story unjudgeable for ever.
-  it('gives a task the old machine left in review to the story’s run, rather than stranding it', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    const action = decideTick(input({ cards, runs: [storyWork('break-down')] }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement' });
-    expect(groupOf(action)).toEqual(['E-001']);
+  // A TASK THE OLD MACHINE LEFT IN `review`, which is every board mid-flight when the judgement moved up. Its
+  // per-task implement had landed and its per-task review never ran — which is exactly what the column means
+  // again since decision 87, delivered and awaiting judgement — so its STORY is judged, rather than the work
+  // being paid for a second time. This asserted the opposite while the loop never stamped `review`.
+  it('judges a story whose task the old machine left in review, rather than implementing it again', () => {
+    const brokeDown = storyWork('break-down');
+    const action = decideTick(
+      input({ cards: [...story(['E-001']), task('E-001', 'review')], runs: [brokeDown] }),
+    );
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review', previous: brokeDown.run });
+    expect(action.kind === 'dispatch' && action.judged?.cards.map((c) => c.id)).toEqual(['E-001']);
   });
 
-  it('gives a task a person dragged into review the same treatment, with no run on the board at all', () => {
-    const cards = [...story(['E-001']), task('E-001', 'review')];
-    expect(groupOf(decideTick(input({ cards })))).toEqual(['E-001']);
+  it('judges a story whose task a person dragged into review, with no run on the board at all', () => {
+    const action = decideTick(input({ cards: [...story(['E-001']), task('E-001', 'review')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.previous).toBeUndefined();
   });
 
   it('dispatches the story’s implement for a task a crashed run left in in-progress', () => {
@@ -1034,11 +1038,79 @@ describe("decideTick — the story's work", () => {
   // (`recordEmptyRun` in service/act/outcomes.ts), and that verdict now lands on the STORY's own run. It
   // does not buy a fix: the tasks are still outstanding, so the story's implement is what is dispatched
   // again, under its own cap — a fix handed a run that produced nothing has no finding to address.
+  //
+  // `failed`, WHICH THE FIXTURE WAS NOT: `producedNothing` is true of a failed run only, so a completed run
+  // carrying this verdict is a shape nothing writes — and since decision 87 a completed run with a failed
+  // verdict is exactly what a send-back looks like, which is the fix's (the test below this one).
   it('retries the story’s implement when a run left nothing behind, rather than spending a fix', () => {
     const cards = [...story(['E-001']), task('E-001', 'in-progress')];
-    const empty = storyJudged('implement-story', false);
+    const empty = withVerification(run('P-001', 'product', 'implement-story', 'failed'), gates(false));
     const action = decideTick(input({ cards, runs: [empty] }));
     expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', skill: 'implement-story' });
+  });
+
+  // A SEND-BACK RE-OPENS THE TASKS IT JUDGED (decision 87), so its story is no longer judgeable — and what it
+  // is owed is its fix, handed the finding, on the fix budget. Read in the old order, this board is P3: an
+  // implement told nothing, on the implement's cap.
+  it('fixes a story whose send-back re-opened its tasks, rather than implementing them again', () => {
+    const refused = storyJudged('implement-story', false);
+    const cards = [
+      ...story(['E-001', 'E-002']),
+      task('E-001', 'in-progress', 10),
+      task('E-002', 'in-progress', 20),
+    ];
+    const action = decideTick(input({ cards, runs: [refused] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix', previous: refused.run });
+    expect(action.kind === 'dispatch' && action.group).toMatchObject({
+      entry: 'in-progress',
+      delivered: 'review',
+    });
+    expect(groupOf(action)).toEqual(['E-001', 'E-002']);
+  });
+
+  // EVERY TASK THE SEND-BACK RE-OPENED, past the ceiling. What a fix is asked for is the finding; capped, the
+  // rest would stand in `in-progress` for the next implement to read as its own.
+  it('gives the fix every task its send-back re-opened, past the ceiling', () => {
+    const ids = Array.from({ length: 7 }, (_, i) => `E-00${i + 1}`);
+    const cards = [...story(ids), ...ids.map((id, i) => task(id, 'in-progress', (i + 1) * 10))];
+    expect(groupOf(decideTick(input({ cards, runs: [storyJudged('implement-story', false)] })))).toEqual(ids);
+  });
+
+  // AND ONLY THOSE: a task still in `backlog` was never delivered, so it is an implement's after the fix.
+  it('leaves a task in the backlog out of the fix, for the implement after it', () => {
+    const cards = [
+      ...story(['E-001', 'E-002']),
+      task('E-001', 'in-progress', 10),
+      task('E-002', 'backlog', 20),
+    ];
+    expect(groupOf(decideTick(input({ cards, runs: [storyJudged('implement-story', false)] })))).toEqual([
+      'E-001',
+    ]);
+  });
+
+  // A FIX THAT DIED ANSWERED NOTHING. Its tasks are still re-opened, so the story is fixed again under the
+  // same budget and handed the finding that still stands — not given to an implement told nothing.
+  it('fixes again after a fix that died, handed the finding it did not answer', () => {
+    const refused = storyJudged('implement-story', false);
+    const died = run('P-001', 'product', 'fix', 'failed');
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const action = decideTick(input({ cards, runs: [refused, died] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-fix', previous: refused.run });
+  });
+
+  it('blocks a story whose re-opened tasks have used every fix attempt, and does not stop the loop', () => {
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const runs = [
+      storyJudged('implement-story', false),
+      run('P-001', 'product', 'fix', 'success'),
+      run('P-001', 'product', 'fix', 'success'),
+      storyJudged('fix', false),
+    ];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-fix',
+      to: 'blocked',
+    });
   });
 
   // AT THE CAP THE STORY IS BLOCKED AND THE LOOP CARRIES ON (decision 45). The per-task implement it
@@ -1094,14 +1166,24 @@ describe("decideTick — the story's work", () => {
     expect(action).toMatchObject({ kind: 'stamp', phase: 'story-implement', to: 'blocked' });
   });
 
-  // AND THE OTHER ONE, which is the settled column off the config rather than a slug written in the tick —
+  // AND THE ONE A JUDGED TASK CLOSES INTO, which is off the config rather than a slug written in the tick —
   // so this fires for a board that never had it and for a `terminal` naming one that has been renamed.
-  it('stops stalled when the engineering board has no column to settle a task in', () => {
+  it('stops stalled when the engineering board has no column to close a task in', () => {
     const cards = [...story(['E-001']), task('E-001', 'backlog')];
     const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'review', 'blocked'] };
     const action = decideTick(input({ cards, columns }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('done');
+  });
+
+  // AND THE ONE A TASK WAITS IN FOR ITS JUDGEMENT (decision 87). Every scaffolded board has it; one that has
+  // lost it is told so by name rather than handed a folder `readBoard` never looks in.
+  it('stops stalled when the engineering board has no column to deliver a task into', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'blocked', 'done'] };
+    const action = decideTick(input({ cards, columns }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('review');
   });
 });
 
@@ -1360,6 +1442,42 @@ describe('decideTick — the story judgement', () => {
       phase: 'story-review',
       to: 'done',
     });
+  });
+
+  // P4r, TASKS FIRST (decision 87). A pass whose moves were refused part-way leaves the story open with its
+  // verdict on the record; closing it before its tasks would strand them in `review`, where nothing looks
+  // once the story is done.
+  it('closes a task still waiting in review before the story whose review passed it', () => {
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'done', 10), task('E-002', 'review', 20)];
+    const runs = [storyJudged('implement-story', true)];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-review',
+      card: { id: 'E-002' },
+      to: 'done',
+    });
+  });
+
+  // THE JUDGEMENT CARRIES THE TASKS IT DECIDES, off the board it was decided from: the ones delivered, where a
+  // pass closes them and where a send-back re-opens them.
+  it('judges a story whose tasks are delivered, carrying them and both of their destinations', () => {
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'review', 10), task('E-002', 'blocked', 20)];
+    const action = decideTick(input({ cards, runs: [storyWork('implement-story')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.judged).toEqual({
+      cards: [expect.objectContaining({ id: 'E-001' })],
+      passed: 'done',
+      sentBack: 'in-progress',
+    });
+  });
+
+  // AND NOT A TASK ALREADY IN `done` — which is every board this loop wrote before decision 87. The machine
+  // cannot tell a task a passing review closed from one it closed on the strength of a run ending, so it
+  // re-opens neither: undoing a real judgement is worse than leaving an old claim for a person to correct.
+  it('carries no task to judge when every task under the story is already done', () => {
+    const action = decideTick(input({ cards: settledStory(), runs: [storyWork('implement-story')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review' });
+    expect(action.kind === 'dispatch' && action.judged).toBeUndefined();
   });
 
   it('fixes a story whose verdict already failed, rather than judging it again', () => {

@@ -94,8 +94,9 @@ export const PHASES: readonly Phase[] = [
   //
   // ON PRODUCT, and that is the whole of the change — the unit of work is the story, and the tasks under it
   // are the record of what was asked rather than the thing dispatched. They stay on the board (the format is
-  // frozen) and are stamped `done` TOGETHER when this run succeeds: `Group` in core/actions.ts carries which
-  // ones and which columns, `settleGroup` in service/act/group.ts does the writing.
+  // frozen) and are stamped into `review` TOGETHER when this run completes — delivered, awaiting judgement,
+  // and never `done`, which only a passing `story-review` writes (decision 87): `Group` in core/actions.ts
+  // carries which ones and which columns, `deliverGroup` in service/act/group.ts does the writing.
   //
   // `entry` AND `exitPass` ARE THE SAME COLUMN, and they are both declared rather than left out. A story is
   // already in `in-progress` every time this phase is reached — `derivePosition` picks the open story out of
@@ -122,6 +123,10 @@ export const PHASES: readonly Phase[] = [
   //
   // No `exitPass`: a fix does not close a story, the judge does. The story stays where it is, and the next
   // tick finds a work run carrying no verdict — which is the judgement's own trigger.
+  //
+  // IT CARRIES A GROUP, as the implement does (decision 87): the tasks the send-back re-opened into
+  // `in-progress`, delivered back into `review` when it completes, so the judgement after it has something
+  // to judge and the board does not call re-opened work finished.
   { name: 'story-fix', skill: 'fix', board: 'product', bounded: 'skill' },
   // THE ONE JUDGEMENT A STORY GETS (decision 80), and it absorbs the story checkup. At story granularity
   // "does this do what the card asked" and "do the tasks under it compose into it" are the same question,
@@ -129,6 +134,10 @@ export const PHASES: readonly Phase[] = [
   //
   // Stays in `product/in-progress` while it runs, so no entry stamp. It keeps the checkup's authority to
   // create on its OWN board — sibling stories (decision 47) — and ruling 61 stamps those too.
+  //
+  // ITS VERDICT MOVES THE TASKS TOO (decision 87), which the table cannot express because they are not its
+  // card: a pass closes every task waiting in `review` before the story, and a send-back re-opens them.
+  // `Judged` in core/actions.ts carries which ones and where.
   //
   // Bounded over INCONCLUSIVE judgements rather than judgements (spec, the review cycle row): a successful
   // one burns an attempt, so counting them all would stall a healthy story at three.

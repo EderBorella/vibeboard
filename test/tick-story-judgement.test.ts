@@ -50,13 +50,13 @@ function dispatched(n: number, from: Card, skill: string): RunRecord {
 type Dispatch = Extract<TickAction, { kind: 'dispatch' }>;
 
 // What one dispatch leaves behind: the run on the record, the verdict a judgement writes onto the run it
-// judged, the entry and exit stamps the table names, and — where the action carries a group — the cards one
-// level down that the run delivered. `passed` is the judgement's answer, and `true` for every phase that is
-// not one.
+// judged, the entry and exit stamps the table names, and — where the action carries them — the cards one
+// level down that the run delivered, or that the judgement closed or re-opened. `passed` is the judgement's
+// answer, and `true` for every phase that is not one.
 //
 // THE GROUP IS READ OFF THE ACTION, not off the table, because that is where it is: the tick decides which
-// tasks and which two columns, and this driver stays a reader of what the machine answered rather than a
-// second copy of `service/act`.
+// tasks and which columns, and this driver stays a reader of what the machine answered rather than a second
+// copy of `service/act`.
 function applyDispatch(
   at: { cards: Card[]; runs: RunRecord[] },
   action: Dispatch,
@@ -65,10 +65,15 @@ function applyDispatch(
   passed: boolean,
 ): { cards: Card[]; runs: RunRecord[] } {
   const p = phase(action.phase);
-  const run = dispatched(n, on, action.skill);
-  const judged = action.previous;
+  // A JUDGEMENT'S OWN RECORD CARRIES ITS VERDICT, as `withReport` folds it in. Without it every review here
+  // was inconclusive by `inconclusiveReviews`' measure, and a walk of three send-backs stopped on that bound
+  // rather than on the fix budget it was written to reach.
+  const verdict =
+    p.bounded === 'review' ? { verdict: passed ? ('done' as const) : ('sent-back' as const) } : {};
+  const run = { ...dispatched(n, on, action.skill), ...verdict };
+  const judgedRun = action.previous;
   const runs = [...at.runs, run].map((r) =>
-    p.bounded === 'review' && r.run === judged
+    p.bounded === 'review' && r.run === judgedRun
       ? withVerification(r, { mode: 'review', passed, at: 'T', by: run.run })
       : r,
   );
@@ -77,8 +82,12 @@ function applyDispatch(
   if (exit !== undefined) cards = move(cards, on.id, exit);
   for (const task of action.group?.cards ?? []) {
     cards = move(cards, task.id, action.group?.entry ?? '');
-    // TOGETHER, and only because the run succeeded — which on this driver's happy path it always does.
-    cards = move(cards, task.id, action.group?.settled ?? '');
+    // TOGETHER, and only because the run completed — which on this driver's happy path it always does.
+    cards = move(cards, task.id, action.group?.delivered ?? '');
+  }
+  // AND WHAT THE JUDGEMENT DECIDES OF THEM (decision 87), off the action for the same reason as the group.
+  for (const task of action.judged?.cards ?? []) {
+    cards = move(cards, task.id, (passed ? action.judged?.passed : action.judged?.sentBack) ?? '');
   }
   return { cards, runs };
 }
@@ -223,5 +232,68 @@ describe('what a story that is sent back once costs', () => {
   it('closes the story rather than judging it for ever', () => {
     const walked = walk(oneTask(), brokeDown(), 'P-001', [false]);
     expect(walked.cards.find((c) => c.id === 'P-001')?.columnSlug).toBe('done');
+  });
+});
+
+// TERMINATION, ASSERTED RATHER THAN ARGUED (decision 87). A task whose story's implement completed waits in
+// `review`, which is neither terminal nor blocked — so under `allSettled` alone the judgement never fires, the
+// group is re-formed out of work the machine thinks is outstanding, and the implement is dispatched until its
+// cap blocks a story that delivered. Both directions are driven here with nothing injected but the verdicts,
+// and the walker's step bound is what turns a machine that loops into a failure rather than a hang.
+describe('a story whose delivered tasks wait for its judgement', () => {
+  const columnsOf = (walked: Step): string[] =>
+    walked.cards.filter((c) => c.board === 'engineering').map((c) => c.columnSlug);
+
+  it('closes, every task done, when every run completes and every judgement passes', () => {
+    const walked = walk(threeTasks(), brokeDown(), 'P-001');
+    expect(walked.phases).toEqual(['story-implement', 'story-review']);
+    expect(walked.cards.find((c) => c.id === 'P-001')?.columnSlug).toBe('done');
+    expect(columnsOf(walked)).toEqual(['done', 'done', 'done']);
+  });
+
+  it('blocks at its fix budget, no task done, when every judgement sends it back', () => {
+    const walked = walk(
+      threeTasks(),
+      brokeDown(),
+      'P-001',
+      Array.from({ length: 20 }, () => false),
+    );
+    expect(walked.phases).toEqual([
+      'story-implement',
+      'story-review',
+      'story-fix',
+      'story-review',
+      'story-fix',
+      'story-review',
+      'story-fix',
+      'story-review',
+    ]);
+    expect(walked.cards.find((c) => c.id === 'P-001')?.columnSlug).toBe('blocked');
+    // SENT BACK AND NEVER DELIVERED, which is what the board now says of them.
+    expect(columnsOf(walked)).toEqual(['in-progress', 'in-progress', 'in-progress']);
+  });
+
+  // PAST THE CEILING, because the fix re-delivers every task the send-back re-opened rather than a group of
+  // them: capped, the rest would stand in `in-progress` for an implement to read as its own.
+  it('blocks a story past the ceiling at its fix budget, every task re-opened', () => {
+    const walked = walk(
+      sevenTasks(),
+      brokeDown(),
+      'P-001',
+      Array.from({ length: 20 }, () => false),
+    );
+    expect(walked.phases).toEqual([
+      'story-implement',
+      'story-implement',
+      'story-review',
+      'story-fix',
+      'story-review',
+      'story-fix',
+      'story-review',
+      'story-fix',
+      'story-review',
+    ]);
+    expect(walked.cards.find((c) => c.id === 'P-001')?.columnSlug).toBe('blocked');
+    expect(columnsOf(walked)).toEqual(Array.from({ length: 7 }, () => 'in-progress'));
   });
 });

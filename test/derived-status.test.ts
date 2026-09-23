@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import {
+  allJudgeable,
   allSettled,
   allTerminal,
   blockedUnder,
   hasUnfinishedChildren,
+  isDelivered,
+  isJudgeable,
   isSettled,
 } from '../src/core/derived-status.js';
 import type { BoardName, Card } from '../src/core/types.js';
@@ -62,6 +65,43 @@ describe('settled', () => {
   });
   // Vacuous truth is the failure Principle 1 is named for.
   it('does not settle a card with no children at all', () => expect(allSettled(ap, [])).toBe(false));
+});
+
+// THE QUESTION THAT FIRES A STORY'S JUDGEMENT, and only that one (decision 87). A delivered task is ready to
+// be judged and is NOT finished: every other question here still reads it as outstanding, which is what makes
+// `done` mean a passing review said so.
+describe('judgeable', () => {
+  it('counts a task waiting in review as judgeable, and as neither settled nor terminal', () => {
+    const waiting = t('E-001', 'review');
+    expect(isJudgeable(ap, waiting)).toBe(true);
+    expect(isSettled(ap, waiting)).toBe(false);
+    expect(allTerminal(ap, [waiting])).toBe(false);
+  });
+
+  it('counts a settled task as judgeable too', () => {
+    expect(isJudgeable(ap, t('E-001', 'blocked'))).toBe(true);
+    expect(isJudgeable(ap, t('E-002', 'done'))).toBe(true);
+  });
+
+  it('does not count a task still being worked', () => {
+    expect(isJudgeable(ap, t('E-001', 'in-progress'))).toBe(false);
+    expect(isJudgeable(ap, t('E-002', 'backlog'))).toBe(false);
+  });
+
+  // ENGINEERING ONLY: a task is what gets delivered, and a column a person named `review` on another board is
+  // not a state this machine writes.
+  it('does not read a review column on another board as delivered', () => {
+    expect(isDelivered(p('P-001', 'review'))).toBe(false);
+    expect(isDelivered(t('E-001', 'review'))).toBe(true);
+  });
+
+  // Two tasks each, because "all" and "any" are the same answer with one.
+  it('makes a story judgeable once every task is delivered or settled', () => {
+    expect(allJudgeable(ap, [t('E-001', 'review'), t('E-002', 'done')])).toBe(true);
+    expect(allJudgeable(ap, [t('E-001', 'review'), t('E-002', 'in-progress')])).toBe(false);
+  });
+
+  it('does not make a card with no children judgeable', () => expect(allJudgeable(ap, [])).toBe(false));
 });
 
 // THE STRICTER QUESTION, and the pair of tests that say why both exist: a blocked card settles and is

@@ -240,8 +240,9 @@ End your report by naming each task by id with its acceptance criterion and how
 this run meets it. That list is what the story's review is checked against, and a
 task you could not finish belongs in it too, said plainly.
 
-You do not move any card, and cannot: auto-pilot stamps these tasks done together
-when this run finishes, and your credential grants nothing that could.
+You do not move any card, and cannot: auto-pilot moves these tasks to review
+together when this run finishes, and only the story's review moves them to done.
+Your credential grants nothing that could.
 `,
   },
   {

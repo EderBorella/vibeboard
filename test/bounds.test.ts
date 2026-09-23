@@ -3,7 +3,7 @@ import {
   cardsCreatedBy,
   creatingRoundSpent,
   inconclusiveReviews,
-  latestWorkRun,
+  latestCompletedWorkRun,
   reviewsRun,
 } from '../src/core/bounds.js';
 import {
@@ -106,9 +106,9 @@ function card(board: BoardName, id: string, over: Partial<Card> = {}): Card {
 // latest work run that CARRIES a verdict", which is how a task in `in-progress` told a fix from an
 // implement — a question no card is asked now that the work and the judgement are both the story's.
 // What survives of it is the ordering suite below, which is where the bug it was written around lives.
-describe('latestWorkRun', () => {
+describe('latestCompletedWorkRun', () => {
   it('is absent for a story with no runs', () => {
-    expect(latestWorkRun([], 'P-001')).toBeUndefined();
+    expect(latestCompletedWorkRun([], 'P-001')).toBeUndefined();
   });
 
   // THE RUN UNDER JUDGEMENT, whether or not it has been judged: that is the difference from the lookup
@@ -116,13 +116,13 @@ describe('latestWorkRun', () => {
   it('answers with the latest work run even when it carries no verdict', () => {
     const judged = withVerification(work('implement-story'), gates(false));
     const fix = work('fix');
-    expect(latestWorkRun([judged, fix], 'P-001')?.skill).toBe('fix');
-    expect(latestWorkRun([judged, fix], 'P-001')?.verification).toBeUndefined();
+    expect(latestCompletedWorkRun([judged, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([judged, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('ignores a review run — a reviewer does not judge itself', () => {
     const judged = withVerification(work('implement-story'), gates(false));
-    expect(latestWorkRun([judged, rev('done')], 'P-001')?.skill).toBe('implement-story');
+    expect(latestCompletedWorkRun([judged, rev('done')], 'P-001')?.skill).toBe('implement-story');
   });
 
   // A TASK HAS NO WORK RUN OF ITS OWN. Every phase on engineering has gone, so a run recorded there is in
@@ -133,11 +133,35 @@ describe('latestWorkRun', () => {
       { outcome: 'success', summary: 'did it', body: '## What I did' },
       'T',
     );
-    expect(latestWorkRun([byHand], 'E-001')).toBeUndefined();
+    expect(latestCompletedWorkRun([byHand], 'E-001')).toBeUndefined();
   });
 
   it('is scoped to the card', () => {
-    expect(latestWorkRun([work('implement-story', 'P-002')], 'P-001')).toBeUndefined();
+    expect(latestCompletedWorkRun([work('implement-story', 'P-002')], 'P-001')).toBeUndefined();
+  });
+
+  // A RUN THAT DIED ANSWERED NOTHING (decision 87). The send-back's tasks are still re-opened, so reading the
+  // dead fix's absent verdict as "nothing was sent back" would hand the story to an implement that is never
+  // told the finding. The fix before it is still the answer — and the verdict it carries still stands.
+  it('passes over a work run that died, so the verdict before it stands', () => {
+    const judged = withVerification(work('implement-story'), gates(false));
+    const answer = latestCompletedWorkRun([judged, died('fix')], 'P-001');
+    expect(answer?.skill).toBe('implement-story');
+    expect(answer?.verification?.passed).toBe(false);
+  });
+
+  // DECISION 40: the two outcomes an agent may write are one ending here, so which it claimed cannot decide
+  // whether its run is what the judgement reads.
+  it('counts a run that ended attention exactly as one that ended success', () => {
+    // Built first, because the id is the tie-break and it ascends with creation order.
+    const implement = work('implement-story');
+    const attention = withReport(
+      base({ skill: 'fix', card: 'P-001', board: 'product' }),
+      { outcome: 'attention', summary: 'could not do it', body: '## What I found' },
+      'T',
+    );
+    expect(attention.status).toBe('attention');
+    expect(latestCompletedWorkRun([implement, attention], 'P-001')?.skill).toBe('fix');
   });
 });
 
@@ -162,8 +186,8 @@ describe('latest, when two runs share a second', () => {
   it('answers with the run that started later, not the one whose id sorts higher', () => {
     const implement = inOneSecond('implement-story', 'uzpn', '2026-08-13T10:00:00.536Z');
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'P-001')?.skill).toBe('fix');
-    expect(latestWorkRun([fix, implement], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([implement, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([fix, implement], 'P-001')?.skill).toBe('fix');
   });
 
   it('leaves no verdict outstanding when the later fix carries none', () => {
@@ -175,13 +199,13 @@ describe('latest, when two runs share a second', () => {
       gates(false),
     );
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'P-001')?.verification).toBeUndefined();
+    expect(latestCompletedWorkRun([implement, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('falls back to the id when neither run says when it started', () => {
     const first = inOneSecond('implement-story', 'aaaa', '');
     const second = inOneSecond('fix', 'zzzz', '');
-    expect(latestWorkRun([second, first], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([second, first], 'P-001')?.skill).toBe('fix');
   });
 });
 

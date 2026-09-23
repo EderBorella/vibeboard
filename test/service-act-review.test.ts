@@ -315,6 +315,106 @@ describe('the story judgement', () => {
     expect(r.moves).toEqual([]);
   });
 
+  // THE TASKS THE JUDGEMENT DECIDES (decision 87). A pass is the only thing that writes a task into `done`, so
+  // that column means judged; a send-back re-opens them, so the fix after it has real work to deliver.
+  const delivered = [
+    { ...CARD('E-001'), columnSlug: 'review' },
+    { ...CARD('E-002'), columnSlug: 'review' },
+  ];
+  const JUDGING = (over: Partial<ReturnType<typeof REVIEW>> = {}): ReturnType<typeof REVIEW> => ({
+    ...REVIEW(),
+    judged: { cards: delivered, passed: 'done', sentBack: 'in-progress' },
+    ...over,
+  });
+
+  it('closes the tasks it judged, and only then the story, on a pass', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.moves).toEqual([
+      { card: 'E-001', to: 'done' },
+      { card: 'E-002', to: 'done' },
+      { card: 'P-001', to: 'done' },
+    ]);
+  });
+
+  it('re-opens the tasks it judged on a sent-back verdict, leaving the story where it stands', async () => {
+    const r = recorder({
+      settle: [reviewRun({ verdict: 'sent-back', summary: 'none of it is in the code' })],
+    });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.moves).toEqual([
+      { card: 'E-001', to: 'in-progress' },
+      { card: 'E-002', to: 'in-progress' },
+    ]);
+    expect(r.diary.find((d) => d.text.startsWith('E-001 moved'))?.text).toBe(
+      'E-001 moved to in-progress: its story P-001 was sent back, so the work it asks for is outstanding again.',
+    );
+  });
+
+  it('re-opens them on a gate failure too, with no model dispatched', async () => {
+    const r = recorder();
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.requests).toHaveLength(0);
+    expect(result.dispatches).toBe(0);
+    expect(r.moves.map((m) => m.to)).toEqual(['in-progress', 'in-progress']);
+  });
+
+  // AND WHERE THE VERDICT HAD NOWHERE TO LAND (decision 82): the tasks still go back, and the send-back is
+  // still reported, so the next tick sends the story to its fix carrying them.
+  it('re-opens them on a gate send-back it had nowhere to record, and still reports it', async () => {
+    const r = recorder();
+    const { previous: _none, ...unrecorded } = JUDGING();
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      unrecorded,
+      STORY(),
+      {},
+      context,
+    );
+    expect(result.unrecordedSendBack).toBe('P-001');
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves.map((m) => m.to)).toEqual(['in-progress', 'in-progress']);
+  });
+
+  // A REFUSAL PART-WAY LEAVES THE STORY OPEN. The verdict is already on the record, so P4r finishes the moves
+  // a stamp a tick; closing the story first would leave a task in `review` that nothing ever visits again.
+  it('does not close the story while one of its tasks could not be closed', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const move = r.client.move;
+    r.client.move = async (board, card, to) =>
+      card === 'E-002'
+        ? { ok: false as const, reason: 'refused with 409', fatal: false }
+        : move(board, card, to);
+    const result = await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.verdicts[0]).toMatchObject({ run: 'WORK-1', passed: true });
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'done' }]);
+    expect(result.dispatches).toBe(1);
+  });
+
   // RULE 2 (act.ts): `outcome` is what the agent said about its own turn. A review whose turn went perfectly
   // and which decided nothing has not passed anything.
   it('advances a story only on the verdict, never on the review run’s own outcome', async () => {

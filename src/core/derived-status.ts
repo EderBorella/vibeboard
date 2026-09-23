@@ -2,8 +2,8 @@ import { type AutopilotConfig, isBlockedColumn, isTerminalColumn } from './autop
 import { childrenOf } from './hierarchy.js';
 import type { Card } from './types.js';
 
-// What is under this card, read as a status. Two questions live here, and they answer differently on
-// purpose:
+// What is under this card, read as a status. The questions here answer differently on purpose — the two
+// below, and `isJudgeable` further down, which asks only whether a story's judgement may run:
 //
 //   SETTLED (decision 45) — done OR blocked. A blocked card is waiting for a person, so it unblocks the
 //   level above: the judgement runs, the parent closes, and the machine carries on. Stopping the project
@@ -42,6 +42,29 @@ export function allSettled(ap: AutopilotConfig, cards: Card[]): boolean {
 // Same vacuity guard as above, and the same reason.
 export function allTerminal(ap: AutopilotConfig, cards: Card[]): boolean {
   return cards.length > 0 && cards.every((c) => isTerminalColumn(ap, c.board, c.columnSlug));
+}
+
+// WHERE A TASK WAITS BETWEEN ITS WORK LANDING AND ITS STORY BEING JUDGED (decision 87). A literal, for the
+// reason `TASK_ENTRY` in core/lifecycle/tick.ts is one: the scaffolder has created it on engineering since
+// the first commit, and a board that has lost it is refused by name before a task is stamped into it.
+export const DELIVERED_COLUMN = 'review';
+
+export const isDelivered = (card: Card): boolean =>
+  card.board === 'engineering' && card.columnSlug === DELIVERED_COLUMN;
+
+// READY FOR ITS STORY'S JUDGEMENT: settled, or delivered and waiting — and it answers ONLY the question that
+// fires that judgement. A delivered task is not done: `done` means a passing review said so, which is the
+// whole of decision 87, so everything that asks whether work is FINISHED — `allTerminal`, the project's own
+// ending — still reads it as outstanding.
+//
+// Without it the judgement never fires: a delivered task is neither terminal nor blocked, so the implement
+// re-forms its group out of work that has landed and is dispatched until its cap blocks the story.
+export const isJudgeable = (ap: AutopilotConfig, card: Card): boolean =>
+  isSettled(ap, card) || isDelivered(card);
+
+// Same vacuity guard as `allSettled`, and the same reason.
+export function allJudgeable(ap: AutopilotConfig, cards: Card[]): boolean {
+  return cards.length > 0 && cards.every((c) => isJudgeable(ap, c));
 }
 
 // THE ONE HOME FOR DECISION 46, and the emptiness of this list IS the status. There was a `derivedStatus`

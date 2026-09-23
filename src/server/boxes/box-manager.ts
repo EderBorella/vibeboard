@@ -327,10 +327,14 @@ export class BoxManager {
 
   // Every box this VibeBoard knows how to make, found by label rather than by anything we wrote down.
   // Used on shutdown and to reap boxes belonging to a project that is no longer open.
+  //
+  // NAMES, SO NEVER `-q`. With `--quiet` beside `--format`, docker drops the format with a warning and
+  // prints container IDs, and every caller compares against `boxName()` — so this answered IDs, matched
+  // nothing, and the rebuild route reported `removed: 0` over a box that was running.
   async list(): Promise<string[]> {
     const res = await this.#docker([
       'ps',
-      '-aq',
+      '-a',
       '--filter',
       `label=${BOX_LABEL}=1`,
       '--format',

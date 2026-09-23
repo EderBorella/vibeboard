@@ -36,10 +36,27 @@ const admin = { authorization: `Bearer ${ADMIN}` };
 // A BoxService that answers as a daemon holding exactly `present`, and records every `docker rm -f`.
 // What went is the assertion here, so it has to be observed rather than assumed: `stop` returns void,
 // and a route that called it twice unconditionally would look identical from the outside.
+//
+// `ps` ANSWERS AS THE REAL DAEMON DOES, which the first version of this double did not: it returned names
+// whatever it was asked, so `list()` could pass `-q` beside `--format '{{.Names}}'` and every test here
+// stayed green. Docker 29 does not: `--quiet` wins, the format is dropped with the warning below on stderr,
+// and the answer is container IDs — so the route matched no box by name, removed nothing, and reported
+// `removed: 0` over a box that was plainly running. Pinned with the strings the daemon printed.
+function psAnswer(args: readonly string[], present: string[]): { stdout: string; stderr: string } {
+  const quiet = args.some((a) => a === '-q' || a === '--quiet' || /^-[a-z]*q[a-z]*$/.test(a));
+  if (!quiet) return { stdout: `${present.join('\n')}\n`, stderr: '' };
+  const stderr = args.includes('--format')
+    ? 'WARNING: Ignoring custom format, because both --format and --quiet are set.\n'
+    : '';
+  // Twelve hex characters, as `docker ps -q` prints them — a value no box name can ever equal.
+  const ids = present.map((_, i) => (0x6fbb53fe2b24 + i).toString(16));
+  return { stdout: `${ids.join('\n')}\n`, stderr };
+}
+
 function recordingBoxes(present: string[]): { boxes: BoxService; removed: string[] } {
   const removed: string[] = [];
   const docker: DockerRun = async (args) => {
-    if (args[0] === 'ps') return { code: 0, stdout: `${present.join('\n')}\n`, stderr: '' };
+    if (args[0] === 'ps') return { code: 0, ...psAnswer(args, present) };
     if (args[0] === 'rm') {
       removed.push(String(args[2]));
       return { code: 0, stdout: '', stderr: '' };

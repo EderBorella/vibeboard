@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
+import { type CliVersions, inspectVersions } from './cli-versions.js';
 import type { BoxState } from './containers.js';
 import {
   BOX_LABEL,
@@ -88,7 +89,11 @@ function ipv6Refusal(address: string): string {
   );
 }
 
-export type ProbeResult = { ok: true } | { ok: false; reason: string; missing: 'daemon' | 'image' };
+// `built` is what the image records about the CLIs it was built with. Optional so a probe that never
+// read it can say so; every reader takes its absence as nothing recorded.
+export type ProbeResult =
+  | { ok: true; built?: CliVersions }
+  | { ok: false; reason: string; missing: 'daemon' | 'image' };
 
 export class BoxManager {
   #docker: DockerRun;
@@ -119,7 +124,11 @@ export class BoxManager {
       const reason = `Docker is not available — ${firstLine(info.stderr) || 'no daemon'}`;
       return { ok: false, reason, missing: 'daemon' };
     }
-    const img = await this.#docker(['image', 'inspect', '-f', '{{.Id}}', image]);
+    // THE WHOLE RECORD, parsed in `inspectVersions`, and not a `-f` template. A template naming a key the
+    // daemon's output lacks does not render empty, it exits 1 — and a non-zero exit here is read as "the
+    // image is missing", which would offer a build for an image that is there. An unlabelled image has
+    // no `Labels` key at all, so that is not hypothetical.
+    const img = await this.#docker(['image', 'inspect', image]);
     if (img.code !== 0) {
       // The remedy is no longer a developer command. VibeBoard builds this itself on start, and offers
       // to from Settings — see `image-build.ts` for why printing `npm run box:build` at an installed
@@ -130,7 +139,7 @@ export class BoxManager {
         missing: 'image',
       };
     }
-    return { ok: true };
+    return { ok: true, built: inspectVersions(img.stdout) };
   }
 
   // Create the box, or adopt the one already there.
@@ -318,10 +327,14 @@ export class BoxManager {
 
   // Every box this VibeBoard knows how to make, found by label rather than by anything we wrote down.
   // Used on shutdown and to reap boxes belonging to a project that is no longer open.
+  //
+  // NAMES, SO NEVER `-q`. With `--quiet` beside `--format`, docker drops the format with a warning and
+  // prints container IDs, and every caller compares against `boxName()` — so this answered IDs, matched
+  // nothing, and the rebuild route reported `removed: 0` over a box that was running.
   async list(): Promise<string[]> {
     const res = await this.#docker([
       'ps',
-      '-aq',
+      '-a',
       '--filter',
       `label=${BOX_LABEL}=1`,
       '--format',

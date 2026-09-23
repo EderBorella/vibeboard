@@ -11,6 +11,13 @@
 #
 # Versions are pinned to the host's deliberately: both CLIs resume sessions from state that the host
 # and the box share over a bind mount, so a version skew here is a skew across the same files.
+#
+# THE HOST'S VERSIONS ARE PASSED IN, and the ARG defaults below are only the fallback for a machine that
+# has no such CLI to read. They used to be the pin itself, copied by hand from the host on the day this
+# was written; the host moved on and the number did not, so every run went on resolving `opus` to the
+# model the older CLI knew. The build reads `claude --version` and `opencode --version` and records what
+# it installed as `io.vibeboard.cli.*` labels, which is how Settings tells an image that has fallen
+# behind — see src/server/boxes/cli-versions.ts.
 FROM node:22-slim
 
 # curl is not optional: agents are told to call the VibeBoard API, and curl is how they do it.

@@ -156,6 +156,12 @@ it is missing, streaming the build into the terminal it was started from — a f
 nothing at all after that. Settings offers the same build for the case where the image goes missing while
 the server is up. `npm run box:build` still exists and does the same thing, by hand.
 
+The Claude Code and OpenCode inside it are pinned to the versions installed on your machine, read at
+build time, because the box and the host resume sessions from the same files. When yours move on, the
+start says so and Settings offers **Rebuild the agent image**; agents keep running on the old one until
+you do. A box that is already running keeps the image it started from, so rebuild the agent boxes
+afterwards — or restart VibeBoard, which replaces them.
+
 **Docker is required.** Without it, the board, the file explorer and Settings all work and no agent will
 start; the refusal says exactly that. There is deliberately no fallback: maintaining a second, weaker
 containment path would mean most people quietly ran the weaker one.

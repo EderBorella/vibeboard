@@ -84,6 +84,34 @@ describe('GET /api/sandbox', () => {
     expect(body.buildable).toBeUndefined();
   });
 
+  // AN IMAGE BEHIND ITS HOST, and the two fields kept apart on purpose. `buildable` says a build fixes
+  // the REFUSAL, and the setup wizard reads it that way — it puts "Build it now — only happens once" next
+  // to a check that just said "Connected and ready". So the drift has a field of its own, which only the
+  // Settings panel reads, and nothing here refuses because of it.
+  it('says why the image is out of date without refusing or calling it buildable', async () => {
+    const stale = 'vibeboard-agent:base has Claude Code 2.1.221 where this machine has 2.1.280';
+    const { app } = await open({ ok: true, image: TEST_IMAGE, stale });
+    const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+    expect(body.imageStale).toBe(stale);
+    expect(body.ok).toBe(true);
+    expect(body.agentRefusal).toBeNull();
+    expect(body.buildable).toBeUndefined();
+  });
+
+  it('carries the drift beside a refusal it has nothing to do with', async () => {
+    const stale = 'vibeboard-agent:base has Claude Code 2.1.221 where this machine has 2.1.280';
+    const { app } = await open({ ok: false, reason: 'the sign-in has expired', kind: 'credential', stale });
+    const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+    expect(body.refusalKind).toBe('credential');
+    expect(body.imageStale).toBe(stale);
+  });
+
+  it('has no drift field at all when the image matches', async () => {
+    const { app } = await open({ ok: true, image: TEST_IMAGE });
+    const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+    expect('imageStale' in body).toBe(false);
+  });
+
   // WHICH cause, reported alongside the sentence, so the UI titles the balloon without reading the
   // sentence for keywords. Docker being fine while the box holds a credential the host has replaced is
   // the case that made "Docker is not ready" a lie.

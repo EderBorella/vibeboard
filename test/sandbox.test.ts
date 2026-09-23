@@ -136,6 +136,114 @@ describe('both images are probed, because a box is built from either', () => {
   });
 });
 
+// AN IMAGE BEHIND ITS HOST IS STILL A WORKING SANDBOX, and says so beside the `ok`. It gates nothing:
+// the three hundred runs that found it went through a box on 2.1.221 with the host on 2.1.280, and
+// refusing agents for it would turn every host update — and every image built before the labels existed
+// — into an outage until somebody spent minutes on a rebuild. What it does is put the rebuild in front of
+// the person who can press it.
+//
+// THE REAL MANAGER, with only docker faked, and the inspect output in the shape a docker 29.6.0 daemon
+// printed for the real images: an unlabelled image has no `Labels` key at all.
+describe('an image whose CLIs are behind the host', () => {
+  const HOST = { claude: '2.1.280', opencode: '1.17.18' };
+  const labelled = (claude: string) => ({
+    'io.vibeboard.cli.claude-code': claude,
+    'io.vibeboard.cli.opencode': '1.17.18',
+  });
+  const holding = (labels: Record<string, Record<string, string> | undefined>, credentialDead = false) => {
+    let hostReads = 0;
+    const manager = new BoxManager({
+      docker: async (args) => {
+        if (args[0] === 'version') return { code: 0, stdout: '29.6.0\n', stderr: '' };
+        if (args[0] === 'image') {
+          const wanted = String(args.at(-1));
+          if (!(wanted in labels))
+            return {
+              code: 1,
+              stdout: '[]\n',
+              stderr: `Error response from daemon: No such image: ${wanted}`,
+            };
+          const got = labels[wanted];
+          return {
+            code: 0,
+            stdout: JSON.stringify([
+              { Id: 'sha256:0f3c', Config: { WorkingDir: '/work', ...(got ? { Labels: got } : {}) } },
+            ]),
+            stderr: '',
+          };
+        }
+        return { code: 0, stdout: '', stderr: '' };
+      },
+    });
+    const host = async () => {
+      hostReads += 1;
+      return HOST;
+    };
+    const credential = credentialDead
+      ? async () => ({ fresh: false as const, reason: 'the sign-in has expired' })
+      : undefined;
+    return {
+      probe: () => probeSandbox(manager, DEFAULT_IMAGE, credential, undefined, host),
+      hostReads: () => hostReads,
+    };
+  };
+
+  it('is ok and says nothing when both images hold the host’s versions', async () => {
+    const h = holding({ [BASE_IMAGE]: labelled('2.1.280'), [DEFAULT_IMAGE]: labelled('2.1.280') });
+    expect(await h.probe()).toEqual({ ok: true, image: DEFAULT_IMAGE });
+  });
+
+  it('is ok, and names the image and both versions, when the base is behind', async () => {
+    const h = holding({ [BASE_IMAGE]: labelled('2.1.221'), [DEFAULT_IMAGE]: labelled('2.1.221') });
+    const status = await h.probe();
+    expect(status).toEqual({
+      ok: true,
+      image: DEFAULT_IMAGE,
+      stale: `${BASE_IMAGE} has Claude Code 2.1.221 where this machine has 2.1.280`,
+    });
+  });
+
+  // THE FAIL-SAFE READING, and the state every existing install is in.
+  it('reads an image with no labels as one that cannot be shown to match', async () => {
+    const h = holding({ [BASE_IMAGE]: undefined, [DEFAULT_IMAGE]: undefined });
+    const status = await h.probe();
+    expect(status.ok).toBe(true);
+    expect(status.stale).toBe(
+      `${BASE_IMAGE} was built before VibeBoard recorded CLI versions on its images, so it cannot be shown to match this machine's Claude Code 2.1.280 and OpenCode 1.17.18`,
+    );
+  });
+
+  // NOT A SECOND REASON TO REFUSE, and not a replacement for the first one. A missing image is the fault
+  // a build fixes, and it is the one said — without spending the host's two spawns to say it.
+  it('leaves a missing image as the missing-image fault, and does not read the host for it', async () => {
+    const h = holding({ [DEFAULT_IMAGE]: labelled('2.1.221') });
+    const status = await h.probe();
+    expect(status.ok === false && status.buildable).toBe(true);
+    expect(status.stale).toBeUndefined();
+    expect(h.hostReads()).toBe(0);
+  });
+
+  // Beside a refusal as well as beside an `ok`: the credential is what stops agents, and the rebuild is
+  // still the answer to the image, so the panel can offer both.
+  it('rides along with a refusal that has nothing to do with it', async () => {
+    const h = holding({ [BASE_IMAGE]: labelled('2.1.221'), [DEFAULT_IMAGE]: labelled('2.1.221') }, true);
+    const status = await h.probe();
+    expect(status.ok === false && status.kind).toBe('credential');
+    expect(status.stale).toContain('2.1.221');
+  });
+
+  it('is carried through the live status', async () => {
+    const manager = new BoxManager({
+      docker: async (args) =>
+        args[0] === 'image'
+          ? { code: 0, stdout: JSON.stringify([{ Config: { Labels: labelled('2.1.221') } }]), stderr: '' }
+          : { code: 0, stdout: '29.6.0\n', stderr: '' },
+    });
+    const status = await liveSandbox(manager, DEFAULT_IMAGE, { now: () => 0, host: async () => HOST })();
+    expect(status.stale).toContain('2.1.221');
+  });
+});
+
 // A STALE CREDENTIAL IS A NOT-OK SANDBOX, and that is the whole mechanism. It could have been a fourth
 // gate with its own call sites; folding it into the status means the dispatch gate, the auto-pilot
 // gate, the copilot gate and the route all refuse it without any of them being told about it, and the

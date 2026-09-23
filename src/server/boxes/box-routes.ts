@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AutopilotStateName } from '../../core/autopilot-state.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
+import { hostCli } from './cli-versions.js';
 import { type BoxBackend, boxName } from './containers.js';
 import { ensureAgentImages } from './image-build.js';
 
@@ -122,11 +123,24 @@ export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // A PRESENT WEB LAYER IS NOT A FINISHED JOB, so this no longer returns early on it: the base can be
     // absent on a machine whose `:latest` predates the split, and the ensurer is what notices. It is
     // idempotent, so "already" falls out of its answer rather than out of a second probe. decision 75.
+    //
+    // NOR IS A PRESENT IMAGE WHOSE CLIs ARE NOT THE HOST'S. This used to answer `already` for any image
+    // that existed, so one on Claude Code 2.1.221 under a 2.1.280 host could not be rebuilt from the
+    // product at all. The host is read fresh, so the labels this build writes are the reading the next
+    // probe compares against.
+    //
+    // THE BOXES ARE NOT THROWN AWAY HERE. A running box keeps the image it started from, so a rebuilt image
+    // reaches a project only through new boxes — and the Settings panel says so after a build. Doing it here
+    // would bypass the confirm that removing boxes asks for, race a run that started during the minutes of
+    // the build, and reach only the open project when the image is every project's.
     const before = await boxes.probe();
     if (!before.ok && before.missing !== 'image') return reply.code(409).send({ error: before.reason });
 
     const frames = buildFrames(ctx.broadcast);
-    const result = await ensureAgentImages(boxes, frames.onLine);
+    const result = await ensureAgentImages(boxes, frames.onLine, {
+      host: hostCli.refresh,
+      whenStale: 'rebuild',
+    });
     frames.finish(result);
     req.log.info({ result }, 'agent image build finished');
     if (result === 'failed' || result === 'no-docker') {

@@ -63,6 +63,15 @@ function buildableFlag(sandbox: SandboxStatus): { buildable?: true } {
   return !sandbox.ok && sandbox.buildable ? { buildable: true } : {};
 }
 
+// WHY THE IMAGE IS BEHIND THIS MACHINE'S CLIs, and a field of its own rather than a second reason for
+// `buildable`. That one means "a build fixes the refusal", and the setup wizard reads it exactly so: it
+// offers "Build it now", which "only happens once", under a check that may just have said "Connected and
+// ready". A drifted image refuses nothing, so folding it in would put a false sentence into setup on every
+// install built before the versions were recorded. The Settings panel reads both.
+function staleFlag(sandbox: SandboxStatus): { imageStale?: string } {
+  return sandbox.stale ? { imageStale: sandbox.stale } : {};
+}
+
 export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/sandbox', async () => {
     const attached = attachedOpencodeUrl();
@@ -94,6 +103,7 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
       agentRefusal: agentRefusal(sandbox, attached),
       refusalKind,
       ...buildableFlag(sandbox),
+      ...staleFlag(sandbox),
       // Beside them and not among them: `ok`, `agentRefusal` and `refusalKind` are untouched by this, so
       // a project whose last runs died on infrastructure can still dispatch. Absent rather than null when
       // the last runs were healthy, matching the field's optionality on the wire.

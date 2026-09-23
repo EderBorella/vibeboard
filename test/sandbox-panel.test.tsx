@@ -91,6 +91,49 @@ describe('the build button', () => {
   });
 });
 
+// THE BUTTON THE OWNER COULD NOT FIND. The image held Claude Code 2.1.221 and the host 2.1.280, and the
+// image EXISTED, so nothing offered to rebuild it — and the one control on screen that said "rebuild" only
+// threw containers away, which put them straight back on the same old image.
+describe('an image behind this machine', () => {
+  const STALE = 'vibeboard-agent:base has Claude Code 2.1.221 where this machine has 2.1.280';
+  const rebuildImage = () => screen.getByRole('button', { name: 'Rebuild the agent image' });
+
+  it('is offered the rebuild, and told by how much it is behind', () => {
+    show({ imageStale: STALE });
+    expect(rebuildImage()).toBeTruthy();
+    expect(screen.getByText(/has Claude Code 2\.1\.221 where this machine has 2\.1\.280/)).toBeTruthy();
+    // Still a working sandbox: agents run, so nothing may say they are disabled.
+    expect(screen.queryByText(/Agents are disabled/i)).toBeNull();
+  });
+
+  // A REBUILT IMAGE DOES NOT REACH A RUNNING BOX. Boxes are adopted rather than remade, so the ones up
+  // now go on running the old CLIs until they are thrown away — and a panel that went quiet after the
+  // build would read as "fixed".
+  it('says, once it has built, that the boxes already running keep the old image', async () => {
+    show({ imageStale: STALE });
+    fireEvent.click(rebuildImage());
+    expect(await screen.findByText(/keep the image they were started from/i)).toBeTruthy();
+  });
+
+  it('says nothing about boxes when there turned out to be nothing to build', async () => {
+    api.buildAgentImage.mockResolvedValueOnce({ ok: true, already: true });
+    show({ imageStale: STALE });
+    fireEvent.click(rebuildImage());
+    await screen.findByRole('button', { name: 'Rebuild the agent image' });
+    expect(screen.queryByText(/keep the image they were started from/i)).toBeNull();
+  });
+
+  it('drops that note once the boxes have been thrown away', async () => {
+    show({ imageStale: STALE });
+    fireEvent.click(rebuildImage());
+    await screen.findByText(/keep the image they were started from/i);
+    fireEvent.click(screen.getByRole('button', { name: /rebuild the agent boxes/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /throw them away/i }));
+    await screen.findByText(/Removed 2 boxes/i);
+    expect(screen.queryByText(/keep the image they were started from/i)).toBeNull();
+  });
+});
+
 describe('what it says is enforced', () => {
   it('names the files an agent cannot write, not just that something is on', () => {
     show();
@@ -192,6 +235,16 @@ describe('rebuilding the boxes', () => {
     // anyone to `npm run box:build`, which an installed copy does not have.
     expect(screen.getByText(/image is not rebuilt/i)).toBeTruthy();
     expect(screen.queryByText(/npm run/)).toBeNull();
+  });
+
+  // THE POINTER THAT POINTED AT NOTHING. The confirm called the image build "the button above", and on
+  // a machine whose image existed there was no button above.
+  it('does not send anyone to a button that may not be on screen', async () => {
+    show();
+    press();
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).not.toContain('the button above');
+    expect(dialog.textContent).toContain('missing or out of date');
   });
 
   it('asks first, and calls nothing if the question is cancelled', async () => {

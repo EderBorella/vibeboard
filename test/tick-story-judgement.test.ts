@@ -297,3 +297,36 @@ describe('a story whose delivered tasks wait for its judgement', () => {
     expect(columnsOf(walked)).toEqual(Array.from({ length: 7 }, () => 'in-progress'));
   });
 });
+
+// A FIX WHOSE DELIVERY WAS REFUSED leaves the tasks its send-back re-opened in `in-progress`. Read off the
+// board alone, that story has landed nothing — so the implement's earned-back allowance, which three groups
+// had grown to five, would fall back to three and block a story that never tried again.
+describe('a story whose fix could not deliver', () => {
+  const ids = Array.from({ length: 11 }, (_, i) => `E-${String(i + 1).padStart(3, '0')}`);
+  const reopened = (): Card[] => [
+    card('F-001', 'features', 'in-progress', 10, ['P-001']),
+    card('P-001', 'product', 'in-progress', 10, ['F-001', ...ids]),
+    ...ids.map((id, i) => task(id, 'in-progress', (i + 1) * 10)),
+  ];
+
+  it('is implemented again rather than blocked at a cap its send-back emptied', () => {
+    const story = reopened()[1] as Card;
+    const [a, b, c] = [1, 2, 3].map((n) => dispatched(n, story, phase('story-implement').skill ?? ''));
+    const review = {
+      ...dispatched(4, story, phase('story-review').skill ?? ''),
+      verdict: 'sent-back' as const,
+    };
+    const runs = [
+      ...brokeDown(),
+      a as RunRecord,
+      b as RunRecord,
+      withVerification(c as RunRecord, { mode: 'review', passed: false, at: 'T', by: review.run }),
+      review,
+      dispatched(5, story, phase('story-fix').skill ?? ''),
+    ];
+    expect(decideTick(input({ cards: reopened(), runs }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-implement',
+    });
+  });
+});

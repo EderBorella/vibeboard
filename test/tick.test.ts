@@ -1173,7 +1173,9 @@ describe("decideTick — the story's work", () => {
     const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'review', 'blocked'] };
     const action = decideTick(input({ cards, columns }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('done');
+    expect(detailOf(action)).toMatch(
+      /tasks are moved through done on their way.* Add it to that board, or point terminal at a column it does have\.$/,
+    );
   });
 
   // AND THE ONE A TASK WAITS IN FOR ITS JUDGEMENT (decision 87). Every scaffolded board has it; one that has
@@ -1183,7 +1185,8 @@ describe("decideTick — the story's work", () => {
     const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'blocked', 'done'] };
     const action = decideTick(input({ cards, columns }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('review');
+    // Pointing `terminal` elsewhere cannot supply a column a task waits in, so it is not offered.
+    expect(detailOf(action)).toMatch(/tasks are moved through review on their way.* Add it to that board\.$/);
   });
 });
 
@@ -1632,6 +1635,14 @@ describe('decideTick — finding D: complete with a blocked task', () => {
     expect(detailOf(action)).toBe('');
   });
 
+  // A DELIVERED TASK IS NOT FINISHED (decision 87): only a passing review writes `done`, so a task left in
+  // `review` under a closed story is unjudged work, and the project's ending must not call it complete.
+  it('reports stalled, naming the task, when a delivered task was never judged', () => {
+    const action = decideTick(input({ cards: closed([task('E-001', 'review'), task('E-002', 'done', 20)]) }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('E-001');
+  });
+
   // CHANGE 4, and it exists because the other three open a false success.
   it('reports stalled, naming the task, for a board holding only a blocked task', () => {
     const action = decideTick(input({ cards: [task('E-001', 'blocked')] }));
@@ -1793,6 +1804,20 @@ describe('a focused run that finished its feature', () => {
       input({ cards: parked, columns: withReview, ap: { ...DEFAULT_AUTOPILOT, focus: 'F-001' } }),
     );
     expect(action.kind === 'stop' && action.reason).not.toBe('complete');
+  });
+
+  // A SEND-BACK RE-OPENED THE BLOCKED STORY'S TASK (decision 87), so the feature closed over work nobody passed.
+  // Unfocused, that ending is `stalled` and names the task; the focus must not turn it into a success.
+  it('stalls, naming the task, when its feature closed over a blocked story’s re-opened work', () => {
+    const stranded = [
+      done('F-001', 'features', 'done', ['P-001']),
+      done('P-001', 'product', 'blocked', ['F-001', 'E-001']),
+      done('E-001', 'engineering', 'in-progress', ['P-001']),
+      done('F-002', 'features', 'backlog'),
+    ];
+    const action = focusOn('F-001', stranded);
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('E-001 is under a card that ran out of attempts');
   });
 
   // AND THE SAME BOARD WITH NO FOCUS CARRIES ON, which is what keeps this a focused-run rule rather than a

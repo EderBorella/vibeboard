@@ -194,6 +194,9 @@ finishes, and your credential grants nothing that could.
     // with the column it stands in. That is also what bounds a big story — a story with more tasks than the
     // ceiling in core/lifecycle/tick.ts is dispatched in groups, and the ones not in this group are still in
     // `backlog` where this text tells the run to leave them.
+    //
+    // AN EXISTING PROJECT'S COPY STILL SAYS ITS TASKS ARE STAMPED DONE (decision 87), for `fix`'s reason below:
+    // nothing rewrites a seeded skill. It changes nothing the run can do, since no run's credential moves a card.
     slug: 'implement-story',
     content: `---
 name: Implement the story

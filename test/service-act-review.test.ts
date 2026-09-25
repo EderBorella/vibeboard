@@ -328,7 +328,7 @@ describe('the story judgement', () => {
   });
 
   it('closes the tasks it judged, and only then the story, on a pass', async () => {
-    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })], boardCards: delivered });
     await reviewStory(
       deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
       JUDGING(),
@@ -346,6 +346,7 @@ describe('the story judgement', () => {
   it('re-opens the tasks it judged on a sent-back verdict, leaving the story where it stands', async () => {
     const r = recorder({
       settle: [reviewRun({ verdict: 'sent-back', summary: 'none of it is in the code' })],
+      boardCards: delivered,
     });
     await reviewStory(
       deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
@@ -364,7 +365,7 @@ describe('the story judgement', () => {
   });
 
   it('re-opens them on a gate failure too, with no model dispatched', async () => {
-    const r = recorder();
+    const r = recorder({ boardCards: delivered });
     const result = await reviewStory(
       deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
       JUDGING(),
@@ -377,10 +378,45 @@ describe('the story judgement', () => {
     expect(r.moves.map((m) => m.to)).toEqual(['in-progress', 'in-progress']);
   });
 
+  // A TASK A PERSON MOVED WHILE THE REVIEW RAN is theirs: the verdict moves only what still stands where it was
+  // judged from, in either direction.
+  it('does not re-open a task a person closed during the review', async () => {
+    const r = recorder({
+      settle: [reviewRun({ verdict: 'sent-back', summary: 'none of it is in the code' })],
+      boardCards: [{ ...CARD('E-001'), columnSlug: 'done' }, delivered[1]],
+    });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.moves).toEqual([{ card: 'E-002', to: 'in-progress' }]);
+  });
+
+  it('does not close a task a person pulled back during the review', async () => {
+    const r = recorder({
+      settle: [reviewRun({ verdict: 'done' })],
+      boardCards: [delivered[0], { ...CARD('E-002'), columnSlug: 'backlog' }],
+    });
+    await reviewStory(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      JUDGING(),
+      STORY(),
+      {},
+      context,
+    );
+    expect(r.moves).toEqual([
+      { card: 'E-001', to: 'done' },
+      { card: 'P-001', to: 'done' },
+    ]);
+  });
+
   // AND WHERE THE VERDICT HAD NOWHERE TO LAND (decision 82): the tasks still go back, and the send-back is
   // still reported, so the next tick sends the story to its fix carrying them.
   it('re-opens them on a gate send-back it had nowhere to record, and still reports it', async () => {
-    const r = recorder();
+    const r = recorder({ boardCards: delivered });
     const { previous: _none, ...unrecorded } = JUDGING();
     const result = await reviewStory(
       deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
@@ -397,7 +433,7 @@ describe('the story judgement', () => {
   // A REFUSAL PART-WAY LEAVES THE STORY OPEN. The verdict is already on the record, so P4r finishes the moves
   // a stamp a tick; closing the story first would leave a task in `review` that nothing ever visits again.
   it('does not close the story while one of its tasks could not be closed', async () => {
-    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })], boardCards: delivered });
     const move = r.client.move;
     r.client.move = async (board, card, to) =>
       card === 'E-002'

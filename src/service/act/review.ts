@@ -257,6 +257,10 @@ async function recordVerdict(
 // the machine writes — so `done` means judged — and back into `in-progress` on a send-back, so the fix after it
 // has real work to deliver and the board says the work is not delivered. Columns off the action, because the
 // tick names them (`Judged` in core/actions.ts); a task already standing there is not moved again.
+//
+// AGAINST THE BOARD AS IT IS NOW, not as the tick read it: a review runs for minutes, and a task a person moved
+// in that time is theirs. Moving it from the stale snapshot would re-open what they closed, or close what they
+// pulled back — so only a task still standing where it was judged from is moved.
 async function moveJudged(
   deps: ActDeps,
   story: Card,
@@ -269,9 +273,21 @@ async function moveJudged(
   const why = passed
     ? `its story ${story.id} passed its review.`
     : `its story ${story.id} was sent back, so the work it asks for is outstanding again.`;
+  const board = await deps.client.board();
+  if (!board.ok) {
+    return await refused(
+      deps,
+      'could not read the board to move the judged tasks',
+      board.reason,
+      board.fatal,
+      dispatches,
+    );
+  }
+  const now = new Map(BOARDS.flatMap((b) => board.value.boards[b] ?? []).map((c) => [c.id, c]));
   for (const task of judged.cards) {
-    if (task.columnSlug === to) continue;
-    const stamped = await stamp(deps, task, to, why);
+    const current = now.get(task.id);
+    if (!current || current.columnSlug !== task.columnSlug || current.columnSlug === to) continue;
+    const stamped = await stamp(deps, current, to, why);
     if (!stamped.ok) {
       return await refused(
         deps,

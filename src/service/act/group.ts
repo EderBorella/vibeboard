@@ -73,7 +73,9 @@ export async function claimGroup(deps: ActDeps, action: Dispatch): Promise<ActRe
 // IT STOPS AT THE FIRST REFUSAL rather than stamping what it can. Both leave a partial board, and this one
 // leaves it on the side that is safe — fewer tasks delivered means the story stays unjudgeable, which is the
 // state the machine already knows how to recover from: the next dispatch re-forms the group out of whatever
-// is still outstanding, and a task already delivered is not in it.
+// is still outstanding, and a task already delivered is not in it. Where the refused delivery was a fix's,
+// that dispatch is an implement, which is not handed the finding — bounded rather than lost, because the
+// story's judgement runs over the work again.
 //
 // `dispatches` is carried into the refusal because the run HAPPENED: a dispatch reported as none at all is
 // how the caps came to be told nothing about a real agent run (see `refused`).

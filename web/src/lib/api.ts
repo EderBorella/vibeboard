@@ -23,6 +23,7 @@ export {
   approveSignin,
   claimSignin,
   collectSignin,
+  fixBoard,
   getSigninState,
   probeCredential,
   refuseSignin,

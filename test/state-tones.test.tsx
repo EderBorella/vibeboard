@@ -229,6 +229,7 @@ async function bar(state: AutopilotState | null, sandbox: SandboxState | null = 
       onChanged={vi.fn()}
       onBackendChanged={vi.fn()}
       onSettings={vi.fn()}
+      onRepairing={vi.fn()}
     />,
   );
   await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
@@ -343,6 +344,7 @@ describe('the auto-pilot bar says its state in a way a glance can tell apart', (
           onChanged={vi.fn()}
           onBackendChanged={vi.fn()}
           onSettings={vi.fn()}
+          onRepairing={vi.fn()}
         />,
       );
       markers.set(name, marker(screen.getByTestId('ap-agent-state')));

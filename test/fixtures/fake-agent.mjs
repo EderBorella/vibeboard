@@ -18,6 +18,7 @@
 //   verdict:v — writes a success report carrying `verdict: v`, for a review run
 //   create:…  — creates cards through the API, one POST per card, then PUTs its own link list
 //   createlinks:… — the same cards, but with `links` on the POST and no PUT. See `createCards` below.
+//   probe:b:id — calls a fixed set of routes with its own credential and records each status. See below.
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -206,6 +207,51 @@ if (behaviour === 'create' || behaviour === 'createlinks') {
     session_id: 'shim-run',
     total_cost_usd: 0.0125,
     usage: { input_tokens: 5, cache_read_input_tokens: 95, output_tokens: 7 },
+  });
+  process.exit(0);
+} else if (behaviour === 'probe') {
+  // WHAT A CREDENTIAL REALLY BUYS, asked of the running server by the agent holding it. Every other test of a
+  // scope asks `allows` directly or injects a request; this is the token the route minted, read out of the
+  // prompt the way a model reads it and sent over HTTP the way a model sends it, so neither end is a fake.
+  // Fix board's grant is the subject (decision 88): two routes it must reach, three it must not, and the
+  // statuses are recorded rather than judged here — the test decides what each one should have been.
+  const [board, card] = behaviourArgs;
+  const status = async (method, path, body) => {
+    const res = await fetch(`${apiBase}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${leakedCred}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+    return res.status;
+  };
+  const probed = {
+    reset: await status('POST', `/api/runs/${board}/${card}/reset`),
+    place: await status('POST', `/api/cards/${board}/${card}/place`, {
+      toColumnSlug: 'backlog',
+      beforeId: null,
+    }),
+    start: await status('POST', '/api/autopilot/start'),
+    fixBoard: await status('POST', '/api/copilot/fix-board'),
+    authorise: await status('POST', '/api/copilot/authority', { enabled: true }),
+  };
+  if (process.env.VIBEBOARD_SHIM_ARGS) {
+    appendFileSync(process.env.VIBEBOARD_SHIM_ARGS, `${JSON.stringify({ probed })}\n`);
+  }
+  say({
+    type: 'assistant',
+    message: { content: [{ type: 'text', text: 'probed' }] },
+    session_id: 'shim-run',
+  });
+  say({
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    result: 'probed',
+    num_turns: 1,
+    duration_ms: 10,
+    session_id: 'shim-run',
+    total_cost_usd: 0,
+    usage: { input_tokens: 5, output_tokens: 1 },
   });
   process.exit(0);
 } else if (behaviour === 'chatty') {

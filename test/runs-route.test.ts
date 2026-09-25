@@ -42,7 +42,9 @@ async function productCard(project: TestProject): Promise<string> {
   return state.snapshot.boards.product[0].id;
 }
 
-// NO AGENT IS TOLD THIS ROUTE EXISTS, checked against the pattern the app REALLY serves.
+// NO AGENT IS TOLD THIS ROUTE EXISTS BUT A REPAIR, checked against the pattern the app REALLY serves. Fix board's
+// `repair` is the one scope that may clear attempts (decision 88), so its catalogue must name the route — an
+// agent handed the authority and not told of it reads the gap as a broken tool — and every other must not.
 //
 // `not.toContain('/reset')` was the shape this replaced, and it goes inert the moment somebody renames
 // the route: the new path cannot contain the old segment, so the assertion passes over a catalogue it is
@@ -53,7 +55,7 @@ async function productCard(project: TestProject): Promise<string> {
 // A CARD IS PASSED TO `endpointsFor`, and that is not decoration: with none, it SKIPS every own-card row,
 // so a planted rule granting `work` confined to its own card would be invisible to this check while
 // `allows` returned true for it.
-async function namedInNoCatalogue(pattern: string): Promise<void> {
+async function namedOnlyForRepair(pattern: string): Promise<void> {
   const app = testApp(new ProjectSession());
   await app.ready();
   expect(app.hasRoute({ method: 'POST', url: pattern }), pattern).toBe(true);
@@ -61,6 +63,7 @@ async function namedInNoCatalogue(pattern: string): Promise<void> {
   for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
     expect(endpointsFor(scope, 'E-001').join('\n'), scope).not.toContain(pattern);
   }
+  expect(endpointsFor('repair').join('\n'), 'repair').toContain(`POST ${pattern}`);
 }
 
 // The prompt the shim was spawned with: the last line of the args log, last argument of the call.
@@ -948,11 +951,11 @@ describe('POST /api/runs/:board/:card/forgive', () => {
   });
 
   // NOT THE TEST OF THE AUTH ROW — that is the grid in test/auth.test.ts, which drives `allows` itself.
-  // `testApp` fills an admin bearer into every request, so nothing driven through this app can tell an
-  // admin-only route from an open one. What is asserted here is the other half: an agent is not TOLD it
-  // may call this, which is what keeps it from trying and reading the 403 as a broken tool.
-  it('is named in no agent’s endpoint catalogue', async () => {
-    await namedInNoCatalogue('/api/runs/:board/:card/forgive');
+  // `testApp` fills an admin bearer into every request, so nothing driven through this app can tell a
+  // route refused to agents from an open one. What is asserted here is the other half: an agent is not TOLD
+  // it may call this unless it may, which is what keeps it from trying and reading the 403 as a broken tool.
+  it('is named in no agent’s endpoint catalogue but a repair’s', async () => {
+    await namedOnlyForRepair('/api/runs/:board/:card/forgive');
   });
 });
 
@@ -1060,9 +1063,9 @@ describe('POST /api/runs/:board/:card/reset', () => {
 
   // NOT THE TEST OF THE AUTH ROW — that is the grid in test/auth.test.ts, and an agent that could reset
   // its own card would have unlimited retries AND could clear the creating run that bounds it. This is
-  // the catalogue half: nothing tells an agent the route is there.
-  it('is named in no agent’s endpoint catalogue', async () => {
-    await namedInNoCatalogue('/api/runs/:board/:card/reset');
+  // the catalogue half: nothing tells an agent the route is there, except the repair that may call it.
+  it('is named in no agent’s endpoint catalogue but a repair’s', async () => {
+    await namedOnlyForRepair('/api/runs/:board/:card/reset');
   });
 });
 

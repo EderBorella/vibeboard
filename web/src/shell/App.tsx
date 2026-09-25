@@ -390,6 +390,12 @@ export function App() {
           // just chosen rather than the one it replaced.
           onBackendChanged={() => setBump((n) => n + 1)}
           onSettings={() => setSettingsOpen(true)}
+          // Fix board's conversation is started by the server and arrives over the socket, so the panel is
+          // opened and told a turn is coming — its thinking indicator is what says the repair has begun.
+          onRepairing={() => {
+            copilot.expectTurn();
+            setCopilotOpen(true);
+          }}
         />
       )}
 

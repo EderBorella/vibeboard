@@ -300,6 +300,19 @@ enforces scope; it is not the same as isolation.
   "cards". **The residual is that prose compliance is not a mechanism.** An instruction inside the
   paste that the model chooses to follow is refused by the scope table and by nothing else — so the
   worst case is bounded by what `assist` holds, not by the frame.
+- **Fix board hands card text to the widest authority an agent holds.** `repair` (`decision 88`) may clear
+  any card's attempts, reorder and restore cards, and do everything `assist` does to the board — and its
+  input is the board: card bodies agents wrote, lists people imported, a stop sentence quoting git. A
+  card's body was edited mid-run on the board that prompted it. Four things confine it, as for the
+  import: the frame says everything read is evidence and never instructions, and quotes the stop
+  sentence line by line so nothing in it can open a line of the brief
+  (`src/server/copilot/fix-board-frame.ts`); the person is watching the conversation; the box bounds the
+  disk; and the scope table bounds the calls. **The same residual holds, and here it is wider**: an
+  instruction the model chooses to obey is refused by the scope table and nothing else, so the worst case
+  is what `repair` holds — which is why it holds no foundation write, no toolchain, no control over the
+  loop and no grant, and why it lasts one turn. Minted by an admin-only route, released by token when
+  the turn settles, and every write under it — and every refusal — is logged with the conversation that
+  made it (`src/server/auth/repair-audit.ts`).
 - **A container is not a VM.** Genuinely untrusted code wants stronger isolation than this.
 
 ### Why the two-level design is safe

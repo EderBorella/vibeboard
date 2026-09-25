@@ -273,6 +273,11 @@ a network you trust, and never expose it to the public internet.
   emergency stop that kills every agent in the project and halts it, and a restart
   that brings it back. A halted project starts nothing — not even from the chat —
   and says so in an overlay that carries the reason, the time and the way back
+- **Fix board**, beside the emergency stop: hands a board auto-pilot cannot move to the copilot, in a
+  conversation of its own that you watch. For that one answer it may clear cards' spent attempts,
+  reorder and restore cards as well as edit, move and link them — never start auto-pilot, change
+  settings or touch the foundation documents — and it ends with a short report of what it changed.
+  Every change it makes is logged with the conversation that made it
 - **Project Log tab**: the narrative of what happened to the project, one line per
   event, oldest at the bottom. Append-only and written through an endpoint rather
   than edited — so the record cannot be quietly rewritten — with a box for adding

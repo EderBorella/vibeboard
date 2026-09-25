@@ -20,7 +20,7 @@ import {
   resolveRun,
   writeRun,
 } from '../../store/run-store.js';
-import type { Scope } from '../auth/credentials.js';
+import type { Credential, Scope } from '../auth/credentials.js';
 import { errorText } from '../errors.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { DispatchInput } from './agent-runner.js';
@@ -210,6 +210,19 @@ async function dispatchRefusal(
   return undefined;
 }
 
+// WHO OVERRULED THE MACHINE, in the voice the three attempt-clearing lines are written in. A person at the
+// browser, or the copilot under Fix board — and then which conversation, because the answer to "why did
+// this card get four tries" is in that transcript (decision 88).
+export function overruledBy(cred: Credential | undefined): {
+  actor: string;
+  facts: { by?: Scope; chat?: string };
+} {
+  if (cred?.scope === 'repair') {
+    return { actor: 'the copilot, repairing the board,', facts: { by: 'repair', chat: cred.run } };
+  }
+  return { actor: 'a person', facts: { by: cred?.scope } };
+}
+
 // Why a card's spent attempts cannot be cleared right now, or nothing.
 //
 // A run still in flight settles into this card's history moments from now, and if it settles as an
@@ -326,10 +339,11 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
   // "This card is not the one that failed." Clears the attempts a card has spent, so auto-pilot will
   // dispatch it again — the way out of a card the machine itself blocked, which until now had none.
   //
-  // ADMIN-ONLY BY ABSENCE from the scope table in auth/auth.ts, and here that default is the whole
-  // bound rather than an omission. The attempt cap is what stops a card being retried for ever, so an
-  // agent able to forgive its own card's attempts would be an agent granting itself unlimited retries
-  // — decision 3's subject reached through the counting side instead of through the verdict.
+  // REFUSED TO EVERY AUTONOMOUS SCOPE AND TO `assist` by the scope table in auth/auth.ts, which names
+  // `repair` alone. The attempt cap is what stops a card being retried for ever, so an agent able to
+  // forgive its own card's attempts would be an agent granting itself unlimited retries — decision 3's
+  // subject reached through the counting side instead of through the verdict. `repair` has no card of its
+  // own and cannot dispatch, so nothing it forgives is its own (decision 88).
   //
   // Board and card in the path like the two routes above: attempts are counted per card, and finding
   // a card's records without its board would mean walking every results folder.
@@ -344,10 +358,11 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const refusal = forgiveRefusal(runs.filter((r) => isInFlight(r.status)).length);
     if (refusal) return reply.code(409).send({ error: refusal });
     const forgiven = await forgiveCardRuns(ctx.session.root, board, card, nowIso());
-    // A person overruling the machine, so the log says who did what. This is the one write that makes
+    // Somebody overruling the machine, so the log says who did what. This is the one write that makes
     // a card the caps had stopped dispatchable again, and months later "why did this card get four
     // tries" is a question only this line answers.
-    req.log.info({ board, card, forgiven, by: req.credential?.scope }, "a person cleared a card's attempts");
+    const who = overruledBy(req.credential);
+    req.log.info({ board, card, forgiven, ...who.facts }, `${who.actor} cleared a card's attempts`);
     return { forgiven };
   });
 
@@ -361,10 +376,10 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
   // so they are different verbs with different names, and the cost of this one is stated in its
   // confirmation rather than hidden behind a checkbox on the milder action.
   //
-  // ADMIN-ONLY BY ABSENCE from the scope table in auth/auth.ts, exactly as the forgive above is, and here
-  // the reason is stronger rather than merely the same: an agent that could reset its own card's attempts
-  // would have unlimited retries AND could clear the record of the creating run that bounds it, which is
-  // every counter this loop keeps undone from inside a run.
+  // REFUSED TO EVERY AGENT BUT `repair`, exactly as the forgive above is, and here the reason is stronger
+  // rather than merely the same: an agent that could reset its own card's attempts would have unlimited
+  // retries AND could clear the record of the creating run that bounds it, which is every counter this loop
+  // keeps undone from inside a run. A repair is inside no run (decision 88).
   api.post('/runs/:board/:card/reset', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, card } = req.params as { board: string; card: string };
@@ -377,7 +392,8 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const forgiven = await resetCardRuns(ctx.session.root, board, card, nowIso());
     // Its own message, not the forgive's. This is the write that can re-open a creating run, so "why did
     // this feature grow a second set of stories" is a question only this line answers.
-    req.log.info({ board, card, forgiven, by: req.credential?.scope }, 'a person reset a card');
+    const who = overruledBy(req.credential);
+    req.log.info({ board, card, forgiven, ...who.facts }, `${who.actor} reset a card`);
     return { forgiven };
   });
 
@@ -400,9 +416,10 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const refusal = forgiveRefusal(runs.filter((r) => isInFlight(r.status)).length);
     if (refusal) return reply.code(409).send({ error: refusal });
     const forgiven = await forgiveProjectRuns(ctx.session.root, nowIso());
-    // A person overruling the machine, so the log says who. This is the write that makes a project the caps
+    // Somebody overruling the machine, so the log says who. This is the write that makes a project the caps
     // had stopped derivable again.
-    _req.log.info({ forgiven, by: _req.credential?.scope }, "a person cleared the project's attempts");
+    const who = overruledBy(_req.credential);
+    _req.log.info({ forgiven, ...who.facts }, `${who.actor} cleared the project's attempts`);
     return { forgiven };
   });
 

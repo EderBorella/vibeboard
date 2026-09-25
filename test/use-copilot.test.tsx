@@ -39,6 +39,7 @@ const h = vi.hoisted(() => {
 
 vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
 
+import { authorityButton } from '../web/src/organisms/copilot/CopilotPanel.js';
 import { useCopilot } from '../web/src/organisms/copilot/useCopilot.js';
 
 const fake = h.get(0);
@@ -490,5 +491,45 @@ describe('useCopilot missing delta text', () => {
     event({ kind: 'text_delta', text: 'kept' });
     event({ kind: 'text_delta' });
     expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'kept' }]);
+  });
+});
+
+// FIX BOARD'S GRANT IS NOT THE AUTHORISE BUTTON'S (decision 88), and the hook says which one the server holds —
+// so the button can refuse to read "Authorised" over a wider grant.
+describe('useCopilot authority', () => {
+  it('reports a repair grant as a repair, and drops it when the grant goes', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    emit({ type: 'copilot:authority', authorised: true, repair: true });
+    expect([result.current.authorised, result.current.repairing]).toEqual([true, true]);
+    emit({ type: 'copilot:authority', authorised: false });
+    expect([result.current.authorised, result.current.repairing]).toEqual([false, false]);
+  });
+
+  // AND THE BUTTON SAYS WHICH. "Authorised" over a repair grant would tell the person they hold less than they do.
+  it('names a repair grant on the Authorise button rather than calling it an authorisation', () => {
+    expect(authorityButton(true, true).label).toBe('Repairing');
+    expect(authorityButton(true, true).title).toMatch(/Fix board gave the copilot repair powers/);
+    expect(authorityButton(true, false).label).toBe('Authorised');
+    expect(authorityButton(false, false).label).toBe('Authorise');
+  });
+
+  it('reports an ordinary authorisation as no repair', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    emit({ type: 'copilot:authority', authorised: true });
+    expect([result.current.authorised, result.current.repairing]).toEqual([true, false]);
+  });
+
+  // A TURN NOBODY HERE SENT: Fix board's is started by the server, so the clocks the thinking indicator reads
+  // are started by `expectTurn` — and an answer left over from the last turn must not hide the indicator.
+  it('starts the thinking clocks for a turn the server begins', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text', text: 'an earlier answer' });
+    expect(result.current.sawText.current).toBe(true);
+    act(() => result.current.expectTurn());
+    expect(result.current.sawText.current).toBe(false);
+    expect(result.current.sentAt.current).not.toBeNull();
+    expect(result.current.lastEventAt.current).toBe(result.current.sentAt.current);
+    // Nothing is sent: the server records the ask itself.
+    expect(fake.sent).toEqual([]);
   });
 });

@@ -256,3 +256,23 @@ describe('the transport state', () => {
     expect(model({ state: null }).state).toBe('idle');
   });
 });
+
+// FIX BOARD'S BUTTON (decision 88), disabled exactly where the server refuses it and saying which refusal.
+describe('whether Fix board can be pressed', () => {
+  it('can be pressed on a stopped board with nothing in flight, and says what it hands over', () => {
+    const repair = model({ state: { state: 'stopped', iteration: 3, reason: 'stalled' } }).repair;
+    expect(repair.disabled).toBe(false);
+    expect(repair.title).toMatch(/elevated powers over the board for one conversation/);
+  });
+
+  it.each([
+    ['a running loop', { state: { state: 'running', iteration: 2 } as AutopilotState }, /Soft-stop it/],
+    ['a halt', { state: { state: 'halted', iteration: 2 } as AutopilotState }, /halted/],
+    ['a run in flight', { runs: { runs: [run({})], active: ['r1'], queued: [] } }, /still working/],
+    ['a queued run', { runs: { runs: [run({})], active: [], queued: ['r1'] } }, /still working/],
+  ])('is disabled under %s, and says so', (_what, over, why) => {
+    const repair = model(over).repair;
+    expect(repair.disabled).toBe(true);
+    expect(repair.title).toMatch(why);
+  });
+});

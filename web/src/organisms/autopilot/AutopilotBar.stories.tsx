@@ -52,6 +52,7 @@ const meta = {
     onChanged: () => {},
     onBackendChanged: () => {},
     onSettings: () => {},
+    onRepairing: () => {},
   },
 } satisfies Meta<typeof AutopilotBar>;
 export default meta;

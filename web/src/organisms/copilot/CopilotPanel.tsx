@@ -165,6 +165,28 @@ function Composer({
   );
 }
 
+// WHAT THE AUTHORITY BUTTON SAYS, and it has three answers now. Fix board's grant is not the one this button
+// gives (decision 88), so reading "Authorised" over it would tell the person they hold less than they do.
+// Pressing it while repairing still revokes — the same click, the same server call.
+export function authorityButton(authorised: boolean, repairing: boolean): { label: string; title: string } {
+  if (repairing) {
+    return {
+      label: 'Repairing',
+      title:
+        'Fix board gave the copilot repair powers over this board for its one answer. Click to take them back now.',
+    };
+  }
+  return authorised
+    ? {
+        label: 'Authorised',
+        title: 'The copilot holds a credential for this conversation. Click to revoke it.',
+      }
+    : {
+        label: 'Authorise',
+        title: 'The copilot can read everything and change nothing. Click to let it use the API.',
+      };
+}
+
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
   backend: string;
@@ -228,12 +250,14 @@ export function CopilotPanel({
     deleteChat,
     cancel,
     authorised,
+    repairing,
     setCopilotAuthority,
     sentAt,
     lastEventAt,
     sawText,
   } = copilot;
   const { confirm, dialog } = useConfirm();
+  const authority = authorityButton(authorised, repairing);
   const [status, setStatus] = useState<ModelStatus | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -403,13 +427,9 @@ export function CopilotPanel({
                   if (ok) setCopilotAuthority(true);
                 });
               }}
-              title={
-                authorised
-                  ? 'The copilot holds a credential for this conversation. Click to revoke it.'
-                  : 'The copilot can read everything and change nothing. Click to let it use the API.'
-              }
+              title={authority.title}
             >
-              {authorised ? 'Authorised' : 'Authorise'}
+              {authority.label}
             </Button>
           </Stack>
 

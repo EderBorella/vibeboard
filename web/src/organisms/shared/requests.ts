@@ -50,6 +50,17 @@ export function signOutEverythingRequest(count: number): ConfirmRequest {
   };
 }
 
+// FIX BOARD. What it grants is the half a person must hear before pressing: a copilot conversation with powers
+// over the board that the Authorise button never gives — clearing attempts, reordering — and that it lasts one
+// answer. What it cannot do is said too, because "elevated" with no edge reads as "everything".
+export function fixBoardRequest(): ConfirmRequest {
+  return {
+    title: 'Hand this board to the copilot to repair?',
+    body: 'It opens a new copilot conversation with elevated powers over this board: beyond creating, editing, moving and archiving cards, it may clear cards’ spent attempts, reorder cards and restore archived ones. The powers last for its one answer, which ends with a short report of what it changed. It cannot start auto-pilot, change settings or touch the foundation documents. You can watch it work in the copilot panel.',
+    action: 'Fix board',
+  };
+}
+
 // The emergency stop. Everything in the project dies — every agent, the backend server, and the loop
 // itself — and the project stays halted until someone restarts it, so the chat and manual runs stop
 // working too. That last part is the half people do not expect, which is why it is in the body.

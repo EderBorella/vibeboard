@@ -122,7 +122,7 @@ export function registerWs(
       // Pushed on connect as well as on change, for the same reason the pending sign-ins are: a tab
       // that opens after the copilot was authorised must show the button as on, or two tabs disagree
       // about authority that is shared between them.
-      socket.send(JSON.stringify({ type: 'copilot:authority', authorised: ctx.copilotAuthority.enabled }));
+      socket.send(JSON.stringify(ctx.copilotAuthority.announcement));
       // The sign-in requests waiting for a decision, pushed on connect as well as on change: a browser
       // that opens after a request was made must still see the prompt, or the person who has to allow
       // it would have to have been watching at the moment it arrived.

@@ -1,4 +1,4 @@
-import type { Credential, CredentialStore } from '../auth/credentials.js';
+import type { ChatScope, Credential, CredentialStore } from '../auth/credentials.js';
 
 // The chat copilot's credential, and its lifetime.
 //
@@ -23,17 +23,34 @@ export class CopilotAuthority {
 
   // Told whenever the credential appears or goes away, so every open tab's button matches reality.
   // Without it a lazy revoke left `authorised` true in the UI while the credential was gone, and the
-  // next press turned OFF something the user believed they were turning off already.
-  #announce: (enabled: boolean) => void = () => {};
+  // next press turned OFF something the user believed they were turning off already. The scope rides
+  // along because the button must not read "Authorised" over a grant that is more than that.
+  #announce: (enabled: boolean, scope: ChatScope | undefined) => void = () => {};
 
   constructor(private readonly credentials: CredentialStore) {}
 
-  onChange(fn: (enabled: boolean) => void): void {
+  onChange(fn: (enabled: boolean, scope: ChatScope | undefined) => void): void {
     this.#announce = fn;
   }
 
   get enabled(): boolean {
     return this.#credential !== undefined;
+  }
+
+  // Which of the two a conversation holds: `assist` from the Authorise button, `repair` from Fix board.
+  get scope(): ChatScope | undefined {
+    return this.#credential?.scope as ChatScope | undefined;
+  }
+
+  // What every tab is told, from the three places that tell it — the change hook, a new socket, and the
+  // Authorise route. One shape, so none of them can announce a repair as a plain authorisation. `repair` is
+  // present only when true: an older client reading `authorised` alone still reads the truth.
+  get announcement(): { type: 'copilot:authority'; authorised: boolean; repair?: true } {
+    return {
+      type: 'copilot:authority',
+      authorised: this.enabled,
+      ...(this.scope === 'repair' ? { repair: true as const } : {}),
+    };
   }
 
   // Which chat holds it, for the UI — never the token itself, which the browser has no use for and
@@ -42,14 +59,17 @@ export class CopilotAuthority {
     return this.#chat;
   }
 
-  authorise(chat: string, project: string): void {
-    // Re-authorising replaces rather than accumulates: two live credentials for one copilot is one
-    // nobody can revoke by name.
+  // ONE SLOT FOR BOTH SCOPES, and that is the point: re-authorising replaces rather than accumulates, because
+  // two live credentials for one copilot is one nobody can revoke by name — and a `repair` grant sitting
+  // beside an `assist` one would be exactly that. Handed back so the caller that minted it can end it.
+  authorise(chat: string, project: string, scope: ChatScope = 'assist'): Credential {
     this.revoke();
-    this.#credential = this.credentials.mintChat(chat, project);
+    const credential = this.credentials.mintChat(chat, project, scope);
+    this.#credential = credential;
     this.#chat = chat;
     this.#project = project;
-    this.#announce(true);
+    this.#announce(true, scope);
+    return credential;
   }
 
   revoke(): void {
@@ -58,7 +78,19 @@ export class CopilotAuthority {
     this.#credential = undefined;
     this.#chat = undefined;
     this.#project = undefined;
-    if (had) this.#announce(false);
+    if (had) this.#announce(false, undefined);
+  }
+
+  // THE END OF ONE GRANT, AND ONLY THAT ONE. Fix board's turn calls this when it settles (decision 88), and
+  // it must not take down whatever is held by then: a person may have switched conversation and pressed the
+  // button again while the first turn was still unwinding from its cancel, and a revoke keyed to "whatever is
+  // current" would end the second repair on the first one's way out. Matched by token, which nothing else
+  // can share.
+  release(credential: Credential): void {
+    if (this.#credential?.token === credential.token) this.revoke();
+    // And from the store regardless: a replaced credential is already gone, and this makes that a fact
+    // rather than a property of `authorise`.
+    else this.credentials.expireToken(credential.token);
   }
 
   // Called by every path that changes which conversation or project is open — opening a chat, starting

@@ -429,7 +429,7 @@ describe('the generated endpoint catalogue', () => {
   // The generator is only honest if it agrees with the enforcement. Every line it emits must be a
   // call `allows()` would permit — otherwise an agent is handed a 403 it was told to expect to work.
   it('emits nothing the scope table would refuse', () => {
-    const scopes: Scope[] = ['work', 'checkup', 'service', 'assist'];
+    const scopes: Scope[] = ['work', 'checkup', 'service', 'assist', 'repair'];
     for (const scope of scopes) {
       for (const line of endpointsFor(scope, 'E-001')) {
         const match = /^- `([A-Z]+) (\S+)`/.exec(line);
@@ -464,7 +464,7 @@ describe('the generated endpoint catalogue', () => {
   it('describes every row it emits', () => {
     // A row whose description is empty compiles — `describe` is required, not non-empty — and would
     // produce a catalogue line that names an endpoint and explains nothing.
-    for (const scope of ['work', 'checkup', 'service', 'assist'] as Scope[]) {
+    for (const scope of ['work', 'checkup', 'service', 'assist', 'repair'] as Scope[]) {
       for (const line of endpointsFor(scope)) {
         expect(line.split('` — ')[1]?.trim().length ?? 0, line).toBeGreaterThan(10);
       }

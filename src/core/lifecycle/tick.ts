@@ -239,6 +239,15 @@ function focusFinished(
   const stories = childrenOf(feature, live);
   const subtree = [...stories, ...stories.flatMap((story) => childrenOf(story, live))];
   const blocked = subtree.filter((c) => isBlockedColumn(ap, c.board, c.columnSlug));
+  // WORK LEFT UNDER IT IS NOT FINISHED, focused or not (decision 87). A send-back re-opens a blocked story's
+  // tasks, and an ending that called the feature finished over them would never name them.
+  const outstanding = subtree.filter((c) => !isSettled(ap, c));
+  if (outstanding.length > 0) {
+    return stop(
+      'stalled',
+      `There is nothing auto-pilot can work on. ${whyStuck(ap, live, outstanding, blocked)}`,
+    );
+  }
   // `smokeIsAGate` applies here for the reason it applies to an unfocused finish (ruling 66): a smoke command
   // that IS one of the gate commands has exercised nothing, so there is no evidence the product runs — and a
   // focused run reaching that state is no better placed to claim success than a whole project is.
@@ -611,9 +620,15 @@ function missingTaskColumn(input: TickInput, story: Card, finished: string): Tic
   const columns = input.columns.engineering ?? [];
   const absent = [TASK_ENTRY, DELIVERED_COLUMN, finished].filter((slug) => !columns.includes(slug));
   if (absent.length === 0) return undefined;
+  // THE `terminal` REMEDY ONLY WHERE IT CAN WORK: it moves where a task closes, never where it is worked or
+  // waits, so offered for a missing `review` it sends a person to a setting that changes nothing.
+  const add = `Add ${absent.length === 1 ? 'it' : 'them'} to that board`;
+  const remedy = absent.includes(finished)
+    ? `${add}, or point terminal at a column it does have.`
+    : `${add}.`;
   return stop(
     'stalled',
-    `${story.id}'s tasks are moved through ${absent.join(' and ')} on their way to being done, and the engineering board has no such column — a column IS a folder, so auto-pilot will not stamp one the board has not got. Add ${absent.length === 1 ? 'it' : 'them'} to that board, or point terminal at a column it does have.`,
+    `${story.id}'s tasks are moved through ${absent.join(' and ')} on their way to being done, and the engineering board has no such column — a column IS a folder, so auto-pilot will not stamp one the board has not got. ${remedy}`,
   );
 }
 
@@ -621,6 +636,11 @@ function missingTaskColumn(input: TickInput, story: Card, finished: string): Tic
 // delivers its whole group or none of it (`deliverGroup`), and only the LAST group is ever a partial one — so
 // the tasks standing delivered or settled are the record of how many runs landed, and dividing by the
 // ceiling is the strictest honest reading of it.
+//
+// UNTIL A SEND-BACK RE-OPENS THEM (decision 87). A story that has been sent back had every group delivered,
+// or its judgement could not have fired, so after one every task counts as landed. Read off the board alone,
+// a fix whose delivery was refused would leave the story having landed nothing, and the implement would be
+// blocked at a cap it had earned back without ever being tried again.
 //
 // THE BOARD AND NOT THE RUN RECORDS, and that is what makes the bound terminate. A rule that read "this run
 // ended `success`, so it delivered" would grant an attempt back for every run that ended well, and a phase
@@ -656,11 +676,12 @@ function implementStory(
   finished: string,
 ): TickAction | undefined {
   const outstanding = tasks.filter((t) => !isJudgeable(input.ap, t)).sort(byQueueOrder);
+  const sentBack = attemptsUsed(input.runs, story.id, phase('story-fix').skill ?? '') > 0;
   const action = dispatchPhase(
     input,
     'story-implement',
     story,
-    groupsDelivered(tasks.length - outstanding.length),
+    groupsDelivered(sentBack ? tasks.length : tasks.length - outstanding.length),
   );
   if (action?.kind !== 'dispatch') return action;
   // AFTER THE CAP AND NOT BEFORE IT, so a story that is out of attempts is still BLOCKED rather than

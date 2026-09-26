@@ -12,6 +12,7 @@ import {
 import type { Skill } from '../../core/skills.js';
 import type { BoardName, Card } from '../../core/types.js';
 import type { GitMeasure, GitPoint } from '../../exec/git-measure.js';
+import type { Gate } from '../../store/project/foundation.js';
 import { redact } from '../../store/redaction.js';
 import {
   appendTranscript,
@@ -59,7 +60,7 @@ export interface DispatchInput {
   userPrompt?: string;
   // Read at dispatch, like boardColumns and for the same reason: a queued run must be bound by the
   // documents the project had when it was resolved, not by whatever they say when it finally starts.
-  foundation?: { paths: string[]; codeQuality?: string };
+  foundation?: { paths: string[]; codeQuality?: string; gates?: Gate[] };
   // Present when this run is a REVIEW: what the loop already established before dispatching it. Carried like
   // `foundation`, and for the same reason — a queued review must be told about the gate run that preceded it,
   // not about whatever the tree looks like when it finally starts.
@@ -399,6 +400,7 @@ export class AgentRunner {
       bin: this.#opts.bin,
       sandbox: this.#opts.sandbox ? await this.#opts.sandbox() : NOT_REQUESTED,
       ...(box ? { box } : {}),
+      card: true,
       onEvent: (event) => {
         // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line
         // each can interleave mid-line, and #settle reads the tail as soon as the process closes —

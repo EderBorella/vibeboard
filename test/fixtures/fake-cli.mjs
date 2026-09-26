@@ -43,7 +43,7 @@ const workdir = process.env.VIBEBOARD_FAKE_DOCKER_WORKDIR ?? '';
 if (log)
   appendFileSync(
     log,
-    `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt, box, workdir, env: { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR ?? '' } })}\n`,
+    `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt, box, workdir, env: { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR ?? '', ENABLE_CLAUDEAI_MCP_SERVERS: process.env.ENABLE_CLAUDEAI_MCP_SERVERS ?? '', CLAUDE_CODE_DISABLE_AUTO_MEMORY: process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY ?? '' } })}\n`,
   );
 
 const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'ok';

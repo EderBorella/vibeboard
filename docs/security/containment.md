@@ -259,6 +259,12 @@ enforces scope; it is not the same as isolation.
   writable by any agent — but it is one credential, not zero, and the directory around it is now
   writable from inside, so an agent can also *replace* it. That buys nothing it did not already have:
   it is the agent's own token, and the blast radius is the next turn's auth failing.
+- **The signed-in account brings its claude.ai connectors, and a card run is started without them.** A box
+  signs in with the user's own Claude account, and the CLI loads that account's connectors — a documents
+  service, on the machine this was measured on — into every turn, where an agent working from a card an
+  agent wrote could read or write the account's documents. Card runs set `ENABLE_CLAUDEAI_MCP_SERVERS=false`
+  and `--strict-mcp-config` (`decision 89`, `src/server/agent-turn.ts`). **The copilot still loads them**:
+  it is a person's conversation, and what it can reach there is what that person can.
 - **The network boundary is not exfiltration control.** The box reaches the internet (it has to, to
   reach the model) and cannot OPEN a connection to RFC 1918 or link-local addresses, so it cannot
   reach the unauthenticated services on this machine or the rest of the LAN. Nothing at this layer

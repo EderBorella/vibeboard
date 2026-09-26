@@ -1,7 +1,9 @@
 import { relative } from 'node:path';
+import { phaseForRun } from '../../../core/phases.js';
 import type { Skill } from '../../../core/skills.js';
 import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
+import type { Gate } from '../../../store/project/foundation.js';
 import type { Scope } from '../../auth/credentials.js';
 import { CONTRACT_LINES, reviewLines } from './contracts.js';
 import { credentialSection, judgeCredentialSection } from './credential.js';
@@ -87,11 +89,12 @@ export interface PromptInputs {
   // The user's own words for this dispatch.
   userPrompt?: string;
   // The documents this run is bound by. Four as paths — the agent has a Read tool, and inlining a
-  // document it may not need is tokens spent on nothing — and CODE-QUALITY.md inlined, because its
-  // gates bind every run and an agent that has to go and fetch them will sometimes not bother.
+  // document it may not need is tokens spent on nothing — and the gates inlined, because they bind
+  // every run and an agent that has to go and fetch them will sometimes not bother: CODE-QUALITY.md in
+  // full for the runs that write or judge code, `gates` alone for the rest (`GATE_LIST_ONLY`).
   // Absent when the project has no foundation yet, and then the section is left out entirely rather
   // than promising a folder with nothing in it.
-  foundation?: { paths: string[]; codeQuality?: string };
+  foundation?: { paths: string[]; codeQuality?: string; gates?: Gate[] };
   // Present when this run is a REVIEW: decision 51's second step, where a model is asked only for what a
   // command's exit code cannot express. It replaces the reporting contract with one that asks for a
   // `verdict`, and carries the two facts about the judgement that ONLY THE LOOP HOLDS — whether the gates it
@@ -202,7 +205,12 @@ export function buildRunPrompt(input: PromptInputs): string {
   // frame everything else is read inside, and a decision an agent meets after the work is described
   // is one it has already reasoned past.
   if (input.foundation && input.foundation.paths.length > 0) {
-    parts.push(section("The project's foundation", foundationSection(input.foundation)));
+    parts.push(
+      section(
+        "The project's foundation",
+        foundationSection(input.foundation, phaseForRun(input.skill.slug, input.card?.board)?.name),
+      ),
+    );
   }
   if (input.linked.length > 0) {
     parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot)));

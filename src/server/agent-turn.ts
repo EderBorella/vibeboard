@@ -49,6 +49,11 @@ export interface AgentTurnOptions {
   // than returning an unconfined command, because "confined" stopped being a property of the status
   // alone the moment containment became a resource something has to create.
   box?: string;
+  // A CARD RUN rather than the copilot, and it decides what the CLI loads around the prompt. A card run
+  // is one prompt in and one report out, and everything it needs is in that prompt — so it is given the
+  // tools it calls and nothing else from the CLI's catalogue (see `CARD_TOOLS`). Absent is the copilot,
+  // which keeps the whole harness: it is a conversation, and a person may ask it for anything.
+  card?: true;
   onEvent: (event: CopilotEvent) => void;
 }
 
@@ -84,6 +89,17 @@ const RESEARCH_PERSONA = [
   'recommendation the user can act on.',
 ].join('\n');
 
+// WHAT A CARD RUN IS GIVEN: the four tools every measured run used, and nothing else the CLI would load and
+// re-read on every turn (decision 89). Research keeps the web, because its persona says to search it.
+const CARD_TOOLS = ['Bash', 'Read', 'Edit', 'Write'];
+const RESEARCH_TOOLS = [...CARD_TOOLS, 'WebFetch', 'WebSearch'];
+// The connectors belong to the account the box is signed in with, so a card run could reach that
+// account's documents; and memory would carry one run's notes into every later run's context.
+const CARD_ENV: Record<string, string> = {
+  ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+  CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+};
+
 // Claude Code mode → --permission-mode + optional persona. Unknown values fall back to a
 // safe permission mode (this only receives Claude modes; OpenCode routes elsewhere).
 function resolveMode(mode: CopilotMode): { permission: string; persona?: string } {
@@ -106,7 +122,7 @@ function claudeBin(bin: string | undefined): string {
   return bin ?? process.env.VIBEBOARD_CLAUDE_BIN ?? 'claude';
 }
 
-// The bundled VibeBoard instructions, appended to every turn's system prompt so the copilot
+// The bundled VibeBoard instructions, appended to every copilot turn's system prompt so the copilot
 // knows the model/conventions without spending tokens rediscovering them. Cached after first
 // read; resolved next to this module (copied into dist by the build).
 let cachedInstructions: string | undefined;
@@ -133,13 +149,21 @@ function projectInstructions(cwd: string): string {
   }
 }
 
-function systemPrompt(cwd: string, persona: string | undefined): string {
-  return [vibeboardInstructions(), projectInstructions(cwd), persona].filter(Boolean).join('\n\n');
+// A CLAUDE CARD RUN IS NOT THE COPILOT, so it is not told it is: the bundled document is the copilot's
+// persona, and what a run needs of it — the container, the read-only paths, what a 403 means — is in its
+// own prompt (runs/prompt/), with the card conventions arriving through CLAUDE.md's imports. OpenCode
+// keeps the document for every turn: it does not expand those imports (store/project/control.ts), so the
+// document is its only copy of the conventions. The project's instructions and the persona reach all.
+function systemPrompt(cwd: string, persona: string | undefined, copilot: boolean): string {
+  return [copilot ? vibeboardInstructions() : '', projectInstructions(cwd), persona]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } {
   const { permission, persona } = resolveMode(opts.mode);
-  const appendPrompt = systemPrompt(opts.cwd, persona);
+  const card = opts.card === true;
+  const appendPrompt = systemPrompt(opts.cwd, persona, !card);
   const args = [
     '-p',
     '--output-format',
@@ -153,6 +177,11 @@ function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } 
   if (opts.model) args.push('--model', opts.model);
   if (opts.effort) args.push('--effort', opts.effort);
   if (opts.sessionId) args.push('--resume', opts.sessionId);
+  // No skills (VibeBoard's arrive in the prompt, not the CLI's catalogue) and no MCP servers at all.
+  if (card) {
+    const tools = opts.mode === 'research' ? RESEARCH_TOOLS : CARD_TOOLS;
+    args.push('--tools', tools.join(','), '--disable-slash-commands', '--strict-mcp-config');
+  }
   // The prompt is NOT an argument. It carries the run's credential, and a command line is world
   // readable through /proc/<pid>/cmdline for as long as the process lives — so any other agent on
   // the machine, or the chat copilot, could lift another run's token with `ps`. It goes in on
@@ -240,7 +269,7 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
         text: opts.text,
         model: opts.model,
         variant: opts.effort,
-        system: systemPrompt(opts.cwd, opts.mode === 'research' ? RESEARCH_PERSONA : ''),
+        system: systemPrompt(opts.cwd, opts.mode === 'research' ? RESEARCH_PERSONA : '', true),
         sessionId: opts.sessionId,
         signal: abort.signal,
         onEvent,
@@ -270,11 +299,15 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
   // is a path INSIDE the container (`/state/claude`), passed to `docker exec -e`; the host path is a
   // digest directory that means nothing in there. Unboxed — tests only, now that docker is required —
   // it is the host path in the spawn's own environment.
-  const boxEnv = isolationEnabled() ? boxEnvFor('claude-code') : {};
-  const env =
-    !sandbox.ok && isolationEnabled()
-      ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() }
-      : process.env;
+  // A card run's switches go where the CLI reads them: `docker exec -e` when boxed — the host's docker
+  // client has no use for them — and the spawn's own environment otherwise.
+  const cardEnv = opts.card ? CARD_ENV : {};
+  const boxEnv = isolationEnabled() ? { ...boxEnvFor('claude-code'), ...cardEnv } : cardEnv;
+  const env = sandbox.ok
+    ? process.env
+    : isolationEnabled()
+      ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir(), ...cardEnv }
+      : { ...process.env, ...cardEnv };
   // Confinement is applied here because one Claude turn is one process. This THROWS rather than
   // silently running unconfined when the sandbox is available but no box was resolved.
   const spawned = wrapCommand(bin, args, sandbox, opts.box, boxEnv);

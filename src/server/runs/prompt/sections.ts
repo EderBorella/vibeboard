@@ -76,17 +76,43 @@ export function linkedSection(linked: Card[], projectRoot: string): string {
   return [lines.join('\n'), ...intent].join('\n\n');
 }
 
+// WHO GETS THE GATE DOCUMENT'S PROSE: every run but these. Its conventions are what the implement builds
+// against and the review judges, and an agent sent to go and read them will sometimes not bother. These
+// four neither write code nor judge it — they need the bar, which is the commands, and not the argument
+// for it (decision 89). A phase is matched on skill and board, so a break-down dispatched by hand is one
+// too; a run no phase claims keeps the document.
+const GATE_LIST_ONLY: ReadonlySet<PhaseName> = new Set([
+  'bootstrap',
+  'feature-breakdown',
+  'story-breakdown',
+  'feature-checkup',
+]);
+
 // Named as binding rather than as background reading, and as read-only rather than as a request:
 // the OS denies these paths to every agent, so an agent that tries to "fix" one gets a permission
 // error it would otherwise read as a broken tool.
-export function foundationSection(foundation: NonNullable<PromptInputs['foundation']>): string {
+
+export function foundationSection(
+  foundation: NonNullable<PromptInputs['foundation']>,
+  phaseName?: PhaseName,
+): string {
   const lines = [
     'These decisions are already made for this project. Follow them, do not re-open them, and do not',
     'edit these files — they are read-only to you at the operating-system level.',
     '',
     ...foundation.paths.map((p) => `- ${p}`),
   ];
-  if (foundation.codeQuality?.trim()) {
+  const listOnly = phaseName !== undefined && GATE_LIST_ONLY.has(phaseName);
+  if (listOnly && foundation.gates && foundation.gates.length > 0) {
+    lines.push(
+      '',
+      'The gates, run from the project root:',
+      '',
+      ...foundation.gates.map((g) => `- ${g.name}: \`${g.command}\``),
+      '',
+      'Why each exists, and what no gate can catch, is in CODE-QUALITY.md, listed above.',
+    );
+  } else if (foundation.codeQuality?.trim()) {
     lines.push(
       '',
       'The gates your work must pass, in full:',
@@ -195,6 +221,15 @@ export function expressSection(skill: string, board: BoardName | undefined): str
 // places to drift, and this is what drifting cost.
 const CHECKUP_CREATES = phase('feature-checkup').creates;
 
+// WHAT EVERY BOX IS, whatever it carries. These lines were the copilot's alone until Claude card runs
+// stopped being handed the copilot's system prompt (agent-turn.ts), and a run meets each of them as an
+// error it would otherwise read as a broken tool.
+const BOX_LIMITS = [
+  'Everything under `.vibeboard/` that decides anything is read-only in here: a write there fails, and',
+  'that is not a broken tool. The internet is reachable and the machine’s own network is not: a refused',
+  'connection to a local address is that rule, not an outage.',
+].join('\n');
+
 // WHAT THE BOX ALREADY HAS. An agent is told about the board, the cards, the columns and its own
 // credential, and until now nothing at all about the machine it is standing in — so it re-fetched a
 // browser the image ships. See `server/boxes/image-tools.ts` for the measurement and why the version
@@ -205,6 +240,10 @@ const CHECKUP_CREATES = phase('feature-checkup').creates;
 // those agents the download is already done is the same wrong belief the section exists to remove,
 // arrived at from the other side. The caller decides, from the image the kind selects. decision 75.
 export function boxSection(browser: boolean): string {
+  return `${browserLines(browser)}\n\n${BOX_LIMITS}`;
+}
+
+function browserLines(browser: boolean): string {
   if (!browser) {
     return [
       'No browser is installed in this container — this project’s kind does not carry the web layer, so',

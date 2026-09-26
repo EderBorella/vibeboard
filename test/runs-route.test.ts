@@ -1193,6 +1193,35 @@ describe('POST /api/runs — the foundation', () => {
     expect(prompt).not.toContain(`- ${FOUNDATION_DIR}/TESTING.md`);
   }, 30000);
 
+  // AND A BREAK-DOWN GETS THE COMMANDS, NOT THE PROSE (decision 89) — through the app, because the list is
+  // parsed in `dispatchFrame` and nothing in a unit test of the section can see that it is handed over.
+  it('hands a break-down the gate commands rather than the document', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/control/file',
+      payload: {
+        path: `${FOUNDATION_DIR}/CODE-QUALITY.md`,
+        content: '---\ngates:\n  - name: tests\n    command: npm test\n---\nThe bar.\n',
+      },
+    });
+    const story = await productCard(project);
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'product', card: story, skill: 'break-down' },
+      })
+    ).json() as { run: RunRecord };
+    await settledOn(project, 'product', story, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain('- tests: `npm test`');
+    expect(prompt).not.toContain('The bar.');
+  }, 30000);
+
   it('does not claim to carry gates when the document declares none', async () => {
     const argsLog = await recordingShimArgs();
     const project = await projectWithCard();

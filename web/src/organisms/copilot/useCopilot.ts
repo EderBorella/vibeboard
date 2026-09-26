@@ -75,7 +75,7 @@ const ZERO: CopilotStats = { costUsd: 0, turns: 0, lastDurationMs: 0, contextTok
 type WsCopilotMessage =
   | { type: 'copilot:event'; event: CopilotEvent }
   | { type: 'copilot:state'; state: { running: boolean; sessionId?: string; model?: string } }
-  | { type: 'copilot:authority'; authorised: boolean }
+  | { type: 'copilot:authority'; authorised: boolean; repair?: true }
   | {
       type: 'copilot:history';
       chats: ChatMeta[];
@@ -92,6 +92,9 @@ export function useCopilot(bump: number) {
   // Whether this conversation may use the API. Server-owned: the button reflects it, it does not own
   // it — a closed tab must not be what expires a credential.
   const [authorised, setAuthorised] = useState(false);
+  // Whether that authority is Fix board's `repair` rather than the Authorise button's. The button must not say
+  // "Authorised" over a grant wider than the one it gives.
+  const [repairing, setRepairing] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [model, setModel] = useState<string | undefined>();
   const [stats, setStats] = useState<CopilotStats>(ZERO);
@@ -243,6 +246,7 @@ export function useCopilot(bump: number) {
           // believing they revoked something they did not.
           case 'copilot:authority':
             setAuthorised(m.authorised);
+            setRepairing(m.repair === true);
             break;
           case 'copilot:history':
             setChats(m.chats);
@@ -298,6 +302,11 @@ export function useCopilot(bump: number) {
     [push, sendRaw, startTurn],
   );
 
+  // A TURN THE SERVER STARTS, which is Fix board's: nothing here sent it, so nothing started the clocks the
+  // thinking indicator reads. Called as the request goes, so the indicator has a baseline before the first
+  // event arrives — the same reset `send` makes, without the message, which the server records itself.
+  const expectTurn = useCallback((): void => startTurn(), [startTurn]);
+
   const newSession = useCallback(() => {
     sendRaw({ type: 'copilot:new' });
     setItems([]);
@@ -329,6 +338,7 @@ export function useCopilot(bump: number) {
     items,
     running,
     authorised,
+    repairing,
     setCopilotAuthority,
     sessionId,
     model,
@@ -338,6 +348,7 @@ export function useCopilot(bump: number) {
     send,
     compact,
     newSession,
+    expectTurn,
     openChat,
     deleteChat,
     cancel,

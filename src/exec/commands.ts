@@ -12,6 +12,13 @@ import { GROUP_GRACE_MS, terminateGroup } from './process-group.js';
 //    read-only along with the rest of `.vibeboard/`. A command read from a card, a
 //    report or a run's output would be an agent choosing what this process executes — never do that.
 //
+//    AND ONE CALLER NOW READS A STRING OFF A CARD, which is why that sentence needs its exception written
+//    here rather than left to be discovered (decision 85). A story's `satisfiedBy` NAMES a command; it
+//    never carries one. `criterionCommand` compares the card's string for exact equality against the gates
+//    the document declares and returns THE DOCUMENT'S string, so what arrives here still originates in the
+//    file — the card's only power is to select which declared line runs, and a card naming anything else
+//    is answered `undefined` and never reaches this function.
+//
 //    Stated exactly, because the read-only mount is not the whole chain: pre-flight AUTHORS those
 //    documents (decision 7), so the real sequence is agent-proposed text → explicit human approval → this
 //    shell, unsandboxed, as the server user, inheriting the server's environment. The approval gate is

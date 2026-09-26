@@ -45,44 +45,6 @@ on it without repeating the search.
 `,
   },
   {
-    // REWRITTEN from a general critique skill into the lifecycle's judge (decision 51's second step). It is
-    // asked for the one thing a command's exit code cannot express: a gate proves the suite passes, and cannot
-    // prove the suite tests the criterion the card states.
-    slug: 'review',
-    content: `---
-name: Review
-description: Judge one run against the card that asked for it
-boards: [engineering]
----
-Judge ONE run against the card below.
-
-The run you are judging is named in this prompt, with how it ended, what VibeBoard
-noted about it and how many files it changed. Judge what THAT run did. An earlier
-run on this card may have succeeded; its work is not this run's work and does not
-count for it.
-
-**This prompt tells you what the gates did** — whether they passed, whether there
-were none to run because this card is the one that installs them, or whether
-nobody ran them at all. Do not assume; read it. Your question is the one no
-command can answer: **does this do what the card asked?** Not "is it good", not
-"is it what I would have built".
-
-Change nothing. Not the code, not the card, not where it sits — your credential
-grants you nothing on the board, and a judge that fixes what it is judging is
-grading its own work.
-
-Answer with a verdict: \`done\`, or \`sent-back\` with your findings. A report with
-no verdict cannot pass anything, so answer even when the answer is sent-back.
-
-Work that does MORE than the card asked still passes. Say so rather than marking
-it down: failing a card for over-delivery throws away working code and spends one
-of the card's attempts rebuilding it.
-
-Your findings are what a \`fix\` run will be handed, so be specific enough that
-someone could disagree with them.
-`,
-  },
-  {
     slug: 'derive-features',
     content: `---
 name: Derive features
@@ -148,6 +110,14 @@ one nobody asked for is not free.
 test can express whether it is done. Two criteria means two cards. This is the
 rule that keeps the project a proof of concept rather than a product.
 
+**If a card's one criterion IS one of the gate commands** this project declares —
+they are quoted in full in this prompt — then say so: send \`satisfiedBy\` on the
+create, carrying that command copied exactly. Auto-pilot runs it before it breaks
+that card down, and closes the card with no work and no cost if it already exits
+0. Say it on the card as well, in words, so a person reading the board knows what
+it was measured against. A string that is not one of the declared gates is
+ignored, so this is never a way to get something else run.
+
 - Create each card with \`POST /api/cards\`, one card per call — never a shell loop
   whose result you cannot check.
 - The board a card may go on, the column it enters, its \`group\` and the card it
@@ -173,6 +143,10 @@ List every card you created in your report, by id.
 `,
   },
   {
+    // NO LONGER A PHASE'S SKILL since the work moved up to the story (decision 83) — `implement-story` below
+    // is what the lifecycle dispatches, and `phaseSkillProblems` no longer asks a project for this one. It
+    // stays seeded because implementing ONE task by hand is a thing a person does, exactly as `execute` is:
+    // a skill no phase names blocks nothing and is offered on the card it is scoped to.
     slug: 'implement',
     content: `---
 name: Implement
@@ -211,11 +185,82 @@ finishes, and your credential grants nothing that could.
 `,
   },
   {
+    // THE STORY'S WORK IN ONE RUN (decision 83). `implement`'s text with the unit changed from a card to a
+    // story and the tasks under it: one agent given all three of a story's tasks did their work in 18 turns
+    // and 50k of context against 41 turns and 148k, for equivalent code and equivalent defect detection.
+    //
+    // WHICH TASKS ARE THIS RUN'S IS READ OFF THE BOARD, because the board is the only channel there is: the
+    // loop stamps the group into `in-progress` before dispatching and the prompt names every linked card
+    // with the column it stands in. That is also what bounds a big story — a story with more tasks than the
+    // ceiling in core/lifecycle/tick.ts is dispatched in groups, and the ones not in this group are still in
+    // `backlog` where this text tells the run to leave them.
+    //
+    // AN EXISTING PROJECT'S COPY STILL SAYS ITS TASKS ARE STAMPED DONE (decision 87), for `fix`'s reason below:
+    // nothing rewrites a seeded skill. It changes nothing the run can do, since no run's credential moves a card.
+    slug: 'implement-story',
+    content: `---
+name: Implement the story
+description: Build every task under this story, and make the gates pass
+boards: [product]
+---
+Implement the story below by doing the work of the tasks under it.
+
+**The tasks in \`engineering/in-progress\` are this run's, and every one of them
+is required.** Each card this story links to is listed above with the board and
+column it sits in and the path to its file. Read every task in that column, and
+deliver the acceptance criterion each one states. A task still in \`backlog\` is a
+later run's — do not do it, and do not touch it.
+
+**Do them as one piece of work.** They were split for the board's sake; they
+share files and they share a design, which is why they are given to you
+together. Decide once, write once, test once.
+
+The gates in the project's foundation/CODE-QUALITY.md are the bar, and they are
+quoted here in full. Run them yourself before you finish: auto-pilot runs them
+again the moment you are done, and a run that leaves them failing has not
+delivered. They run ONCE for this whole story, so a red suite will not say which
+task broke it — that is yours to keep track of as you go.
+
+**If one of these tasks asks you to declare the project's \`smoke:\` command**,
+declare it with \`POST /api/foundation/smoke\` and a body of \`{ command }\`. Do NOT
+try to edit foundation/TESTING.md: the foundation documents are read-only to
+every run, that endpoint is the only way to declare this, and it writes that one
+key and nothing else. If the card tells you to edit the file, this is what it
+means.
+
+The command must not be one of the gate commands foundation/CODE-QUALITY.md
+declares — the endpoint refuses that outright. A gate and a smoke command that are
+the same command are one check, not two: gates are written alongside the code they
+judge, so they pass over a product with no way to run it. Make the smoke command
+start the product the way the README describes starting it, and use it the way the
+README describes using it.
+
+Do what these tasks ask and nothing more. Anything else you find — an unrelated
+bug, a missing dependency, work a task implies but does not say — goes to
+\`POST /api/suggestions\`. Do the part you can, file the rest, and stop.
+
+End your report by naming each task by id with its acceptance criterion and how
+this run meets it. That list is what the story's review is checked against, and a
+task you could not finish belongs in it too, said plainly.
+
+You do not move any card, and cannot: auto-pilot moves these tasks to review
+together when this run finishes, and only the story's review moves them to done.
+Your credential grants nothing that could.
+`,
+  },
+  {
+    // `boards: [engineering, product]` SINCE DECISION 80, and an existing project's `fix.md` still says
+    // `[engineering]`: `seedSkills` writes only into a project whose skills folder is absent, so nothing
+    // rewrites it. Readiness is silent about that on purpose. `boards` decides which skills the CARD's
+    // hand-dispatch menu offers (`skillsForCard`) and nothing else — `POST /api/runs` does not consult it —
+    // so a stale list narrows a menu on a product card and cannot stop the loop, which is the bar
+    // `phaseSkillProblems` is set at. The `review-story` migration it does name is a skill that does not
+    // EXIST, where the dispatch 404s and the card can never advance.
     slug: 'fix',
     content: `---
 name: Fix
 description: Address the findings that sent this card back
-boards: [engineering]
+boards: [engineering, product]
 ---
 Fix what sent the card below back.
 
@@ -238,29 +283,59 @@ that first.
 `,
   },
   {
-    slug: 'checkup-story',
+    // THE STORY'S ONE JUDGEMENT (decision 80), and it is two retired skills in one: `review`, which judged a
+    // single task's run, and `checkup-story`, which asked whether the tasks composed. At story granularity
+    // those are the same question, and asking both paid two cold starts for one answer.
+    slug: 'review-story',
     content: `---
-name: Story checkup
-description: Decide whether the tasks under this story compose into it
+name: Review the story
+description: Judge whether the work under this story delivers it
 boards: [product]
 ---
-Decide whether the tasks under the card below compose into the story it describes.
+Judge the card below: does the work under this story deliver what the story asks
+for?
 
 Everything you need is in this prompt: every task under this story with the column
 it is in and how its last run ended, the blocked ones named, and the open
 suggestions. You cannot fetch any of it and do not need to — your credential does
 not reach those endpoints, and auto-pilot already holds every one of those facts.
 
-Three tasks can each pass their own gates and the story they compose not work.
-That is the question here, and it is the only one no command can answer.
+**This prompt tells you what the gates did** — whether they passed, whether there
+were none to run because this story is the one that installs them, or whether
+nobody ran them at all. Do not assume; read it, and do not run them again where it
+says auto-pilot already has.
 
-A blocked task is **settled**, not outstanding. If every task of this story is
-done or blocked, the story is finished: **say so in your report** and name the
-blocked ones. Do not create work to get past a blocked task —
+Your question is the one no command can answer, and it has two halves:
+
+- does the work do what the card asked? Not "is it good", not "is it what I would
+  have built";
+- do the tasks COMPOSE? Three tasks can each pass their own gates and the story
+  they make not work, and nothing mechanical can see that the third undid the
+  first.
+
+Change nothing. Not the code, not the cards, not where they sit — your credential
+grants you nothing on the board, and a judge that fixes what it is judging is
+grading its own work. You do not move or archive any card; auto-pilot stamps the
+column when this run finishes.
+
+Answer with a verdict: \`done\`, or \`sent-back\` with your findings. A report with
+no verdict cannot pass anything, so answer even when the answer is sent-back.
+
+Work that does MORE than the card asked still passes. Say so rather than marking
+it down: failing a story for over-delivery throws away working code and spends one
+of its attempts rebuilding it.
+
+Your findings are what a \`fix\` run will be handed, so be specific enough that
+someone could disagree with them.
+
+A blocked task is **settled**, not outstanding.
+Do not create work to get past a blocked task —
 it has already had every attempt it is allowed, and it is waiting for a person.
+Name it and judge the rest.
 
 So: create work for what was MISSED, never for what was attempted and blocked.
-**Read the board first**, and create through \`POST /api/cards\`,
+If this story needs something no task under it ever attempted,
+**read the board first** and create a sibling story with \`POST /api/cards\`,
 one card per call. You get ONE round of creating: anything you still believe is
 missing afterwards goes to \`POST /api/suggestions\`.
 
@@ -270,10 +345,7 @@ card. Anything under it that neither asks for is over-scope, and **naming it in
 your report is the whole of what you do about it** — your one creating round is for
 what was MISSED, never for work nobody asked for.
 
-You do not move or archive any card. Auto-pilot stamps the column when this run
-finishes.
-
-Report what you found, list by id any cards you created, and name every blocked
+Report what you judged, list by id any cards you created, and name every blocked
 task you left behind.
 `,
   },

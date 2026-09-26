@@ -24,6 +24,10 @@ export interface SandboxState {
   // never offers to build against a daemon that is not running. Absent otherwise, including when the
   // sandbox is fine.
   buildable?: true;
+  // WHY THE AGENT IMAGE IS BEHIND THIS MACHINE'S CLIs, when it is — naming the image and both versions.
+  // It refuses nothing, and it is not `buildable`: that one means a build fixes the refusal, and the setup
+  // wizard offers its once-only build on it. Settings offers the rebuild on either.
+  imageStale?: string;
   // WHAT ALREADY WENT WRONG, as distinct from what is wrong NOW — and it does not gate anything.
   //
   // Every other field here answers "may an agent start", which is a question about the present and is
@@ -65,9 +69,10 @@ export function rebuildBoxes(): Promise<{ ok: true; removed: number }> {
   return post<{ ok: true; removed: number }>('/api/boxes/rebuild', {});
 }
 
-// BUILD THE AGENT IMAGE. Minutes, and its progress arrives over the socket as `box:build` frames rather
-// than in this response — a request that shows nothing for minutes is indistinguishable from one that
-// has hung. `already` is true when the image turned up between the refusal and the click.
+// BUILD THE AGENT IMAGE, or rebuild one whose CLIs are behind this machine's. Minutes, and its progress
+// arrives over the socket as `box:build` frames rather than in this response — a request that shows
+// nothing for minutes is indistinguishable from one that has hung. `already` is true when there turned
+// out to be nothing to do: the image arrived, or caught up, between the panel's poll and the click.
 export function buildAgentImage(): Promise<{ ok: true; already: boolean }> {
   return post<{ ok: true; already: boolean }>('/api/boxes/build', {});
 }

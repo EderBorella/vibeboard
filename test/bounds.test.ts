@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cardsCreatedBy,
   creatingRoundSpent,
   inconclusiveReviews,
-  latestWorkRun,
-  outstandingVerdict,
+  latestCompletedWorkRun,
   reviewsRun,
 } from '../src/core/bounds.js';
 import {
@@ -43,21 +43,48 @@ function base(over: Partial<RunRecord> = {}): RunRecord {
   };
 }
 
-// A run that did the work and delivered a report.
-const work = (skill: 'implement' | 'fix', card = 'E-001'): RunRecord =>
-  withReport(base({ skill, card }), { outcome: 'success', summary: 'did it', body: '## What I did' }, 'T');
+// A run that did the work and delivered a report. ON PRODUCT, and that is decision 83 rather than a
+// fixture preference: `isWorkRun` reads the phase table, and since the work moved up to the story the runs
+// a verdict can land on are a story's break-down, its implement and its fix. A run on engineering is in no
+// phase at all.
+const work = (skill: 'break-down' | 'implement-story' | 'fix', card = 'P-001'): RunRecord =>
+  withReport(
+    base({ skill, card, board: 'product' }),
+    { outcome: 'success', summary: 'did it', body: '## What I did' },
+    'T',
+  );
 
 // A run that DIED: no report at all, which is exactly the shape that must not clear an earlier verdict.
-const died = (skill: string, card = 'E-001'): RunRecord =>
-  withoutReport(base({ skill, card }), 'failed', 'The agent exited with code 1 and wrote no report.', 'T');
+const died = (skill: string, card = 'P-001'): RunRecord =>
+  withoutReport(
+    base({ skill, card, board: 'product' }),
+    'failed',
+    'The agent exited with code 1 and wrote no report.',
+    'T',
+  );
 
 const gates = (passed: boolean): Verification =>
   passed
     ? { mode: 'gates', passed: true, at: 'T' }
     : { mode: 'gates', passed: false, at: 'T', command: 'npm test', output: '1 failed' };
 
-const rev = (verdict: ReviewVerdict, card = 'E-001'): RunRecord =>
-  withReport(base({ skill: 'review', card }), { outcome: 'success', verdict, body: '## Judgement' }, 'T');
+// THE JUDGEMENT, which is a STORY's since decision 80: `review-story` on product, and `isReviewRun` reads
+// the phase table, so a run recorded on any other board is not one.
+const rev = (verdict: ReviewVerdict, card = 'P-001'): RunRecord =>
+  withReport(
+    base({ skill: 'review-story', card, board: 'product' }),
+    { outcome: 'success', verdict, body: '## Judgement' },
+    'T',
+  );
+
+// A judgement that ended and answered nothing.
+const judgeDied = (card = 'P-001'): RunRecord =>
+  withoutReport(
+    base({ skill: 'review-story', card, board: 'product' }),
+    'failed',
+    'The agent exited with code 1 and wrote no report.',
+    'T',
+  );
 
 function card(board: BoardName, id: string, over: Partial<Card> = {}): Card {
   return {
@@ -75,41 +102,66 @@ function card(board: BoardName, id: string, over: Partial<Card> = {}): Card {
   };
 }
 
-describe('outstandingVerdict', () => {
-  it('is absent for a task with no runs', () => {
-    expect(outstandingVerdict([], 'E-001')).toBeUndefined();
+// `outstandingVerdict` HAD A SUITE HERE, and it went with the lookup (decision 83). It answered "the
+// latest work run that CARRIES a verdict", which is how a task in `in-progress` told a fix from an
+// implement — a question no card is asked now that the work and the judgement are both the story's.
+// What survives of it is the ordering suite below, which is where the bug it was written around lives.
+describe('latestCompletedWorkRun', () => {
+  it('is absent for a story with no runs', () => {
+    expect(latestCompletedWorkRun([], 'P-001')).toBeUndefined();
   });
 
-  it('is absent when the only run carries no verification', () => {
-    // Nothing has judged it yet, which is not the same fact as failing.
-    expect(outstandingVerdict([work('implement')], 'E-001')).toBeUndefined();
-  });
-
-  it('is the verification on the latest settled implement or fix run that has one', () => {
-    const first = withVerification(work('implement'), gates(false));
-    const second = withVerification(work('fix'), gates(true));
-    expect(outstandingVerdict([first, second], 'E-001')?.passed).toBe(true);
-    // Order of the argument must not decide the answer.
-    expect(outstandingVerdict([second, first], 'E-001')?.passed).toBe(true);
-  });
-
-  // A fix that DIED leaves the previous failed verdict outstanding — the task still needs fixing.
-  it('keeps the earlier failed verdict when a later fix run carries none', () => {
-    const judged = withVerification(work('implement'), gates(false));
-    expect(outstandingVerdict([judged, died('fix')], 'E-001')?.passed).toBe(false);
-    expect(outstandingVerdict([judged, died('fix')], 'E-001')?.command).toBe('npm test');
+  // THE RUN UNDER JUDGEMENT, whether or not it has been judged: that is the difference from the lookup
+  // that went, and it is what lets a story that was sent back and fixed pass.
+  it('answers with the latest work run even when it carries no verdict', () => {
+    const judged = withVerification(work('implement-story'), gates(false));
+    const fix = work('fix');
+    expect(latestCompletedWorkRun([judged, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([judged, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('ignores a review run — a reviewer does not judge itself', () => {
-    const judged = withVerification(work('implement'), gates(false));
-    // A verdict sitting on the REVIEW run's own record, which is not a verdict about the task's work.
-    const reviewJudged = withVerification(rev('done'), gates(true));
-    expect(outstandingVerdict([judged, reviewJudged], 'E-001')?.passed).toBe(false);
+    const judged = withVerification(work('implement-story'), gates(false));
+    expect(latestCompletedWorkRun([judged, rev('done')], 'P-001')?.skill).toBe('implement-story');
+  });
+
+  // A TASK HAS NO WORK RUN OF ITS OWN. Every phase on engineering has gone, so a run recorded there is in
+  // no phase — which is what stops a hand-dispatched `fix` on a task becoming a run a verdict lands on.
+  it('is absent for a run on the engineering board, which is in no phase at all', () => {
+    const byHand = withReport(
+      base({ skill: 'fix', card: 'E-001', board: 'engineering' }),
+      { outcome: 'success', summary: 'did it', body: '## What I did' },
+      'T',
+    );
+    expect(latestCompletedWorkRun([byHand], 'E-001')).toBeUndefined();
   });
 
   it('is scoped to the card', () => {
-    const other = withVerification(work('implement', 'E-002'), gates(false));
-    expect(outstandingVerdict([other], 'E-001')).toBeUndefined();
+    expect(latestCompletedWorkRun([work('implement-story', 'P-002')], 'P-001')).toBeUndefined();
+  });
+
+  // A RUN THAT DIED ANSWERED NOTHING (decision 87). The send-back's tasks are still re-opened, so reading the
+  // dead fix's absent verdict as "nothing was sent back" would hand the story to an implement that is never
+  // told the finding. The fix before it is still the answer — and the verdict it carries still stands.
+  it('passes over a work run that died, so the verdict before it stands', () => {
+    const judged = withVerification(work('implement-story'), gates(false));
+    const answer = latestCompletedWorkRun([judged, died('fix')], 'P-001');
+    expect(answer?.skill).toBe('implement-story');
+    expect(answer?.verification?.passed).toBe(false);
+  });
+
+  // DECISION 40: the two outcomes an agent may write are one ending here, so which it claimed cannot decide
+  // whether its run is what the judgement reads.
+  it('counts a run that ended attention exactly as one that ended success', () => {
+    // Built first, because the id is the tie-break and it ascends with creation order.
+    const implement = work('implement-story');
+    const attention = withReport(
+      base({ skill: 'fix', card: 'P-001', board: 'product' }),
+      { outcome: 'attention', summary: 'could not do it', body: '## What I found' },
+      'T',
+    );
+    expect(attention.status).toBe('attention');
+    expect(latestCompletedWorkRun([implement, attention], 'P-001')?.skill).toBe('fix');
   });
 });
 
@@ -120,59 +172,64 @@ describe('outstandingVerdict', () => {
 // fixed again and again until the cap blocks it.
 describe('latest, when two runs share a second', () => {
   const inOneSecond = (
-    skill: 'implement' | 'fix',
+    skill: 'implement-story' | 'fix',
     id: string,
     started: string,
     over: Partial<RunRecord> = {},
   ): RunRecord =>
     withReport(
-      { ...base({ skill, ...over }), run: `20260813-100000-${id}`, started },
+      { ...base({ skill, card: 'P-001', board: 'product', ...over }), run: `20260813-100000-${id}`, started },
       { outcome: 'success', summary: 'did it', body: '## What I did' },
       'T',
     );
 
   it('answers with the run that started later, not the one whose id sorts higher', () => {
-    const implement = inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z');
+    const implement = inOneSecond('implement-story', 'uzpn', '2026-08-13T10:00:00.536Z');
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'E-001')?.skill).toBe('fix');
-    expect(latestWorkRun([fix, implement], 'E-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([implement, fix], 'P-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([fix, implement], 'P-001')?.skill).toBe('fix');
   });
 
   it('leaves no verdict outstanding when the later fix carries none', () => {
     // The whole failure in one assertion: the implement run's failed gates verdict must not be what the
-    // task stands under once a fix has run, or the loop re-stamps it back to `in-progress` for ever.
+    // card stands under once a fix has run, or the loop re-stamps it back to `in-progress` for ever. Found
+    // at task level and moved up with the machine — the lookup is the same and so is the bug.
     const implement = withVerification(
-      inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z'),
+      inOneSecond('implement-story', 'uzpn', '2026-08-13T10:00:00.536Z'),
       gates(false),
     );
     const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
-    expect(latestWorkRun([implement, fix], 'E-001')?.verification).toBeUndefined();
+    expect(latestCompletedWorkRun([implement, fix], 'P-001')?.verification).toBeUndefined();
   });
 
   it('falls back to the id when neither run says when it started', () => {
-    const first = inOneSecond('implement', 'aaaa', '');
+    const first = inOneSecond('implement-story', 'aaaa', '');
     const second = inOneSecond('fix', 'zzzz', '');
-    expect(latestWorkRun([second, first], 'E-001')?.skill).toBe('fix');
+    expect(latestCompletedWorkRun([second, first], 'P-001')?.skill).toBe('fix');
   });
 });
 
 describe('inconclusiveReviews', () => {
   it('counts a failed review run', () => {
-    expect(inconclusiveReviews([died('review')], 'E-001')).toBe(1);
+    expect(inconclusiveReviews([judgeDied()], 'P-001')).toBe(1);
   });
 
   it('counts a review that finished and reported no verdict', () => {
     // `attention` FINISHED — it has a report — but a report with no `verdict:` decided nothing.
-    const silent = withReport(base({ skill: 'review' }), { outcome: 'attention', body: 'I am unsure' }, 'T');
+    const silent = withReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      { outcome: 'attention', body: 'I am unsure' },
+      'T',
+    );
     expect(silent.status).toBe('attention');
-    expect(inconclusiveReviews([silent], 'E-001')).toBe(1);
+    expect(inconclusiveReviews([silent], 'P-001')).toBe(1);
   });
 
   // THE ONE THAT MATTERS. Three healthy reviews must not stop the loop: `BURNS.success` is true, so a cap
   // over every review run would stall a perfectly healthy task at three — while the spec's own arithmetic
   // expects `attemptCap + 1` review runs per task.
   it('counts none of three completed reviews that each answered', () => {
-    expect(inconclusiveReviews([rev('done'), rev('sent-back'), rev('done')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([rev('done'), rev('sent-back'), rev('done')], 'P-001')).toBe(0);
   });
 
   // THE E-022 CASE, closed 2026-09-01. A review whose report the SERVER could not read is not the work
@@ -181,113 +238,151 @@ describe('inconclusiveReviews', () => {
   // rebuilt. The only way back was moving files out of `results/` by hand.
   it('does not count a review whose report the server could not read', () => {
     const unreadable = withReport(
-      base({ skill: 'review' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'attention', body: 'judged', unreadable: 'its verdict reads "maybe"' },
       'T',
     );
     expect(unreadable.fault).toBe('unreadable-report');
     expect(unreadable.verdict).toBeUndefined(); // so the OLD rule would have counted it
-    expect(inconclusiveReviews([unreadable], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([unreadable], 'P-001')).toBe(0);
   });
 
   it('does not count a cancelled review — you stopped it', () => {
     // `burnsAttempt` is false for a cancellation, and a decision you took is not an attempt the agent had.
-    const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');
-    expect(inconclusiveReviews([stopped], 'E-001')).toBe(0);
+    const stopped = withoutReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      'cancelled',
+      'You stopped it.',
+      'T',
+    );
+    expect(inconclusiveReviews([stopped], 'P-001')).toBe(0);
   });
 
   it('does not count a work run that carries no verdict', () => {
     // Only a REVIEW is inconclusive for want of one: an implement run is never asked for a verdict, and
     // counting it would exhaust the review bound before a review had ever run.
-    expect(inconclusiveReviews([work('implement'), died('fix')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([work('implement-story'), died('fix')], 'P-001')).toBe(0);
   });
 
   it('is scoped to the card', () => {
-    expect(inconclusiveReviews([died('review', 'E-002')], 'E-001')).toBe(0);
+    expect(inconclusiveReviews([judgeDied('P-002')], 'P-001')).toBe(0);
   });
 });
 
-// EVERY REVIEW A TASK HAS COST, which is the total the spec's arithmetic row states and which
+// EVERY REVIEW A STORY HAS COST, which is the total the spec's arithmetic row states and which
 // `inconclusiveReviews` deliberately does not count. It exists for the reviews that ANSWERED and still left
-// the task in review — a verdict the endpoint refused, for instance.
+// the card open — a verdict the endpoint refused, for instance.
 describe('reviewsRun', () => {
   it('counts the reviews that answered, which the inconclusive bound does not', () => {
     const runs = [rev('done'), rev('sent-back'), rev('done')];
-    expect(reviewsRun(runs, 'E-001')).toBe(3);
-    expect(inconclusiveReviews(runs, 'E-001')).toBe(0);
+    expect(reviewsRun(runs, 'P-001')).toBe(3);
+    expect(inconclusiveReviews(runs, 'P-001')).toBe(0);
   });
 
-  it('counts an inconclusive review too, because it is still a review the task paid for', () => {
-    expect(reviewsRun([died('review'), rev('done')], 'E-001')).toBe(2);
+  it('counts an inconclusive review too, because it is still a review the card paid for', () => {
+    expect(reviewsRun([judgeDied(), rev('done')], 'P-001')).toBe(2);
   });
 
   it('does not count a cancelled review — you stopped it', () => {
-    const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');
-    expect(reviewsRun([stopped], 'E-001')).toBe(0);
+    const stopped = withoutReport(
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
+      'cancelled',
+      'You stopped it.',
+      'T',
+    );
+    expect(reviewsRun([stopped], 'P-001')).toBe(0);
   });
 
   it('does not count the work runs, or another card’s reviews', () => {
-    expect(reviewsRun([work('implement'), work('fix'), rev('done', 'E-002')], 'E-001')).toBe(0);
+    expect(reviewsRun([work('implement-story'), work('fix'), rev('done', 'P-002')], 'P-001')).toBe(0);
   });
 });
 
 describe('creatingRoundSpent', () => {
   const story = card('product', 'P-001', { columnSlug: 'in-progress' });
 
-  it('is false when no checkup has run at this point', () => {
-    expect(creatingRoundSpent([story], [], 'P-001', 'checkup-story')).toBe(false);
+  it('is false when no judgement has run at this point', () => {
+    expect(creatingRoundSpent([story], [], 'P-001', 'review-story')).toBe(false);
   });
 
   it("is true once a card on the board names one of this card's checkup runs as its creator", () => {
     // `createdBy`, stamped by the endpoint from the credential — NOT `created`, which the agent wrote.
     const checkup = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-002'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-002', { createdBy: checkup.run })];
-    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-story')).toBe(true);
+    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'review-story')).toBe(true);
   });
 
   it('is false when the checkup run CLAIMED a card it did not create', () => {
     // A run reporting `created: ['P-004']` with no such card on the board has spent no round. Finding F:
     // the report is the agent's claim about itself, and this is the second of the four places it applies.
     const boastful = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-004'], body: '## Missing' },
       'T',
     );
-    expect(creatingRoundSpent([story], [boastful], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent([story], [boastful], 'P-001', 'review-story')).toBe(false);
   });
 
   it('is false when the checkup ran and created nothing', () => {
     // Its ordinary CLOSING case (decision 47) — getting this the other way round refuses every close.
     const closed = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', summary: 'nothing missing', body: '## Composed' },
       'T',
     );
-    expect(creatingRoundSpent([story], [closed], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent([story], [closed], 'P-001', 'review-story')).toBe(false);
   });
 
-  it('is scoped to the skill, so a story checkup does not spend a feature checkup round', () => {
+  it('is scoped to the skill, so a story judgement does not spend a feature checkup round', () => {
     const checkup = withReport(
-      base({ skill: 'checkup-story', card: 'P-001', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-001', board: 'product' }),
       { outcome: 'success', created: ['P-002'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-002', { createdBy: checkup.run })];
-    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-story')).toBe(true);
+    expect(creatingRoundSpent(cards, [checkup], 'P-001', 'review-story')).toBe(true);
     expect(creatingRoundSpent(cards, [checkup], 'P-001', 'checkup-feature')).toBe(false);
   });
 
-  it("is scoped to the card, so another story's checkup does not spend this one's round", () => {
+  it("is scoped to the card, so another story's judgement does not spend this one's round", () => {
     const elsewhere = withReport(
-      base({ skill: 'checkup-story', card: 'P-009', board: 'product' }),
+      base({ skill: 'review-story', card: 'P-009', board: 'product' }),
       { outcome: 'success', created: ['P-010'], body: '## Missing' },
       'T',
     );
     const cards = [story, card('product', 'P-010', { createdBy: elsewhere.run })];
-    expect(creatingRoundSpent(cards, [elsewhere], 'P-001', 'checkup-story')).toBe(false);
+    expect(creatingRoundSpent(cards, [elsewhere], 'P-001', 'review-story')).toBe(false);
+  });
+});
+
+// The feature's substitute for `fixedSince` reads this, so what it selects is what decides whether a
+// finished feature can be closed (decision 86).
+describe('cardsCreatedBy', () => {
+  const checkup = withReport(
+    base({ skill: 'checkup-feature', card: 'F-001', board: 'features' }),
+    { outcome: 'success', created: ['P-002'], body: '## Missing' },
+    'T',
+  );
+
+  it('answers the cards the board says that run made, and no other', () => {
+    // TWO CARDS THAT ARE NOT IT, not one: a card created by a DIFFERENT run and a card created by
+    // nothing are separate ways to be wrong, and a fixture with one of them cannot tell them apart.
+    const other = base({ skill: 'checkup-feature', card: 'F-002', board: 'features' });
+    const cards = [
+      card('product', 'P-002', { createdBy: checkup.run }),
+      card('product', 'P-003', { createdBy: other.run }),
+      card('product', 'P-004'),
+    ];
+    expect(cardsCreatedBy(cards, checkup).map((c) => c.id)).toEqual(['P-002']);
+  });
+
+  it('is empty for a run whose cards the agent only claimed', () => {
+    // Ruling 58 again, from the other side: `created: ['P-002']` is on the run's own report above, and
+    // with no card on the board stamped with its id the round produced nothing this can see.
+    expect(cardsCreatedBy([card('product', 'P-004')], checkup)).toEqual([]);
   });
 });

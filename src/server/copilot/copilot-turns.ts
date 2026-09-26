@@ -1,3 +1,4 @@
+import { forClient } from '../../core/autopilot-state.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { classifyCopilotError } from '../../core/copilot-errors.js';
 import { readWizardState } from '../../store/project/wizard.js';
@@ -7,8 +8,9 @@ import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
 import { agentRefusal } from '../boxes/sandbox.js';
 import { errorText } from '../errors.js';
 import type { AppCtx, WsClient } from '../route-context.js';
-import { assistCredentialSection } from '../runs/prompt/credential.js';
+import { assistCredentialSection, repairCredentialSection } from '../runs/prompt/credential.js';
 import type { Backend, CopilotMode, EffortLevel } from './copilot.js';
+import { FIX_BOARD_ASK, fixBoardFrame } from './fix-board-frame.js';
 import { wizardFrame } from './wizard-frame.js';
 
 // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
@@ -30,14 +32,22 @@ interface CopilotOpts {
 // command is only a command while it is the first thing in the text.
 const COMPACT = '/compact';
 
+// Refused, while a Fix board turn is starting or running, to a second press and to a typed message alike.
+const REPAIR_UNDER_WAY =
+  'The copilot is repairing this board. Wait for its report, or stop it from the copilot panel.';
+
 // Everything the copilot channel does over /ws: turn orchestration, chat open/delete, and
-// the three broadcast shapes the client distinguishes (state, full history, chat list).
+// the three broadcast shapes the client distinguishes (state, full history, chat list) — and the one turn
+// begun over HTTP instead, Fix board's, because its grant must never travel through the socket's verbs.
 export function createCopilotTurns(ctx: AppCtx): {
   handleMessage: (raw: string) => void;
   sendHistory: (target?: WsClient) => Promise<void>;
   copilotState: () => void;
+  startRepair: () => Promise<{ chat: string } | { error: string }>;
 } {
   const { session, copilot, chats, broadcast } = ctx;
+  // Whether a Fix board turn is starting or running — see `startRepair`.
+  let repairing = false;
 
   const copilotState = (): void => broadcast({ type: 'copilot:state', state: copilot.state });
   // Full replay (connect + explicit chat change): replaces the client's transcript.
@@ -87,8 +97,15 @@ export function createCopilotTurns(ctx: AppCtx): {
   // this conversation. Nothing is injected otherwise — not a placeholder, not an explanation — because
   // an unauthorised copilot that knows an endpoint exists is one that will keep trying it and reporting
   // 403s to the user as if they were bugs.
+  //
+  // `repair` IS NEVER HANDED TO A TYPED MESSAGE. It is minted for the one turn Fix board starts and passed to
+  // that turn directly (decision 88); a message the person sends afterwards — or in the moment before the
+  // repair's turn is running — is an ordinary turn and gets an ordinary answer: no credential at all. Without
+  // this the credential keyed to the conversation would reach a turn framed as `assist`, carrying
+  // `repair`'s authority under a catalogue that does not describe it.
   async function turnCredential(root: string): Promise<Credential | undefined> {
-    return ctx.copilotAuthority.forTurn(await chats.currentId(), root);
+    const credential = ctx.copilotAuthority.forTurn(await chats.currentId(), root);
+    return credential?.scope === 'repair' ? undefined : credential;
   }
 
   function withCredential(token: string, text: string): string {
@@ -119,38 +136,16 @@ export function createCopilotTurns(ctx: AppCtx): {
     return credential ? withCredential(credential.token, framed) : framed;
   }
 
-  async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
-    // Read root rather than isOpen, so the cwd below needs no assertion.
-    const root = session.root;
-    if (!root) {
-      broadcast({ type: 'copilot:error', error: 'No project open' });
-      return;
-    }
-    if (!text.trim()) return;
-    const refused = await sendRefusal();
-    if (refused) {
-      broadcast({ type: 'copilot:error', error: refused });
-      return;
-    }
+  // ONE TURN, whoever began it: a typed message or Fix board. `prepare` runs INSIDE the try, so a failure
+  // recording the message or composing the model's copy is reported the way a failed turn is, rather than
+  // escaping as an unhandled rejection from a handler nobody awaits.
+  async function runTurn(
+    root: string,
+    opts: CopilotOpts,
+    prepare: () => Promise<{ credential: Credential | undefined; modelText: string }>,
+  ): Promise<void> {
     try {
-      await chats.recordUser(text);
-      // THE TRANSCRIPT GETS THE PERSON'S WORDS; THE MODEL GETS THE CREDENTIAL TOO.
-      //
-      // Two statements, and the separation is the security property: the token never enters
-      // `.vibeboard/chat/`. A chat file is readable inside the project's box for as long as it exists,
-      // so a token recorded here would be readable by every agent working that project.
-      //
-      // On stdin, in the prompt, rather than argv: `--append-system-prompt` is a command-line argument
-      // and /proc/<pid>/cmdline is world-readable, which agent-turn.ts refuses credentials for by name.
-      //
-      // NOT A CLOSED LEAK, AND SAYING SO: the CLI writes its own session transcript into the box's
-      // `/state`, which every agent on the same (project, backend) shares — so a `work` agent can lift
-      // this credential out of the copilot's session file. Runs have the same exposure and survive it
-      // because their tokens die in minutes; this one lives for a conversation, which is the argument
-      // for ending it eagerly on every chat and project change rather than only on a send. The
-      // exposure and its limits are stated in full in docs/security/containment.md.
-      const credential = await turnCredential(root);
-      const modelText = await modelCopy(root, text, credential, opts.attach);
+      const { credential, modelText } = await prepare();
       const choice = resolveCopilotSelection(session.config?.copilot, {
         backend: opts.backend,
         model: opts.model,
@@ -190,6 +185,94 @@ export function createCopilotTurns(ctx: AppCtx): {
       await chats.flush();
       await broadcastChatList();
       copilotState();
+    }
+  }
+
+  async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
+    // Read root rather than isOpen, so the cwd below needs no assertion.
+    const root = session.root;
+    if (!root) {
+      broadcast({ type: 'copilot:error', error: 'No project open' });
+      return;
+    }
+    if (!text.trim()) return;
+    const refused = repairing ? REPAIR_UNDER_WAY : await sendRefusal();
+    if (refused) {
+      broadcast({ type: 'copilot:error', error: refused });
+      return;
+    }
+    await runTurn(root, opts, async () => {
+      await chats.recordUser(text);
+      // THE TRANSCRIPT GETS THE PERSON'S WORDS; THE MODEL GETS THE CREDENTIAL TOO.
+      //
+      // Two statements, and the separation is the security property: the token never enters
+      // `.vibeboard/chat/`. A chat file is readable inside the project's box for as long as it exists,
+      // so a token recorded here would be readable by every agent working that project.
+      //
+      // On stdin, in the prompt, rather than argv: `--append-system-prompt` is a command-line argument
+      // and /proc/<pid>/cmdline is world-readable, which agent-turn.ts refuses credentials for by name.
+      //
+      // NOT A CLOSED LEAK, AND SAYING SO: the CLI writes its own session transcript into the box's
+      // `/state`, which every agent on the same (project, backend) shares — so a `work` agent can lift
+      // this credential out of the copilot's session file. Runs have the same exposure and survive it
+      // because their tokens die in minutes; this one lives for a conversation, which is the argument
+      // for ending it eagerly on every chat and project change rather than only on a send. The
+      // exposure and its limits are stated in full in docs/security/containment.md.
+      const credential = await turnCredential(root);
+      return { credential, modelText: await modelCopy(root, text, credential, opts.attach) };
+    });
+  }
+
+  // FIX BOARD (decision 88): a new conversation, `repair` granted to it, and one turn started — in that order
+  // and all on the server, so the grant exists only for a conversation this function made and a turn it began.
+  //
+  // Answers once the turn is under way and does not wait for it: a repair is minutes of model time, and the
+  // person watches it in the copilot panel rather than in a request left open. The turn's own ending is what
+  // ends the grant — `release`, in the `finally` — so a turn that fails, is cancelled, or is killed by an
+  // emergency stop hands the authority back exactly as one that finishes does.
+  //
+  // `repairing` IS SET BEFORE THE FIRST AWAIT, and that is the whole of its job. `copilot.state.running` turns
+  // true only once the box is up, which can be seconds, and in that window a second press would pass every
+  // other check and replace this conversation under the turn about to start in it.
+  async function startRepair(): Promise<{ chat: string } | { error: string }> {
+    const root = session.root;
+    if (!root) return { error: 'No project open' };
+    if (repairing) return { error: REPAIR_UNDER_WAY };
+    repairing = true;
+    let started = false;
+    let credential: Credential | undefined;
+    try {
+      const refused = await sendRefusal();
+      if (refused) return { error: refused };
+      copilot.newSession();
+      await chats.newChat();
+      const chat = await chats.currentId();
+      credential = ctx.copilotAuthority.authorise(chat, root, 'repair');
+      const granted = credential;
+      const frame = fixBoardFrame(forClient(await ctx.autopilot.current()));
+      const apiBase = `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`;
+      const modelText = `${repairCredentialSection(apiBase, granted.token)}\n\n---\n\n${frame}\n\n---\n\n${FIX_BOARD_ASK}`;
+      await chats.recordUser(FIX_BOARD_ASK);
+      // Every tab, so each lands in the new conversation with the ask already in it — the same broadcast a
+      // new chat sends, and the one the panel hydrates from.
+      await sendHistory();
+      ctx.log.warn({ chat }, 'the copilot was given repair authority for one Fix board turn');
+      started = true;
+      void runTurn(root, { mode: 'bypassPermissions' }, async () => ({
+        credential: granted,
+        modelText,
+      })).finally(() => {
+        ctx.copilotAuthority.release(granted);
+        repairing = false;
+        ctx.log.warn({ chat }, 'the Fix board turn settled and its repair authority was withdrawn');
+      });
+      return { chat };
+    } finally {
+      // A refusal, or a throw between the grant and the turn: either way no turn will ever release it.
+      if (!started) {
+        repairing = false;
+        if (credential) ctx.copilotAuthority.release(credential);
+      }
     }
   }
 
@@ -265,5 +348,5 @@ export function createCopilotTurns(ctx: AppCtx): {
     copilotState();
   }
 
-  return { handleMessage: handleCopilotMessage, sendHistory, copilotState };
+  return { handleMessage: handleCopilotMessage, sendHistory, copilotState, startRepair };
 }

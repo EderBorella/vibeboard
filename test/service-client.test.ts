@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import type { TickAction } from '../src/core/tick.js';
+import type { BoardName, Card } from '../src/core/types.js';
 import type { BoardView } from '../src/service/board-client.js';
 import { BoardClient } from '../src/service/board-client.js';
 import { type ActResult, type LoopDeps, runLoop } from '../src/service/loop.js';
@@ -238,6 +239,20 @@ describe('the loop’s sequencing', () => {
     problems: [],
   });
 
+  // And one card, for the single test below that needs a board the machine can be mid-lifecycle on.
+  const aCard = (id: string, board: BoardName, columnSlug: string, links: string[]): Card => ({
+    id,
+    title: id,
+    order: 10,
+    tags: [],
+    links,
+    created: '2026-09-20',
+    board,
+    columnSlug,
+    body: '',
+    filePath: `/tmp/${id}.md`,
+  });
+
   function harness(
     over: Partial<LoopDeps> & { states?: import('../src/core/autopilot-state.js').AutopilotState[] } = {},
   ) {
@@ -265,6 +280,10 @@ describe('the loop’s sequencing', () => {
       // Nothing declared. Every test in this file is about SEQUENCING — which tick read the state, what was
       // dispatched — and reaches no ending that compares a smoke command to a gate.
       commands: async () => ({ gates: [] }),
+      // And nothing already satisfied: no card here carries a criterion, so the real checker would spawn
+      // nothing either. Present rather than absent because the dependency is required — a loop that could
+      // be built without it would be one that silently never checks.
+      satisfied: async () => [],
       act: async (action): Promise<ActResult> => {
         acted.push(action);
         return { dispatches: action.kind === 'dispatch' ? 1 : 0 };
@@ -413,6 +432,51 @@ describe('the loop’s sequencing', () => {
     const ended = await runLoop(deps);
     expect(ended.reason).toBe('stalled');
     expect(said.some((line) => line.includes('could not record the stop'))).toBe(true);
+  });
+
+  // THE ONE THING THE LOOP REMEMBERS BETWEEN TWO TICKS (decision 82), and the only test here driven over a
+  // board mid-lifecycle rather than an empty one — because the fact being carried is about a STORY, and the
+  // tick has to be given one to answer about.
+  //
+  // BOTH ENDS ARE REAL. `decideTick` decides both ticks and `runLoop` carries the value between them; only
+  // `act` is replaced, and it is replaced by the one thing it cannot be asked for here — the result of
+  // running a project's gate commands. A test that faked the tick as well would prove the two fakes agreed.
+  it('carries a send-back act could not record into the next tick, which routes the story to its fix', async () => {
+    const story = (): BoardView => ({
+      config: defaultConfig('T'),
+      boards: {
+        features: [aCard('F-001', 'features', 'in-progress', ['P-001'])],
+        product: [aCard('P-001', 'product', 'in-progress', ['F-001', 'E-001'])],
+        engineering: [aCard('E-001', 'engineering', 'done', ['P-001'])],
+      },
+      problems: [],
+    });
+    const seen: TickAction[] = [];
+    const { deps } = harness({
+      states: [running, running, { ...IDLE_STATE, state: 'stopped' }],
+      client: {
+        board: async () => ({ ok: true, value: story() }),
+        runs: async () => ({ ok: true, value: { runs: [] } }),
+        stopped: async () => ({ ok: true, value: {} }),
+        log: async () => ({ ok: true, value: {} }),
+      } as unknown as LoopDeps['client'],
+      // The gates failed, and there was no run on the card to write the verdict onto — so the action says so
+      // and spends nothing, exactly as `reviewStory` does.
+      act: async (action): Promise<ActResult> => {
+        seen.push(action);
+        return action.kind === 'dispatch' && action.phase === 'story-review'
+          ? { dispatches: 0, unrecordedSendBack: 'P-001' }
+          : { dispatches: 1 };
+      },
+    });
+    await runLoop(deps);
+    // THE SECOND TICK IS THE ASSERTION. Without the value carried, the board has not changed and the second
+    // tick decides what the first did — which is the halt: the gate suite re-run every tick, nothing
+    // dispatched, and `MAX_IDLE_TICKS` ending the project 240 ticks later.
+    expect(seen.map((a) => (a.kind === 'dispatch' ? a.phase : a.kind))).toEqual([
+      'story-review',
+      'story-fix',
+    ]);
   });
 
   it('stops rather than going round in circles for ever', async () => {

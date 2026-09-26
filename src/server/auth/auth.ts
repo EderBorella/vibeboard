@@ -11,12 +11,16 @@ declare module 'fastify' {
 }
 
 const AGENT_SCOPES = ['work', 'checkup', 'service'] as const;
-// Everything that reads the board. `assist` is the chat copilot, which is driven by a person looking
-// at that board, so it reads everything a run does.
-const READ_SCOPES = [...AGENT_SCOPES, 'assist'] as const;
+// The chat copilot in both its forms: authorised for a conversation, or handed a stuck board by Fix board
+// (decision 88). Both are driven by a person looking at the board, and `repair` holds every board verb
+// `assist` does — which is why the board rows below name this pair rather than `assist` alone.
+const COPILOT_SCOPES = ['assist', 'repair'] as const;
+// Everything that reads the board. The copilot is driven by a person looking at that board, so it reads
+// everything a run does.
+const READ_SCOPES = [...AGENT_SCOPES, ...COPILOT_SCOPES] as const;
 // The board verbs the copilot shares with a checkup. Not with `work`: a run is confined to its own
 // card, and the copilot is not a run.
-const BOARD_SCOPES = ['checkup', 'assist'] as const;
+const BOARD_SCOPES = ['checkup', ...COPILOT_SCOPES] as const;
 
 interface Rule {
   scopes: readonly Scope[];
@@ -65,10 +69,17 @@ const RULES: Record<string, Rule> = {
   // sometimes be missing. Every rule this endpoint enforces for a run still applies to it — the credential
   // carries a run id, so `lifecycleRulesForCreate` runs — and the loop is already the caller that stamps
   // `setup: true` and moves cards, so this grants no authority it does not have one door along.
+  //
+  // AND `satisfiedBy` IS ON IT (decision 85), because the seeded `break-down` skill tells an agent to send
+  // that key on the create and this list is where the same prompt says what the create takes. The two
+  // disagreed: the field was absent here, so an agent reading the catalogue it was handed had no reason to
+  // send it and the check would never have fired on a real project. Written here rather than in the skill
+  // for the reason the whole table exists — the payload shape has one home, and three hand-written copies
+  // is what this generator replaced.
   'POST /api/cards': {
     scopes: ['work', 'service', ...BOARD_SCOPES],
     describe:
-      '`{ board, columnSlug, title, description?, body? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
+      '`{ board, columnSlug, title, description?, body?, satisfiedBy? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id. `satisfiedBy` names a gate command this project already declares, copied exactly, and only when that gate IS the card’s one acceptance criterion; it must be a string, and anything else is refused.',
   },
   'PATCH /api/cards/:board/:id': {
     scopes: ['work', ...BOARD_SCOPES],
@@ -87,15 +98,31 @@ const RULES: Record<string, Rule> = {
   },
 
   // Moving is supervision, not work: a work agent must not be able to put its own card in done and
-  // declare itself finished. `/place` is absent deliberately — it is the drag-and-drop verb, and
-  // where in a column a card belongs is a person's judgement about a board they can see.
+  // declare itself finished.
   'POST /api/cards/:board/:id/move': {
-    scopes: ['checkup', 'service', 'assist'],
+    scopes: ['checkup', 'service', ...COPILOT_SCOPES],
     describe: '`{ toColumnSlug }` — move a card to another column on the same board, keeping its id.',
+  },
+  // THE DRAG-AND-DROP VERB, and every scope but `repair` is refused it: where in a column a card belongs is a
+  // person's judgement about a board they can see. `repair` is that judgement made in front of the person
+  // (decision 88), and it needs this because a column's order is what the loop reads as "next" — siblings
+  // ordered against their dependency is one of the ways a board sticks, and `move` can only append.
+  'POST /api/cards/:board/:id/place': {
+    scopes: ['repair'],
+    describe:
+      '`{ toColumnSlug, beforeId }` — put a card in a column in front of the card `beforeId` names, or at the end when `beforeId` is null. The loop takes a column’s cards in this order.',
   },
   'POST /api/cards/:board/:id/archive': {
     scopes: BOARD_SCOPES,
     describe: 'archive a card. It leaves the board and keeps its id; nothing is deleted.',
+  },
+  // THE UNDO OF THE ROW ABOVE, for `repair` alone (decision 88). Archive is the one board verb the copilot holds
+  // with no way back, so a repair that archived the wrong card — or a card whose absence is what stalled the
+  // story above it — would otherwise be left for the person to find in a drawer.
+  'POST /api/cards/:board/:id/restore': {
+    scopes: ['repair'],
+    describe:
+      '`{ toColumnSlug? }` — bring an archived card back to the board, at the end of the column it was archived from unless you name another (the board’s first column when that one is gone). `GET /api/archive/:board` lists them.',
   },
   // THE SERVICE ALONE, and `checkup` is refused as deliberately as `work` is (decision 44). `setup` makes
   // an absent gate set EXPECTED for a whole subtree (decision 51), and `followUp` decides which feature a
@@ -116,7 +143,10 @@ const RULES: Record<string, Rule> = {
     describe:
       '`{ title, body? }` — file a problem you noticed but were not asked to fix, so it is not lost and not acted on unasked.',
   },
-  'GET /api/suggestions': { scopes: ['checkup', 'service', 'assist'], describe: 'the open suggestions.' },
+  'GET /api/suggestions': {
+    scopes: ['checkup', 'service', ...COPILOT_SCOPES],
+    describe: 'the open suggestions.',
+  },
   // PATCH is absent on purpose: triage is the human's, and the checkup's in slice C through its own
   // path. A run marking its own finding `dismissed` would close the channel from the inside.
 
@@ -132,10 +162,19 @@ const RULES: Record<string, Rule> = {
   // The diary. The SERVICE writes it — loop step 12 appends a run's summary after every dispatch, and
   // the service is a separate process reaching the board over HTTP like anything else. Both working
   // scopes are absent deliberately: a run already reports that summary, so an agent writing here would
-  // be a second path to one fact. Reading is absent for every scope — admin-only, like triaging a
-  // suggestion — because nothing an agent does needs the project's narrative, and an agent reading how
-  // the last ten runs went is an agent reasoning about the loop that is running it.
+  // be a second path to one fact. Reading is refused to every autonomous scope and to `assist` — nothing
+  // they do needs the project's narrative, and an agent reading how the last ten runs went is an agent
+  // reasoning about the loop that is running it.
   'POST /api/log': { scopes: ['service'], describe: "append a line to the project's diary." },
+  // EXCEPT A REPAIR, which is reasoning about exactly that and is meant to be (decision 88). No loop is running
+  // it — Fix board refuses while one is — and the line that found the real incident was a diary line: "E-214
+  // moved to done: its story's implement-story run delivered it." The file is readable in its box already;
+  // this is the same text with the entries parsed.
+  'GET /api/log': {
+    scopes: ['repair'],
+    describe:
+      "the project's diary, oldest first: what each dispatch did to which card, and why the loop stopped.",
+  },
 
   // The toolchain. OPEN TO EVERY WORKING SCOPE, deliberately: an agent that cannot install what a
   // job needs is an agent that reports the job as impossible. It installs into the container the
@@ -161,8 +200,16 @@ const RULES: Record<string, Rule> = {
   // handed the ADMIN token instead — which is decisions 10 and 21 collapsing in one step. Same reasoning
   // as `GET /api/accounting`, and the working scopes are refused for the same reason: an agent that can
   // see every run in the project is an agent reasoning about its own leash.
-  'GET /api/runs': { scopes: ['service'], describe: 'every run record in the project.' },
-  'GET /api/runs/:board/:card': { scopes: ['service'], describe: "one card's run records." },
+  //
+  // `repair` reads both because a card's history IS the evidence (decision 88), and it has no leash to reason
+  // about: it dispatches nothing. The records sit in its box's read-only mount already, so the row adds the
+  // server's own count of attempts against the cap, not a reach.
+  'GET /api/runs': { scopes: ['service', 'repair'], describe: 'every run record in the project.' },
+  'GET /api/runs/:board/:card': {
+    scopes: ['service', 'repair'],
+    describe:
+      "one card's run records, oldest first, and `account.attempts` — how many attempts each skill has used against `account.attemptCap`, counted the way the loop counts them.",
+  },
 
   // The verdict on a run, written by the loop that judged it (decision 18). Neither working scope may reach
   // it: a run that could write its own verification would be a run advancing itself on self-assessment,
@@ -170,6 +217,31 @@ const RULES: Record<string, Rule> = {
   'POST /api/runs/:board/:card/:run/verification': {
     scopes: ['service'],
     describe: "write a run's verdict.",
+  },
+
+  // CLEARING SPENT ATTEMPTS, and `repair` is the only scope that may (decisions 86 and 88). Every autonomous
+  // scope is refused for the reason the routes give: an agent able to clear its own card's attempts has
+  // unlimited retries, and the reset also clears the creating run that bounds a checkup. `repair` is not that
+  // agent. It is minted for one Fix board turn, it belongs to no card and no run, it cannot dispatch — so no
+  // attempt it clears is ever its own — and it exists because a card whose failures have a cause that is gone
+  // was a card only a person could free.
+  //
+  // `:card` AND NOT `:id`, which the preHandler reads as "no card". Harmless here, because none of these carries
+  // an own-card rule, and nothing may rely on that: the bound is that `repair` is the only scope named.
+  'POST /api/runs/:board/:card/forgive': {
+    scopes: ['repair'],
+    describe:
+      "clear a card's FAILED attempts so auto-pilot will try it again. A run that succeeded still counts. Only where the cause of the failures is gone; refused while a run on the card is unfinished.",
+  },
+  'POST /api/runs/:board/:card/reset': {
+    scopes: ['repair'],
+    describe:
+      'clear EVERY attempt a card has spent, successes included — so a checkup or break-down that already created work may create it again. Only when the forgive above would leave the card at its cap and the cause is gone; refused while a run on the card is unfinished.',
+  },
+  'POST /api/runs/project/forgive': {
+    scopes: ['repair'],
+    describe:
+      "clear the failed attempts of the project's own runs — the derivation of an empty board, which has no card. Refused while one is unfinished.",
   },
 
   // The loop saying why it stopped. The service alone: the other three controls are admin-only because a
@@ -334,6 +406,12 @@ export function registerAuth(
     // here would refuse every run in the project.
     if (!bearer && !sameOrigin(req)) return reply.code(403).send({ error: CROSS_ORIGIN });
     req.credential = cred;
+    // `:id` AND NOTHING ELSE, which is a naming convention rather than a rule. The run routes spell their
+    // card segment `:card`, so one of those reaches `allows` with no card and an `ownCard` row on it would
+    // DENY every agent rather than confine one. That direction is safe, and it is still an accident — the
+    // bound on `/runs/:board/:card/reset` and `/forgive` is that their rows name `repair` and nothing else,
+    // asserted row by row in test/auth.test.ts, and never this. Widening the read to `:card` would make the table
+    // able to express a confinement it has never been asked for; the comment is the cheaper answer.
     const { id } = req.params as { id?: string };
     if (!allows(cred, req.method, req.routeOptions.url ?? '', openProject(), id)) {
       return reply.code(403).send({ error: 'Forbidden' });

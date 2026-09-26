@@ -116,8 +116,8 @@ describe('the express section', () => {
   // down is a section about the wrong subject, and the reader has no way to know it does not apply.
   it('says nothing to a phase it has no size for', () => {
     const text = build({
-      skill: skillNamed(phase('task-implement').skill ?? ''),
-      card: card('engineering'),
+      skill: skillNamed(phase('story-implement').skill ?? ''),
+      card: card('product'),
       express: true,
     });
     expect(text).not.toContain(HEADING);

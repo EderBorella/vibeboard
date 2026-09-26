@@ -101,6 +101,7 @@ async function bar(state: AutopilotState | null, sandbox: SandboxState | null = 
       onChanged={vi.fn()}
       onBackendChanged={vi.fn()}
       onSettings={vi.fn()}
+      onRepairing={vi.fn()}
     />,
   );
   await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());

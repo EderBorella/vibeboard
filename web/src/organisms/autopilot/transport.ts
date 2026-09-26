@@ -60,6 +60,10 @@ export interface TransportModel {
   //
   // Disabled while halted, because there is nothing left to kill and the way back is the overlay.
   emergency: { disabled: boolean; title: string };
+  // FIX BOARD, beside the emergency stop (decision 88). Disabled on the three states the server refuses it in
+  // — a running loop, a halt, an agent still at work — with the title saying which, so the button is never a
+  // dead end with no reason. The server's refusal is still the rule; this only spares the round trip.
+  repair: { disabled: boolean; title: string };
   // WHY it stopped, in full, when there is more to say than fits on a line.
   //
   // Separate from `status` because `status` is a row: one line, ellipsised, and these sentences are
@@ -215,6 +219,25 @@ function statusFor(state: AutopilotState | null, doing: ActiveWork[], missing: s
   return '';
 }
 
+// Why Fix board cannot be pressed, in the order the server asks, or the button's own description.
+function repairTitle(running: boolean, halted: boolean, working: number): string | null {
+  if (running) return 'Auto-pilot is running. Soft-stop it before handing the board to the copilot.';
+  if (halted) return 'This project is halted. Restart it from the overlay first.';
+  if (working > 0) return 'An agent is still working on this project. Wait for it to finish first.';
+  return null;
+}
+
+function repairModel(running: boolean, halted: boolean, working: number): TransportModel['repair'] {
+  const refused = repairTitle(running, halted, working);
+  return refused
+    ? { disabled: true, title: refused }
+    : {
+        disabled: false,
+        title:
+          'Hand this board to the copilot to find out why it is stuck and repair it, with elevated powers over the board for one conversation. Asks first.',
+      };
+}
+
 export function transportModel(input: {
   state: AutopilotState | null;
   runs: RunList;
@@ -264,5 +287,6 @@ export function transportModel(input: {
         ? 'Already halted. Restart it from the overlay.'
         : 'Kill every agent in this project and halt it. Asks first.',
     },
+    repair: repairModel(running, halted, doing.length),
   };
 }

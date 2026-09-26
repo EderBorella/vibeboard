@@ -100,6 +100,12 @@ two `docker image inspect`s. A start missing one builds it here, streaming into 
 minutes on a first run — also correct, and the reason that build lives in the start script rather than in
 a command somebody has to know about.
 
+**One line is not silence, and it is not a failure.** If the images' CLIs are not the host's, the start
+prints `vibeboard-agent:base has Claude Code … where this machine has …` (or, for an image built before
+the versions were recorded, `… cannot be shown to match …`) and builds nothing. `docker image inspect
+vibeboard-agent:latest --format '{{json .Config.Labels}}'` shows what an image records; after a rebuild
+the web layer must carry the same `io.vibeboard.cli.*` values as the base.
+
 **On the first start after upgrading into kinds, a multi-minute build here is the expected case**, not a
 finding: a machine whose `vibeboard-agent:latest` predates the split has no `vibeboard-agent:base`, so the
 base is built and the web layer, which already exists under its old tag, is left alone. Expect a line per
@@ -108,10 +114,12 @@ says which.
 
 ## A2. The refusals refuse
 
-`POST /api/boxes/build` with an empty body. With **both** images present it must answer
-`{"ok":true,"already":true}`, do nothing, and — the part that is easy to miss — send no `box:build` frames
-at all: with Settings open, the build log must not flash into "running" and back for a build that did not
-happen. With only one of the two present it builds the other and answers `already: false`.
+`POST /api/boxes/build` with an empty body. With **both** images present and holding the host's CLI
+versions it must answer `{"ok":true,"already":true}`, do nothing, and — the part that is easy to miss — send
+no `box:build` frames at all: with Settings open, the build log must not flash into "running" and back for a
+build that did not happen. With only one of the two present it builds the other and answers
+`already: false`; with an image whose CLIs are behind the host it rebuilds both, base first, and answers
+`already: false`.
 
 Then the delete guards, which are the important ones, because this is the only recursive delete a user
 can aim. **All four must refuse and nothing may be removed:**
@@ -229,7 +237,14 @@ Runs, and everything that judges them.
 - **Cancel a run** mid-flight (`POST /api/runs/:run/cancel`). It must record `cancelled`, and a
   cancellation must not burn an attempt.
 - **Forgive attempts** on a card (`POST /api/runs/:board/:card/forgive`) and the project-level one
-  (`/runs/project/forgive`). Both are the human override for a card the machine has cornered.
+  (`/runs/project/forgive`). Both spare a run that SUCCEEDED, deliberately: clearing a break-down that
+  worked frees the loop to hang a second set of children off the card.
+- **Reset a card** (`POST /api/runs/:board/:card/reset`), the third override and the only one that clears
+  a success. It is the button beside the forgive on the ledger line — *Reset all*, against that one's *Clear failed tries*. Read the
+  confirmation: it has to say the loop may create that work again, because that is the price. Make a card
+  whose only spent runs are successes, watch *Clear failed tries* report **nothing was cleared**, then
+  reset it and watch the count go to zero. That card is the state this control exists for, and the forgive
+  cannot reach it by design.
 - **Resolve** a run that needs it — the card version and the project version are different routes on
   purpose (`/runs/:board/:card/:run/resolve`, `/project-runs/:run/resolve`).
 - **The verdict on a run** (`…/:run/verification`) is written by the loop that judged it and is
@@ -331,6 +346,10 @@ reach them by accident.
 - **Restart** (`/restart`) clears the halt and the overlay.
 - **Gates reviewed** (`/autopilot/gates-reviewed`) — a person confirming they have read commands an agent
   wrote. An agent must not be able to clear it.
+- **Reset the card the stop names**, under a `stalled` bar. The picker offers only cards this project has
+  RUN something on, and comes up already aimed at the id the stop sentence mentions — a sentence naming two
+  preselects neither. It is the same write as the card pane's, addressed from where the problem is met, and
+  it must not appear on `complete`, on `stopped` or while the loop is running.
 - **Kill in one tab raises the overlay in another.** Open two, and check.
 
 ## B8. Settings
@@ -341,6 +360,9 @@ reach them by accident.
 - **Context budget**, and the bar that reads it.
 - **Agent sandbox**: what it says about containment, *Rebuild the agent boxes*, and — only when the image
   is what is missing — *Build the agent image*. It must **not** offer to build when the daemon is down.
+  When the image's CLIs are behind the host's it says by how much and offers *Rebuild the agent image*
+  instead; after that build it says that running boxes keep the old image, and the note goes once the
+  boxes are thrown away.
 - **The OpenCode server**, on that backend only: *Restart server* (`POST /api/opencode/restart`) and,
   when `VIBEBOARD_OPENCODE_URL` is set, *Take over with a managed server* (`/takeover`). Claude Code
   spawns a process per turn and has no server, so neither button may appear for it.

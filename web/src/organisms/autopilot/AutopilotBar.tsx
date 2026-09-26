@@ -7,6 +7,7 @@ import { stateClass } from '../../design/state-tones';
 import {
   type AutopilotState,
   acknowledgeGates,
+  fixBoard,
   killAutopilot,
   patchConfig,
   type RunList,
@@ -21,12 +22,13 @@ import { StatusChip } from '../../molecules/StatusChip';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import { List } from '../shared/List';
-import { killProjectRequest } from '../shared/requests';
+import { fixBoardRequest, killProjectRequest } from '../shared/requests';
 import { type LightAdvice, lightAdvice } from '../topbar/connection-light';
 import { AutopilotHelp } from './AutopilotHelp';
 import { FocusPicker } from './FocusPicker';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { LifecyclePicker } from './LifecyclePicker';
+import { ResetCard } from './ResetCard';
 import { ReviewFeatures } from './ReviewFeatures';
 import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
@@ -57,6 +59,9 @@ interface Props {
   onBackendChanged: () => void;
   // Where the caps and the routing table live. The stops are HERE now — see below.
   onSettings: () => void;
+  // Fix board has been confirmed and is about to be asked for: the shell opens the copilot panel, where the
+  // repair's conversation arrives over the socket, so the person lands watching it rather than looking for it.
+  onRepairing: () => void;
 }
 
 // Headings for the three ways a project can be unable to run an agent. They come from `refusalKind`,
@@ -277,6 +282,7 @@ export function AutopilotBar({
   onChanged,
   onBackendChanged,
   onSettings,
+  onRepairing,
 }: Props) {
   const [open, setOpen] = useState(false);
   // The server's own words on a refusal. A refusal names what is missing, and swallowing it turns the
@@ -286,6 +292,8 @@ export function AutopilotBar({
   // the emergency stop go dead while a backend write is in flight — two controls reporting an act that
   // is not theirs.
   const { busy: switching, error: switchError, run: runSwitch } = useAction();
+  // Fix board's own, for the same reason: its request must not read as the play button starting.
+  const { busy: repairing, error: repairError, run: runRepair } = useAction();
   const [helpOpen, setHelpOpen] = useState(false);
   // Re-asked whenever the project changes or the loop's state does: fixing a blocker and pressing play
   // should not require a reload, and stopping may have been caused by one.
@@ -376,6 +384,23 @@ export function AutopilotBar({
     });
   }
 
+  // Whichever of the three actions the server last refused. Named once rather than written out at both of its
+  // uses, which is also what keeps the bar under the complexity ceiling.
+  const refused = error ?? switchError ?? repairError;
+
+  // FIX BOARD (decision 88). Asks first, naming the powers it hands over; then the panel opens and the request
+  // goes. The shell is told BEFORE the request so the conversation is on screen when its first words arrive —
+  // a refusal still lands here, in the bar's own banner, with the server's sentence.
+  function repair(): void {
+    void confirm(fixBoardRequest()).then((ok) => {
+      if (!ok) return;
+      void runRepair(async () => {
+        onRepairing();
+        await fixBoard();
+      });
+    });
+  }
+
   return (
     // `vb-tone-*` AND NOT `ap-bar-${tone}`. Four classes lived only inside that template literal, which
     // is the *Risks* defect, and each of them named a token of its own — including `var(--ok, #3fb950)`,
@@ -402,6 +427,19 @@ export function AutopilotBar({
           onClick={kill}
         >
           <Icon name="close" /> Emergency stop
+        </Button>
+
+        {/* FIX BOARD, directly after the emergency stop, on the owner's placement: the stop is how you end a
+            loop that is doing the wrong thing, and this is what you reach for when it has stopped and nothing
+            will move it. `default` for the stop's own reason — a control people should read, not skim. */}
+        <Button
+          className="vb-fixed"
+          disabled={model.repair.disabled || repairing !== null}
+          title={model.repair.title}
+          data-testid="ap-fix-board"
+          onClick={repair}
+        >
+          <Icon name="tool" /> Fix board
         </Button>
 
         <TransportChip model={model} />
@@ -543,11 +581,11 @@ export function AutopilotBar({
         </Stack>
       </Stack>
 
-      {/* One banner for both actions. They cannot be in flight together — each disables its own
-          control — and a refused backend write is as much "the server said no" as a refused start. */}
-      {(error ?? switchError) && (
+      {/* One banner for every action. Each disables its own control while it is in flight, and a refused
+          backend write or a refused Fix board is as much "the server said no" as a refused start. */}
+      {refused && (
         <Text role="error" className="ap-bar-error" testId="ap-bar-error">
-          {error ?? switchError}
+          {refused}
         </Text>
       )}
 
@@ -577,6 +615,14 @@ export function AutopilotBar({
           the result on its own line under the button. */}
       <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
+        {/* THE SAME RESET THE CARD PANE OFFERS, ADDRESSED FROM THE STOP SENTENCE (decision 86).
+            `ForgiveDerivation` answers the position with no card; this answers a card the loop has just
+            named, and it takes `detail` for that reason — the control comes up aimed at whatever that
+            sentence mentioned, so nobody has to go and find the card first. The remedy itself is NOT
+            confined to here: `ResetAttempts` sits on the card's own ledger line, because this one
+            renders while the loop reports `stalled` and a stranded card must be recoverable whatever
+            auto-pilot last said. */}
+        <ResetCard reason={state?.reason} detail={state?.detail} runs={runs} onReset={onChanged} />
         {/* DECISION 74 — the other thing that can be beside a stop sentence, and the only one that is not a
             repair. It sits here for the reason the row above it cannot take it: three controls do not fit on
             a bar that already wants 1504px of the 1277 it has. */}

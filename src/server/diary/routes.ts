@@ -12,9 +12,10 @@ import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 // would be a second path to the same fact — and the file itself sits in `.vibeboard/`, which every agent
 // box mounts read-only (docs/security/containment.md), so this endpoint is what exists instead.
 //
-// `GET` is in no scope at all, admin-only by absence, like triaging a suggestion. Nothing an agent does
+// `GET` is refused to every autonomous scope and to `assist`, like triaging a suggestion. Nothing they do
 // needs the project's narrative, and an agent reading how the last ten runs went is an agent reasoning
-// about the loop that is running it.
+// about the loop that is running it. `repair` alone reads it (decision 88): Fix board runs only while no
+// loop is, and the diary is where a card's history is told in order.
 //
 // There is no `PATCH` and no `DELETE`, and that absence is the whole enforcement of append-only.
 

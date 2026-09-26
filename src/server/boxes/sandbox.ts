@@ -1,3 +1,4 @@
+import { type CliVersions, cliDrift } from './cli-versions.js';
 import { BASE_IMAGE, dockerBin, execArgs } from './containers.js';
 
 // The agent sandbox: a Docker container per (project, backend), and the only place an agent runs.
@@ -33,8 +34,14 @@ import { BASE_IMAGE, dockerBin, execArgs } from './containers.js';
 // 2026-08-16: an OpenCode server was destroyed under a live URL, every dispatch died in 449ms with
 // `fetch failed`, three attempts were spent in five seconds — and both lights stayed green, because nothing
 // was refusing and nothing had asked.
+//
+// `stale` is on BOTH sides and refuses nothing. It says an image's CLIs are not the host's, which is a
+// reason to rebuild it and not a reason to stop: the three hundred runs that found it all went through a
+// box on 2.1.221 while the host was on 2.1.280, and refusing would turn every host update — and every
+// image built before the versions were recorded — into an outage lasting until somebody spent minutes on
+// a build.
 export type SandboxStatus =
-  | { ok: true; image: string }
+  | { ok: true; image: string; stale?: string }
   | {
       ok: false;
       reason: string;
@@ -44,6 +51,7 @@ export type SandboxStatus =
       // a daemon that is not running is a button that cannot work — the fault a user reads and the
       // remedy a user is offered have to be the same fault.
       buildable?: true;
+      stale?: string;
     };
 
 // `docker`, because "not requested" is a statement about the container layer: nothing asked for a box,
@@ -53,7 +61,9 @@ export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested'
 interface SandboxProbe {
   // The image is a parameter because there are two of them: the web layer a box's kind may select, and
   // the shared base every other kind is built from. Optional, so the default answers for the default.
-  probe(image?: string): Promise<{ ok: true } | { ok: false; reason: string; missing?: 'daemon' | 'image' }>;
+  probe(
+    image?: string,
+  ): Promise<{ ok: true; built?: CliVersions } | { ok: false; reason: string; missing?: 'daemon' | 'image' }>;
 }
 
 // Whether the box is holding the credential the host currently has. Injected as a bare thunk rather
@@ -71,6 +81,10 @@ export type CredentialCheck = () => Promise<{ fresh: true } | { fresh: false; re
 // every probe or prove nothing — this status therefore means slightly more for one backend than the other,
 // which is worth saying out loud rather than papering over.
 export type BackendCheck = () => Promise<{ live: true } | { live: false; reason: string }>;
+
+// THE HOST'S CLI VERSIONS, to hold the images' labels up against. A thunk for the reason the other two
+// are; `cli-versions.ts` is the implementation, and it keeps a cache of its own — see there for why.
+export type HostCliCheck = () => Promise<CliVersions>;
 
 // A LIVE answer, because the startup one was wrong the moment anybody touched Docker.
 //
@@ -105,7 +119,17 @@ export function liveSandbox(
   // ONE cache for both halves, under the one TTL, behind the one shared in-flight promise. A second
   // cache for the credential would be a second thing to expire, and the two would then disagree for up
   // to a second at a time — which is the whole class of bug the live status was introduced to end.
-  opts: { ttlMs?: number; now?: () => number; credential?: CredentialCheck; backend?: BackendCheck } = {},
+  //
+  // THE HOST'S VERSIONS ARE THE EXCEPTION, and they sit behind a longer cache of their own: reading them is
+  // two process spawns, and what a stale reading can get wrong is when the rebuild button appears, which
+  // gates nothing.
+  opts: {
+    ttlMs?: number;
+    now?: () => number;
+    credential?: CredentialCheck;
+    backend?: BackendCheck;
+    host?: HostCliCheck;
+  } = {},
 ): LiveSandbox {
   const ttl = opts.ttlMs ?? SANDBOX_TTL_MS;
   const now = opts.now ?? Date.now;
@@ -116,7 +140,7 @@ export function liveSandbox(
   return async () => {
     if (cached && now() - cached.at < ttl) return cached.status;
     if (inFlight) return await inFlight;
-    inFlight = probeSandbox(service, image, opts.credential, opts.backend)
+    inFlight = probeSandbox(service, image, opts.credential, opts.backend, opts.host)
       .then((status) => {
         cached = { at: now(), status };
         return status;
@@ -134,6 +158,7 @@ export async function probeSandbox(
   image: string,
   credential?: CredentialCheck,
   backend?: BackendCheck,
+  host?: HostCliCheck,
 ): Promise<SandboxStatus> {
   // BOTH IMAGES, because a box is built from EITHER of them. `imageForKind` sends a `game` or `research`
   // project to the shared base, so a machine whose `:latest` predates the split — every machine that
@@ -149,26 +174,44 @@ export async function probeSandbox(
   if (!base.ok && base.missing !== 'image') return { ok: false, reason: base.reason, kind: 'docker' };
   // The base first, because that is the order they are built in: a machine missing both is about to be
   // told what it is missing in the order it will get it.
-  const absent: string[] = [];
-  if (!base.ok) absent.push(base.reason);
-  if (!web.ok) absent.push(web.reason);
   // ORDER IS THE BEHAVIOUR, and only the docker answer decides whether the second question is even
   // asked. A missing daemon or a missing image is the more fundamental fault — the credential check
   // cannot run without docker anyway, and if it could, "rebuild the agent boxes" is useless advice to
   // someone whose image was never built. The first message is the one that helps, so it is the one
   // that survives; the credential fault is still there and is reported the moment docker is.
-  if (absent.length > 0) {
+  if (!base.ok || !web.ok) {
+    const absent: string[] = [];
+    if (!base.ok) absent.push(base.reason);
+    if (!web.ok) absent.push(web.reason);
     return { ok: false, reason: absent.join('; '), kind: 'docker', buildable: true as const };
   }
+  // Asked only once both images are there: a missing one is the fault a build fixes, and it is the one said.
+  const stale = host ? staleImage([BASE_IMAGE, base.built], [image, web.built], await host()) : undefined;
+  const said = <T extends SandboxStatus>(status: T): T => (stale ? { ...status, stale } : status);
   const cred = await credential?.();
-  if (cred && !cred.fresh) return { ok: false, reason: cred.reason, kind: 'credential' };
+  if (cred && !cred.fresh) return said({ ok: false, reason: cred.reason, kind: 'credential' });
   // LAST, and the order is the same argument again. A dead credential and an unanswering server are true
   // together far more often than either is true alone — an expired sign-in is WHY a server would be refusing
   // — and "fix your sign-in" is the sentence that helps. Asking anyway would also spend a request per probe
   // on a server that cannot work until the credential is fixed.
   const live = await backend?.();
-  if (live && !live.live) return { ok: false, reason: live.reason, kind: 'backend' };
-  return { ok: true, image };
+  if (live && !live.live) return said({ ok: false, reason: live.reason, kind: 'backend' });
+  return said({ ok: true, image });
+}
+
+// THE FIRST IMAGE BEHIND THE HOST, in build order. The web layer stands on the base and holds its CLIs, so
+// a base that is behind almost always has a web layer behind with it — and rebuilding the base rebuilds
+// the layer above, so naming the base once says everything the button is about to do.
+function staleImage(
+  base: [string, CliVersions | undefined],
+  web: [string, CliVersions | undefined],
+  host: CliVersions,
+): string | undefined {
+  for (const [name, built] of [base, web]) {
+    const drift = cliDrift(built ?? {}, host);
+    if (drift !== null) return `${name} ${drift}`;
+  }
+  return undefined;
 }
 
 // `aa-exec -p <profile> -- bin args` became `docker exec -w /work <box> bin args`.

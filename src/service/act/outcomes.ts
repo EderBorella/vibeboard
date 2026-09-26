@@ -8,6 +8,7 @@ import { BOARDS, type BoardName, type Card } from '../../core/types.js';
 import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
+import { deliverGroup } from './group.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused } from './refusals.js';
 import {
@@ -24,9 +25,9 @@ import {
 // them applies is decided here and nowhere else, so the order the questions are asked in is the behaviour.
 
 // THE THREE PHASES WHOSE ONLY PRODUCT IS CARDS (decision 43). Named here rather than derived from `creates`,
-// because the two checkups declare a `creates` too and this rule must not touch them: a checkup's product is a
-// REPORT, creating is optional, and a checkup that creates nothing is the ordinary closing case (decision 47) —
-// applied to them, this would refuse every close.
+// because the feature checkup and the story's judgement declare one too and this rule must not touch them:
+// a judging run's product is a VERDICT, creating is optional, and one that creates nothing is the ordinary
+// closing case (decision 47) — applied to them, this would refuse every close.
 const CREATING_PHASES: readonly PhaseName[] = ['bootstrap', 'feature-breakdown', 'story-breakdown'];
 
 // AND THE PHASE WHOSE TWO EXITS DIFFER BY THE SAME COMPARISON. A feature checkup that created stories has
@@ -77,7 +78,6 @@ export async function afterCardRun(
   // already in scope. A field on the run record would be a second copy of a fact with one reader.
   smoke: Verification | undefined,
 ): Promise<ActResult> {
-  const p = phase(action.phase);
   // An ending nobody is answerable for: the user cancelled it, a restart left it stale, the MACHINE
   // failed rather than the work, or a person has forgiven it. No attempt is burned (accounting.ts),
   // and the card does not move — as far as the card is concerned the work never happened.
@@ -114,7 +114,8 @@ export async function afterCardRun(
   if (emptied) return emptied;
 
   // AND A FEATURE CHECKUP THAT DID GROW IT takes its other exit: the feature stays open and L2 walks the
-  // stories it created (decision 47 allows that once, and `creatingRoundSpent` is what bounds it).
+  // stories it created (decision 47 allows that once; `creatingRoundStop` in core/lifecycle/tick.ts is what
+  // bounds it, and since decision 86 it re-opens only once that created work is itself finished).
   if (grew === true && HOLDS_OPEN_HAVING_CREATED.includes(action.phase)) {
     return await heldOpen(deps, action, card, settled, context);
   }
@@ -122,19 +123,24 @@ export async function afterCardRun(
   // AND A `failed` RUN NEVER ADVANCES ITS CARD — decision 40's third clause, asserted on its own because
   // `producedNothing` does not cover it. A run killed by the clock after touching one file HAS changed a file,
   // and one whose report claimed success before the clock got it HAS an `outcome`, so neither of that
-  // predicate's other two clauses holds and both reached the exit stamp. The worst case is a checkup, whose
-  // `exitPass` is `done`: a dead run must not be able to close a story or a feature.
+  // predicate's other two clauses holds and both reached the exit stamp. The worst case reaching HERE is the
+  // feature checkup, whose `exitPass` is `done`: a dead run must not be able to close a feature. The story's
+  // judgement has the same exit and does not come through this function at all since decision 80 — its
+  // gates-first path bypasses it, so `judge` in review.ts asserts the clause again for itself.
   //
   // No verdict, deliberately. The attempt is burned by the record (accounting.ts) and the card retries its OWN
-  // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending
-  // the fix budget on a run that produced no finding to fix.
+  // phase until that phase's cap gives up — a failed verdict here would spend the fix budget on a run that
+  // produced no finding to fix.
   if (settled.status === 'failed') return await recordFailedRun(deps, action, card, settled, context);
 
   // DECISION 69, AND IT REVERSES HALF OF RULING 55. That ruling made the smoke result EVIDENCE rather than a
   // gate, so a failing one could not stall a project — and the consequence was a feature closing over a product
   // that does not run, which is the whole of decision 66's incident. What has changed since is that the
-  // objection is answered elsewhere: `creatingRoundSpent` already stops a feature after one round of created
-  // work, with a sentence asking for a person, so refusing the close here cannot loop forever.
+  // objection is answered elsewhere: `creatingRoundStop` stops a feature whose created work nobody finished,
+  // with a sentence asking for a person, and the `checkup-feature` attempt cap ends it in every other case —
+  // so refusing the close here cannot loop forever. NAMED AS TWO BOUNDS since decision 86, because it is: the
+  // creating round re-opens when the work it asked for lands, and what stops a feature whose smoke keeps
+  // failing over work that keeps landing is the cap rather than that stop.
   //
   // THE MACHINE DECIDES, NOT THE MODEL, which is the point. Asked to judge a failing smoke, a model reads the
   // output and talks itself into "environmental" — observed twice on 2026-09-03, once correctly and once from a
@@ -163,20 +169,56 @@ export async function afterCardRun(
     return { dispatches: 1 };
   }
 
+  return await earnedItsExit(deps, action, card, settled, context);
+}
+
+// WHAT A RUN THAT EARNED ITS EXIT LEAVES BEHIND, and the ORDER is the behaviour. One function rather than
+// three blocks at the end of `afterCardRun`, which the complexity gate decides: that function is at the
+// ceiling, and flattening beats a suppression.
+async function earnedItsExit(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  const p = phase(action.phase);
+  // THE CARDS ONE LEVEL DOWN THIS RUN DELIVERED, stamped TOGETHER and before anything else in here
+  // (decision 83), into the column where they wait for their story's judgement (decision 87). What
+  // "together" buys is held by test/service-act-group.test.ts: a refusal part-way returns from this line, so
+  // no exit stamp is written and the diary does not report the run as completed — the side the machine
+  // recovers from, because the next dispatch re-forms the group out of what is left.
+  //
+  // BEING AHEAD OF THE EXIT STAMP IS DEFENSIVE, AND NOTHING EXERCISES IT — said plainly rather than as a
+  // live rule, because the two phases that carry a group never move their card here: `story-implement`'s
+  // `exitPass` IS its `entry`, and `story-fix` has none, so `moved` below is always undefined and no test can
+  // tell the two orders apart. It is written this way for the table row that does not exist yet: a
+  // group-carrying phase whose exit differed from its entry would advance its card while a task under it was
+  // still outstanding, and the level above is judged on its children.
+  const group = await deliverGroup(deps, action, 1);
+  if (group) return group;
+
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
-  if (p.exitPass) {
-    const stamped = await stamp(deps, card, p.exitPass, `its ${action.skill} run completed.`);
+  //
+  // AND ONLY WHERE THE CARD IS NOT ALREADY THERE, which is the same care `stampEntry` and `recordVerdict`
+  // each take at their own end. The entry stamp has already run, so where the card stands now is the phase's
+  // `entry` if it declares one — and `story-implement` exits into the column it runs in, so without this it
+  // would move a story to where it stands and write a diary line about an event that did not happen.
+  const at = p.entry ?? card.columnSlug;
+  const moved = p.exitPass !== undefined && p.exitPass !== at ? p.exitPass : undefined;
+  if (moved !== undefined) {
+    const stamped = await stamp(deps, card, moved, `its ${action.skill} run completed.`);
     // `dispatches: 1` EVEN HERE, and that is not tidiness: a dispatch that happened and then failed to move
     // its card was reported as no dispatch at all, so neither cap was told about a real agent run, the tick
     // counted as idle, and the next tick re-picked the same card and dispatched over work that had already
     // passed — three times over, until the attempt cap caught it.
     if (!stamped.ok) {
-      return refused(deps, `could not advance ${card.id} to ${p.exitPass}`, stamped.reason, stamped.fatal, 1);
+      return refused(deps, `could not advance ${card.id} to ${moved}`, stamped.reason, stamped.fatal, 1);
     }
   }
   // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
   // and `outcome` precisely so the diary's readers do not have to regex prose.
-  await deps.client.log('run', runLine(card, action, settled, p.exitPass, context), {
+  await deps.client.log('run', runLine(card, action, settled, moved, context), {
     iteration: context.iteration + 1,
     card: card.id,
     board: card.board,

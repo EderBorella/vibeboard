@@ -15,7 +15,16 @@ import type { BoardName } from '../../core/types.js';
 // types, so it gets the board verbs a checkup has without being confined to one card — and it gets
 // the one control-plane write, which no autonomous scope may have. It gets nothing the loop counts:
 // no dispatch, no diary, no accounting, no verdicts.
-export type Scope = 'work' | 'checkup' | 'service' | 'assist' | 'admin';
+//
+// `repair` IS THE SAME COPILOT, HANDED A STUCK BOARD (decision 88). It is minted by Fix board alone, for the
+// one turn that button starts, and holds `assist`'s board verbs plus the three a person used to have to do by
+// hand to unstick one: clearing attempts, placing a card within its column, restoring an archived card. It
+// drops what `assist` holds that is not the board — the foundation documents, the toolchain, setup's rows —
+// because its input is card text, and card text is the thing anyone can write.
+export type Scope = 'work' | 'checkup' | 'service' | 'assist' | 'repair' | 'admin';
+
+// The two scopes a copilot conversation can hold. Named so a signature can refuse the other four.
+export type ChatScope = Extract<Scope, 'assist' | 'repair'>;
 
 export interface Credential {
   token: string;
@@ -153,8 +162,8 @@ export class CredentialStore {
   // than to a run — so `expireRun(chatId)` retires it when the conversation ends, with no second
   // index and no new machinery. A chat is not a run and has no card, which is exactly the shape
   // `mintRun` already produces for a `service` credential.
-  mintChat(chat: string, project: string): Credential {
-    return this.mintRun('assist', chat, project);
+  mintChat(chat: string, project: string, scope: ChatScope = 'assist'): Credential {
+    return this.mintRun(scope, chat, project);
   }
 
   // Called when a run settles. Scanned rather than indexed by run id: the map only ever holds the
@@ -164,6 +173,12 @@ export class CredentialStore {
     for (const [token, cred] of this.#byToken) {
       if (cred.run === run) this.#byToken.delete(token);
     }
+  }
+
+  // One credential, by its token. For a holder that must end ITS grant without touching a newer one minted
+  // under the same run id — which `expireRun` would, because a chat keeps its id across two grants.
+  expireToken(token: string): void {
+    this.#byToken.delete(token);
   }
 
   // Everything held by one scope. Exists for the auto-pilot service, whose credential belongs to no run

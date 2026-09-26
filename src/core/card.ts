@@ -26,6 +26,10 @@ export function parseCardContent(content: string): { data: CardFrontmatter; body
       links: Array.isArray(d.links) ? d.links : [],
       group: d.group,
       created: d.created ?? '',
+      // A STRING OR NOTHING, which is what makes a card carrying junk inert rather than dangerous: the
+      // create endpoint writes what an agent sent, and `criterionCommand` compares this against the gates
+      // the project declares. A non-string reads as absent and the story is broken down as it always was.
+      satisfiedBy: typeof d.satisfiedBy === 'string' ? d.satisfiedBy : undefined,
       // `=== true`, not truthy: `setup: "no"` is a string, and a card whose author meant the opposite
       // must not become the project's barrier.
       setup: d.setup === true ? true : undefined,
@@ -42,7 +46,7 @@ export function parseCardContent(content: string): { data: CardFrontmatter; body
 
 export function toFrontmatter(card: Card): CardFrontmatter {
   const { id, title, description, order, tags, links, group, created } = card;
-  const { setup, followUp, createdBy, archived, archivedFrom } = card;
+  const { satisfiedBy, setup, followUp, createdBy, archived, archivedFrom } = card;
   return {
     id,
     title,
@@ -52,6 +56,7 @@ export function toFrontmatter(card: Card): CardFrontmatter {
     links,
     group,
     created,
+    satisfiedBy,
     setup,
     followUp,
     createdBy,
@@ -68,6 +73,10 @@ export function serializeCard(fm: CardFrontmatter, body: string): string {
   data.links = fm.links;
   if (fm.group !== undefined) data.group = fm.group;
   data.created = fm.created;
+  // Only when a card names one, like every other optional key here: a project written before decision 85
+  // has no card carrying this, and emitting an empty one would rewrite every file on the board to say
+  // nothing.
+  if (fm.satisfiedBy !== undefined) data.satisfiedBy = fm.satisfiedBy;
   // Only when true: `setup: false` on every card in the project would be noise on every file. Same for
   // `followUp` — and it is what makes clearing either flag work, since the key simply leaves the file.
   if (fm.setup === true) data.setup = true;
@@ -122,6 +131,11 @@ function pickTags(value: unknown, rejected: string[]): string[] | undefined {
 const PATCH_OWNERS: readonly { keys: readonly string[]; owner: string }[] = [
   { keys: ['setup', 'followUp'], owner: 'set by auto-pilot' },
   { keys: ['createdBy'], owner: 'stamped by this endpoint' },
+  // WRITTEN WITH THE CARD AND NOT AFTER IT (decision 85). A break-down names the criterion as it writes the
+  // story; changing it later would change what a machine may close the card on without changing the card's
+  // one acceptance criterion. Refused BY NAME rather than dropped, for the reason the whole table exists:
+  // an agent told 200 over a field the endpoint discarded has no reason to try the other spelling.
+  { keys: ['satisfiedBy'], owner: 'written when the card is created' },
   // Each has its own path: placement is a drag, links are symmetric and go through the links endpoint
   // that writes the far side, archiving is a scope of its own, and an id is a card's identity.
   { keys: ['id', 'order', 'links', 'archived', 'archivedFrom', 'created'], owner: 'not editable here' },

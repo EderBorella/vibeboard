@@ -65,6 +65,154 @@ describe('bearerToken', () => {
 // nobody exercises is a row that does not work" — and then no test imported it. The table IS well
 // covered through the app, but only where a route happens to be convenient to call; this is the
 // whole grid, including the rows that say no.
+//
+// FIVE AGENT COLUMNS, and the two copilot ones are why the grid grew. `assist` holds board verbs `work` does
+// not, so a row granting it anything passed every line of a three-column grid; `repair` (decision 88) holds
+// more again. Every one of their answers is asked of `allows` itself, never of the generated catalogue: the
+// review before this one found a catalogue assertion passing while `allows` said yes to a scope it should
+// have refused, held back only by `:card` versus `:id`.
+type Row = [
+  route: string,
+  method: string,
+  work: boolean,
+  checkup: boolean,
+  service: boolean,
+  assist: boolean,
+  repair: boolean,
+];
+
+const GRID: Row[] = [
+  // route,                                     method,  work,  checkup, service, assist, repair
+  ['/api/state', 'GET', true, true, true, true, true],
+  ['/api/config', 'GET', true, true, true, true, true],
+  ['/api/archive/:board', 'GET', true, true, true, true, true],
+  ['/api/cards/:board/:id/raw', 'GET', true, true, true, true, true],
+  // The service creates ONE card in the whole lifecycle — the smoke-harness feature at the bootstrap's exit
+  // (ruling 66) — because a mandatory feature that depends on an agent remembering it is one that will
+  // sometimes be missing. PATCH and links stay refused: it has no card of its own to edit.
+  ['/api/cards', 'POST', true, true, true, true, true],
+  ['/api/cards/:board/:id', 'PATCH', true, true, false, true, true],
+  ['/api/cards/:board/:id/links', 'PUT', true, true, false, true, true],
+  ['/api/cards/:board/:id/move', 'POST', false, true, true, true, true],
+  ['/api/cards/:board/:id/archive', 'POST', false, true, false, true, true],
+  // Named here to pin that they are refused, not merely absent from the table by oversight.
+  ['/api/cards/:board/:id/raw', 'PUT', false, false, false, false, false],
+  // THE DRAG-AND-DROP VERB, refused to every autonomous scope and to `assist`, and granted to `repair` because
+  // siblings ordered against their dependency is one of the ways a board sticks — a card's place in its column
+  // is what the loop reads as "next" (decision 88).
+  ['/api/cards/:board/:id/place', 'POST', false, false, false, false, true],
+  // The undo of an archive `repair` already holds, so a repair's own mistake is not left for the person.
+  ['/api/cards/:board/:id/restore', 'POST', false, false, false, false, true],
+  // The flags auto-pilot owns (decision 44): authority, not supervision, and not a repair either.
+  ['/api/cards/:board/:id/flags', 'POST', false, false, true, false, false],
+  // C2's one new grant, and the row the loop cannot exist without: absent from this table,
+  // `POST /api/runs` is admin-only and the service cannot dispatch at all. Both WORKING scopes stay
+  // refused — decision 21 — because a run that can dispatch escapes the iteration counter, the budget
+  // and the attempt cap in one move. Nor may either copilot: a repair hands the board back rather than
+  // working it.
+  ['/api/runs', 'POST', false, false, true, false, false],
+  // The reads dispatch depends on: `decideTick` counts attempts from the run records and has to know
+  // which runs are in flight. A loop that could dispatch but not read would have to be handed the ADMIN
+  // token, which is decisions 10 and 21 collapsing in one step. `repair` reads them because the histories
+  // are the evidence — and the records are readable in its box already, so the row adds a view, not a reach.
+  ['/api/runs', 'GET', false, false, true, false, true],
+  ['/api/runs/:board/:card', 'GET', false, false, true, false, true],
+  // The verdict on a run, and the loop reporting its own ending. Service-only: a run that could write its own
+  // verification would advance itself on self-assessment, and one that could stop auto-pilot could stop the
+  // thing supervising it.
+  ['/api/runs/:board/:card/:run/verification', 'POST', false, false, true, false, false],
+  // THE THREE WAYS TO CLEAR SPENT ATTEMPTS, refused to every autonomous scope and to `assist` (decision 86) and
+  // held by `repair` alone (decision 88). The attempt cap is the only thing that stops a card being retried for
+  // ever, so an agent that could clear its own card's attempts would have unlimited retries; the reset is worse
+  // again, because it clears a SUCCESS — including the creating run that bounds a feature's checkup. `repair`
+  // is no run and has no card: it is minted for one Fix board turn a person is watching, and it cannot
+  // dispatch, so nothing it clears is ever its own. test/runs-route.test.ts asks the other half — whether an
+  // agent is TOLD the route exists — and these lines are the enforcement.
+  ['/api/runs/:board/:card/forgive', 'POST', false, false, false, false, true],
+  ['/api/runs/:board/:card/reset', 'POST', false, false, false, false, true],
+  ['/api/runs/project/forgive', 'POST', false, false, false, false, true],
+  // "I have dealt with this" is a person's answer to a question a run asked them, and it moves no card.
+  ['/api/runs/:board/:card/:run/resolve', 'POST', false, false, false, false, false],
+  ['/api/project-runs/:run/resolve', 'POST', false, false, false, false, false],
+  ['/api/runs/:run/cancel', 'POST', false, false, false, false, false],
+  ['/api/autopilot/stopped', 'POST', false, false, true, false, false],
+  ['/api/config', 'PATCH', false, false, false, false, false],
+  ['/api/explorer/file', 'PUT', false, false, false, false, false],
+  ['/api/skills/:slug', 'PUT', false, false, false, false, false],
+  // Slice D's routes. The ledger is the one grant: the auto-pilot service enforces the budget between
+  // dispatches and reaches the board over HTTP like anything else. An AGENT that could read it would be
+  // an agent reasoning about its own leash — and a repair has no use for the budget, since it dispatches
+  // nothing; a card's attempts reach it on the per-card read above.
+  ['/api/accounting', 'GET', false, false, true, false, false],
+  // The controls are admin-only BY ABSENCE from the table — which task 6 calls load-bearing, and
+  // load-bearing behaviour with no row is one refactor from silent. `repair` is refused every one of them:
+  // the person resumes the loop, the copilot hands the board back (decision 88). The state read too, because
+  // the Fix board frame carries the stop sentence to it.
+  ['/api/autopilot/state', 'GET', false, false, false, false, false],
+  ['/api/autopilot/readiness', 'GET', false, false, false, false, false],
+  ['/api/autopilot/start', 'POST', false, false, false, false, false],
+  ['/api/autopilot/stop', 'POST', false, false, false, false, false],
+  ['/api/autopilot/kill', 'POST', false, false, false, false, false],
+  ['/api/autopilot/restart', 'POST', false, false, false, false, false],
+  ['/api/autopilot/gates-reviewed', 'POST', false, false, false, false, false],
+  // Projects: which one is open, and whether one exists at all.
+  ['/api/project/open', 'POST', false, false, false, false, false],
+  ['/api/project/scaffold', 'POST', false, false, false, false, false],
+  ['/api/project/delete', 'POST', false, false, false, false, false],
+  // Signing in, and the browsers that are.
+  ['/api/signin', 'GET', false, false, false, false, false],
+  ['/api/signin/approve/:id', 'POST', false, false, false, false, false],
+  ['/api/signin/clear', 'POST', false, false, false, false, false],
+  ['/api/signin/devices/:id', 'DELETE', false, false, false, false, false],
+  // WHO MAY GRANT THE COPILOT AUTHORITY: nobody but the person. An agent able to reach either of these would be
+  // an agent elevating itself, and `fix-board` is the one that mints `repair`.
+  ['/api/copilot/authority', 'POST', false, false, false, false, false],
+  ['/api/copilot/fix-board', 'POST', false, false, false, false, false],
+  // Boxes and the image they are built from.
+  ['/api/boxes/rebuild', 'POST', false, false, false, false, false],
+  ['/api/boxes/build', 'POST', false, false, false, false, false],
+  ['/api/opencode/restart', 'POST', false, false, false, false, false],
+  // Settings.
+  ['/api/settings', 'PATCH', false, false, false, false, false],
+  // The diary: the service writes it, and nobody else. `repair` alone may read it besides the person: the
+  // diary is where "E-214 moved to done" was written, and the file is readable in its box regardless.
+  ['/api/log', 'POST', false, false, true, false, false],
+  ['/api/log', 'GET', false, false, false, false, true],
+  // Filing is uncapped and open to the working scopes; reading is not (decision 5). A repair files what it
+  // finds and should not change, which is the channel for exactly that.
+  ['/api/suggestions', 'POST', true, true, false, true, true],
+  ['/api/suggestions', 'GET', false, true, true, true, true],
+  ['/api/suggestions/:id', 'PATCH', false, false, false, false, false],
+  // THE ROWS `assist` HOLDS AND `repair` DOES NOT, because none of them is the board. The foundation write can
+  // rewrite commands the server later runs outside the sandbox, the toolchain installs as root into the box, and
+  // the two wizard rows belong to setup. A repair reads card text as its input, so the thing its input can
+  // steer is kept to the board.
+  ['/api/control/foundation/:name', 'PUT', false, false, false, true, false],
+  ['/api/foundation/smoke', 'POST', true, true, true, true, false],
+  ['/api/toolchain/install', 'POST', true, true, true, true, false],
+  ['/api/wizard/resumes/:name', 'PUT', false, false, false, true, false],
+  ['/api/wizard/prefill', 'PUT', true, false, false, false, false],
+  ['/api/control/file', 'PUT', false, false, false, false, false],
+];
+
+// Every route the app registers, keyed the way `allows` keys them. Collected from the app itself rather than
+// typed out, so a route added tomorrow is in this list without anybody remembering to put it there.
+async function registeredRoutes(): Promise<string[]> {
+  const session = new ProjectSession();
+  const app = buildApp(session, { credentials: new CredentialStore(ADMIN), logger: false });
+  const seen = new Set<string>();
+  app.addHook('onRoute', (route) => {
+    for (const method of [route.method].flat()) {
+      // Fastify's own HEAD twin of every GET, which `allows` reads as the GET.
+      if (method !== 'HEAD' && route.url.startsWith('/api/')) seen.add(`${method} ${route.url}`);
+    }
+  });
+  await app.ready();
+  await app.close();
+  await session.close();
+  return [...seen];
+}
+
 describe('the scope table', () => {
   const PROJECT = '/p/A';
   const cred = (scope: Scope, card?: string): Credential => ({
@@ -73,68 +221,83 @@ describe('the scope table', () => {
     ...(scope === 'admin' ? {} : { run: 'r', project: PROJECT, card }),
   });
 
-  it.each([
-    // route,                                     method,  work,  checkup, service
-    ['/api/state', 'GET', true, true, true],
-    ['/api/config', 'GET', true, true, true],
-    ['/api/archive/:board', 'GET', true, true, true],
-    ['/api/cards/:board/:id/raw', 'GET', true, true, true],
-    // The service creates ONE card in the whole lifecycle — the smoke-harness feature at the bootstrap's exit
-    // (ruling 66) — because a mandatory feature that depends on an agent remembering it is one that will
-    // sometimes be missing. PATCH and links stay refused: it has no card of its own to edit.
-    ['/api/cards', 'POST', true, true, true],
-    ['/api/cards/:board/:id', 'PATCH', true, true, false],
-    ['/api/cards/:board/:id/links', 'PUT', true, true, false],
-    ['/api/cards/:board/:id/move', 'POST', false, true, true],
-    ['/api/cards/:board/:id/archive', 'POST', false, true, false],
-    // Named here to pin that they are refused, not merely absent from the table by oversight.
-    ['/api/cards/:board/:id/raw', 'PUT', false, false, false],
-    ['/api/cards/:board/:id/place', 'POST', false, false, false],
-    // C2's one new grant, and the row the loop cannot exist without: absent from this table,
-    // `POST /api/runs` is admin-only and the service cannot dispatch at all. Both WORKING scopes stay
-    // refused — decision 21 — because a run that can dispatch escapes the iteration counter, the budget
-    // and the attempt cap in one move.
-    ['/api/runs', 'POST', false, false, true],
-    // The reads dispatch depends on: `decideTick` counts attempts from the run records and has to know
-    // which runs are in flight. A loop that could dispatch but not read would have to be handed the ADMIN
-    // token, which is decisions 10 and 21 collapsing in one step.
-    ['/api/runs', 'GET', false, false, true],
-    ['/api/runs/:board/:card', 'GET', false, false, true],
-    // The verdict on a run, and the loop reporting its own ending. Service-only: a run that could write its own
-    // verification would advance itself on self-assessment, and one that could stop auto-pilot could stop the
-    // thing supervising it.
-    ['/api/runs/:board/:card/:run/verification', 'POST', false, false, true],
-    ['/api/autopilot/stopped', 'POST', false, false, true],
-    ['/api/config', 'PATCH', false, false, false],
-    ['/api/explorer/file', 'PUT', false, false, false],
-    ['/api/project/open', 'POST', false, false, false],
-    ['/api/skills/:slug', 'PUT', false, false, false],
-    // Slice D's routes. The ledger is the one grant: the auto-pilot service enforces the budget between
-    // dispatches and reaches the board over HTTP like anything else. An AGENT that could read it would be
-    // an agent reasoning about its own leash.
-    ['/api/accounting', 'GET', false, false, true],
-    // The three controls, and the project-run resolve, are admin-only BY ABSENCE from the table — which
-    // task 6 calls load-bearing, and load-bearing behaviour with no row is one refactor from silent.
-    ['/api/autopilot/state', 'GET', false, false, false],
-    ['/api/autopilot/stop', 'POST', false, false, false],
-    ['/api/autopilot/kill', 'POST', false, false, false],
-    ['/api/autopilot/restart', 'POST', false, false, false],
-    ['/api/project-runs/:run/resolve', 'POST', false, false, false],
-    ['/api/project/scaffold', 'POST', false, false, false],
-    // The diary: the service writes it, nobody else, and nobody reads it but admin.
-    ['/api/log', 'POST', false, false, true],
-    ['/api/log', 'GET', false, false, false],
-  ])('%s %s', (route, method, work, checkup, service) => {
+  it.each(GRID)('%s %s', (route, method, work, checkup, service, assist, repair) => {
     // `card` matches the :id row's own-card rule, so this grid measures scope and not confinement.
     expect(allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001'), 'work').toBe(work);
     expect(allows(cred('checkup'), method, route, PROJECT, 'E-001'), 'checkup').toBe(checkup);
     expect(allows(cred('service'), method, route, PROJECT, 'E-001'), 'service').toBe(service);
+    // THE COPILOT'S TWO SCOPES, minted with no card because a chat has none (`mintChat`), and asked twice:
+    // with the request's `:id` and without one. Neither has an own-card row, so an answer that CHANGED between
+    // the two would be the `:card`-versus-`:id` accident deciding a grant.
+    for (const cardId of ['E-001', undefined]) {
+      expect(allows(cred('assist'), method, route, PROJECT, cardId), `assist, card ${cardId}`).toBe(assist);
+      expect(allows(cred('repair'), method, route, PROJECT, cardId), `repair, card ${cardId}`).toBe(repair);
+    }
     // Admin reaches everything, on every row.
     expect(allows(cred('admin'), method, route, PROJECT, 'E-001'), 'admin').toBe(true);
   });
 
   it('denies a route it has never heard of', () => {
     expect(allows(cred('service'), 'POST', '/api/something-new', PROJECT)).toBe(false);
+    expect(allows(cred('repair'), 'POST', '/api/something-new', PROJECT)).toBe(false);
+  });
+
+  // A GRID ROW THAT NAMES NO ROUTE PINS NOTHING. `allows` answers false for a key it has never heard of, so a
+  // row misspelling a refused route passes for ever while the real route goes unasked.
+  it('names only routes the app really registers', async () => {
+    const registered = new Set(await registeredRoutes());
+    for (const [route, method] of GRID)
+      expect(registered.has(`${method} ${route}`), `${method} ${route}`).toBe(true);
+  });
+
+  // THE DEFAULT, ASKED OF EVERY ROUTE THERE IS. A route this grid does not name is admin-only, and that is the
+  // security property the table's own comment describes — so it is asserted for all of them, including the
+  // ones nobody has written yet. A new row granting any agent scope a route the grid has not reasoned about
+  // fails here rather than shipping.
+  it('refuses every agent scope every route the grid does not name', async () => {
+    const named = new Set(GRID.map(([route, method]) => `${method} ${route}`));
+    const rest = (await registeredRoutes()).filter((key) => !named.has(key));
+    expect(rest.length, 'nothing left to ask, so this asserts nothing').toBeGreaterThan(10);
+    for (const key of rest) {
+      const [method, route] = key.split(' ') as [string, string];
+      for (const scope of ['work', 'checkup', 'service', 'assist', 'repair'] as const) {
+        expect(allows(cred(scope, 'E-001'), method, route, PROJECT, 'E-001'), `${scope} ${key}`).toBe(false);
+      }
+    }
+  });
+
+  // DECISION 88'S FIRST CLAUSE, stated as a relation rather than a list: whatever `assist` may do to the board,
+  // `repair` may too. The rows `assist` holds that are not the board are the grid's to name, above.
+  it('gives repair every board verb assist has', () => {
+    const notTheBoard = new Set([
+      'PUT /api/control/foundation/:name',
+      'POST /api/foundation/smoke',
+      'POST /api/toolchain/install',
+      'PUT /api/wizard/resumes/:name',
+    ]);
+    const assisted = GRID.filter(([, , , , , assist]) => assist);
+    expect(assisted.length).toBeGreaterThan(8);
+    for (const [route, method] of assisted) {
+      if (notTheBoard.has(`${method} ${route}`)) continue;
+      expect(allows(cred('repair'), method, route, PROJECT), `${method} ${route}`).toBe(true);
+    }
+  });
+
+  // AND A REPAIR CREDENTIAL IS STILL CONFINED TO ITS PROJECT, which every other scope is. It is minted against
+  // the project open when Fix board was pressed; the person switching project revokes it, and this is the
+  // second reason it would not work on the new one.
+  it('refuses a repair credential against a project that is not the open one', () => {
+    expect(allows(cred('repair'), 'POST', '/api/runs/:board/:card/reset', '/p/B')).toBe(false);
+  });
+
+  // THE OWN-CARD ROW'S CLOSED DIRECTION, and it is named here because something else leans on it. The
+  // preHandler reads `req.params.id` and nothing else, so a route whose card segment is `:card` — every
+  // run route — hands `allows` no card at all and an `ownCard` row on one would deny outright rather than
+  // confine. That is FAIL-CLOSED and it is an accident of two naming conventions, so nothing may be built
+  // on it as a grant: the rows above are what decide the reset and the forgive, not this.
+  it('denies an own-card row when the request produced no card, whatever the credential holds', () => {
+    expect(allows(cred('work', 'E-001'), 'PATCH', '/api/cards/:board/:id', PROJECT, undefined)).toBe(false);
+    expect(allows(cred('work'), 'PATCH', '/api/cards/:board/:id', PROJECT, 'E-001')).toBe(false);
   });
 });
 

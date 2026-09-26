@@ -156,6 +156,12 @@ it is missing, streaming the build into the terminal it was started from — a f
 nothing at all after that. Settings offers the same build for the case where the image goes missing while
 the server is up. `npm run box:build` still exists and does the same thing, by hand.
 
+The Claude Code and OpenCode inside it are pinned to the versions installed on your machine, read at
+build time, because the box and the host resume sessions from the same files. When yours move on, the
+start says so and Settings offers **Rebuild the agent image**; agents keep running on the old one until
+you do. A box that is already running keeps the image it started from, so rebuild the agent boxes
+afterwards — or restart VibeBoard, which replaces them.
+
 **Docker is required.** Without it, the board, the file explorer and Settings all work and no agent will
 start; the refusal says exactly that. There is deliberately no fallback: maintaining a second, weaker
 containment path would mean most people quietly ran the weaker one.
@@ -267,6 +273,11 @@ a network you trust, and never expose it to the public internet.
   emergency stop that kills every agent in the project and halts it, and a restart
   that brings it back. A halted project starts nothing — not even from the chat —
   and says so in an overlay that carries the reason, the time and the way back
+- **Fix board**, beside the emergency stop: hands a board auto-pilot cannot move to the copilot, in a
+  conversation of its own that you watch. For that one answer it may clear cards' spent attempts,
+  reorder and restore cards as well as edit, move and link them — never start auto-pilot, change
+  settings or touch the foundation documents — and it ends with a short report of what it changed.
+  Every change it makes is logged with the conversation that made it
 - **Project Log tab**: the narrative of what happened to the project, one line per
   event, oldest at the bottom. Append-only and written through an endpoint rather
   than edited — so the record cannot be quietly rewritten — with a box for adding

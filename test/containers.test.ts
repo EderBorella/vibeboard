@@ -674,14 +674,41 @@ describe('probe', () => {
     expect(res.ok === false && res.reason).not.toMatch(/npm run/);
   });
 
-  it('is ok when both are present', async () => {
+  // AND WHAT THE IMAGE WAS BUILT WITH, out of the same call: the sandbox route is polled, so staleness has
+  // to come from the inspect already being made rather than from a container per poll.
+  //
+  // THE WHOLE RECORD, parsed here, and not a `-f` template — a template naming a key the daemon's output
+  // lacks does not render empty, it exits 1, and a non-zero exit here reads as "the image is missing".
+  it('is ok when both are present, and reads the CLI versions the image was built with', async () => {
+    const calls: string[][] = [];
+    const labels = { 'io.vibeboard.cli.claude-code': '2.1.280', 'io.vibeboard.cli.opencode': '1.17.18' };
+    const mgr = new BoxManager({
+      docker: fakeDocker(
+        {
+          version: { code: 0, stdout: '29.6.0\n', stderr: '' },
+          'image inspect': {
+            code: 0,
+            stdout: JSON.stringify([{ Id: 'sha256:abc', Config: { WorkingDir: '/work', Labels: labels } }]),
+            stderr: '',
+          },
+        },
+        calls,
+      ),
+    });
+    expect(await mgr.probe()).toEqual({ ok: true, built: { claude: '2.1.280', opencode: '1.17.18' } });
+    expect(calls.find((c) => c[0] === 'image')).toEqual(['image', 'inspect', DEFAULT_IMAGE]);
+  });
+
+  // PRESENT IS PRESENT, whatever the labels say: an image whose record cannot be read has not gone
+  // missing, and answering "missing" would offer a build for an image that is there.
+  it('is still ok when the record cannot be read, and then says nothing about what it holds', async () => {
     const mgr = new BoxManager({
       docker: fakeDocker({
         version: { code: 0, stdout: '29.6.0\n', stderr: '' },
         'image inspect': { code: 0, stdout: 'sha256:abc\n', stderr: '' },
       }),
     });
-    expect(await mgr.probe()).toEqual({ ok: true });
+    expect(await mgr.probe()).toEqual({ ok: true, built: {} });
   });
 });
 

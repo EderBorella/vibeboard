@@ -17,6 +17,7 @@ import type { Credential, Scope } from '../src/server/auth/credentials.js';
 import { BOX_BROWSERS_PATH, BOX_PLAYWRIGHT_VERSION } from '../src/server/boxes/image-tools.js';
 import { assistCredentialSection } from '../src/server/runs/prompt/credential.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/runs/prompt/index.js';
+import { SEED_SKILLS } from '../src/store/project/seed-skills.js';
 
 const ROOT = '/p';
 
@@ -217,6 +218,35 @@ describe('buildRunPrompt', () => {
     );
     expect(text).toContain('- **F-002** (features/todo) — Auth');
     expect(text).toContain(`file: ${boardRel('features', 'todo', 'F-002.md')}`);
+  });
+
+  // THE CHANNEL THE STORY'S IMPLEMENT RUNS ON (decision 83). The loop tells that run which tasks are its
+  // own by stamping them into `in-progress`; the seeded skill tells the agent to read the tasks in
+  // `engineering/in-progress`. Those are two halves of one contract written in two files, so the exact
+  // string each side names is asserted against the other — both real, neither faked: the seed's own text,
+  // and `buildRunPrompt` over a linked task standing in that column.
+  it('renders a linked task exactly where the seeded implement-story skill tells the run to look', () => {
+    const where = 'engineering/in-progress';
+    const text = buildRunPrompt(
+      inputs({
+        card: card({ id: 'P-001', board: 'product', columnSlug: 'in-progress' }),
+        linked: [
+          card({
+            id: 'E-001',
+            board: 'engineering',
+            columnSlug: 'in-progress',
+            title: 'The solidity table',
+            description: undefined,
+            filePath: `${ROOT}/${boardRel('engineering', 'in-progress', 'E-001.md')}`,
+            body: '',
+          }),
+        ],
+      }),
+    );
+    expect(text).toContain(`- **E-001** (${where}) — The solidity table`);
+    expect(text).toContain(`file: ${boardRel('engineering', 'in-progress', 'E-001.md')}`);
+    const seeded = SEED_SKILLS.find((s) => s.slug === 'implement-story')?.content ?? '';
+    expect(seeded).toContain(`\`${where}\``);
   });
 
   it('quotes a linked PRODUCT card in full, because it carries the intent', () => {
@@ -718,6 +748,13 @@ describe('the review contract', () => {
 
   it('names the ONE run under judgement', () => {
     expect(reviewing()).toContain('You are judging ONE run: **RUN-2**');
+  });
+
+  // `story-review` KEEPS THE CHECKUP'S AUTHORITY TO WRITE SIBLING STORIES (decision 80), and its skill body
+  // asks it to list what it created — which this frontmatter gave it no field for, so `ActiveReport` showed
+  // no created cards for the one judging phase allowed to create any.
+  it('gives a review somewhere to name the cards it created', () => {
+    expect(reviewing()).toContain('created: [P-041]');
   });
 
   // DECISION 51'S TWO STEPS, and the reviewer has to be told the first one happened: a judge that does not

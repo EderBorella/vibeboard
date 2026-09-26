@@ -35,6 +35,12 @@ describe('coveredBy', () => {
     expect(coveredBy(ap, board, ['P-030', 'P-050'])).toBe(false);
   });
 
+  // DELIVERED IS NOT DONE (decision 87). A task waiting in `review` has not been judged, and covering a
+  // sibling with it closes that sibling over work nobody has passed.
+  it('refuses a cited task that is delivered but not yet judged', () => {
+    expect(coveredBy(ap, [...board, C('E-060', 'engineering', 'review')], ['E-060'])).toBe(false);
+  });
+
   // BLOCKED COUNTS AS SETTLED, which is decision 45's argument unchanged: a blocked card has had every
   // attempt it is allowed and will not land on its own. Work that stopped there is still work that
   // happened, and refusing it would leave the citing card stuck for a reason nobody can clear.

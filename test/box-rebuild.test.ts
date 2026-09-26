@@ -1,4 +1,5 @@
 import { chmodSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -35,10 +36,27 @@ const admin = { authorization: `Bearer ${ADMIN}` };
 // A BoxService that answers as a daemon holding exactly `present`, and records every `docker rm -f`.
 // What went is the assertion here, so it has to be observed rather than assumed: `stop` returns void,
 // and a route that called it twice unconditionally would look identical from the outside.
+//
+// `ps` ANSWERS AS THE REAL DAEMON DOES, which the first version of this double did not: it returned names
+// whatever it was asked, so `list()` could pass `-q` beside `--format '{{.Names}}'` and every test here
+// stayed green. Docker 29 does not: `--quiet` wins, the format is dropped with the warning below on stderr,
+// and the answer is container IDs — so the route matched no box by name, removed nothing, and reported
+// `removed: 0` over a box that was plainly running. Pinned with the strings the daemon printed.
+function psAnswer(args: readonly string[], present: string[]): { stdout: string; stderr: string } {
+  const quiet = args.some((a) => a === '-q' || a === '--quiet' || /^-[a-z]*q[a-z]*$/.test(a));
+  if (!quiet) return { stdout: `${present.join('\n')}\n`, stderr: '' };
+  const stderr = args.includes('--format')
+    ? 'WARNING: Ignoring custom format, because both --format and --quiet are set.\n'
+    : '';
+  // Twelve hex characters, as `docker ps -q` prints them — a value no box name can ever equal.
+  const ids = present.map((_, i) => (0x6fbb53fe2b24 + i).toString(16));
+  return { stdout: `${ids.join('\n')}\n`, stderr };
+}
+
 function recordingBoxes(present: string[]): { boxes: BoxService; removed: string[] } {
   const removed: string[] = [];
   const docker: DockerRun = async (args) => {
-    if (args[0] === 'ps') return { code: 0, stdout: `${present.join('\n')}\n`, stderr: '' };
+    if (args[0] === 'ps') return { code: 0, ...psAnswer(args, present) };
     if (args[0] === 'rm') {
       removed.push(String(args[2]));
       return { code: 0, stdout: '', stderr: '' };
@@ -262,5 +280,73 @@ describe('the frames a build broadcasts', () => {
     frames.onLine('Could not build vibeboard-agent:base: E: Unable to locate package curl');
     frames.finish('failed');
     expect(sent.at(-1)).toEqual({ type: 'box:build', state: 'failed' });
+  });
+});
+
+// POST /api/boxes/build ON AN IMAGE THAT EXISTS. It used to answer `already` for any image that did, so
+// one on Claude Code 2.1.221 under a 2.1.280 host could not be rebuilt from the product at all.
+//
+// THE HOST IS REAL HERE, and only docker is not. `claude` and `opencode` are scripts on PATH printing
+// versions no machine has, so the route's own reader spawns them and parses what they print — a reader
+// that ignored PATH, or a route that compared against nothing, would be measured against whatever this
+// machine has installed instead. The build spawns the suite's stand-in docker, which answers `build` with
+// success.
+describe('POST /api/boxes/build', () => {
+  const CURRENT = { 'io.vibeboard.cli.claude-code': '9.9.9', 'io.vibeboard.cli.opencode': '8.8.8' };
+  const BEHIND = { 'io.vibeboard.cli.claude-code': '2.1.221', 'io.vibeboard.cli.opencode': '8.8.8' };
+
+  async function hostClis(): Promise<void> {
+    const bin = await tempDir();
+    await writeFile(join(bin, 'claude'), '#!/bin/sh\necho "9.9.9 (Claude Code)"\n', { mode: 0o755 });
+    await writeFile(join(bin, 'opencode'), '#!/bin/sh\necho 8.8.8\n', { mode: 0o755 });
+    const previous = process.env.PATH;
+    process.env.PATH = `${bin}:${previous ?? ''}`;
+    onTestFinished(() => {
+      process.env.PATH = previous;
+    });
+  }
+
+  function holding(labels: Record<string, string>): FastifyInstance {
+    const docker: DockerRun = async (args) => {
+      if (args[0] === 'version') return { code: 0, stdout: '29.6.0\n', stderr: '' };
+      if (args[0] === 'image') {
+        return {
+          code: 0,
+          stdout: JSON.stringify([{ Id: 'sha256:0f3c', Config: { Labels: labels } }]),
+          stderr: '',
+        };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    };
+    const session = new ProjectSession();
+    const app = buildApp(session, {
+      credentials: new CredentialStore(ADMIN),
+      logger: false,
+      sandbox: fixedSandbox(TEST_SANDBOX),
+      boxes: new BoxService({
+        manager: new BoxManager({ docker, user: '1000:1000' }),
+        image: 'vibeboard-agent:test',
+      }),
+    });
+    onTestFinished(async () => {
+      await app.close();
+      await session.close();
+    });
+    return app;
+  }
+
+  const build = (app: FastifyInstance) =>
+    app.inject({ method: 'POST', url: '/api/boxes/build', headers: admin });
+
+  it('rebuilds an image whose CLIs are behind the host, rather than calling it present', async () => {
+    await hostClis();
+    const res = await build(holding(BEHIND));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, already: false });
+  });
+
+  it('leaves alone an image that holds what the host has', async () => {
+    await hostClis();
+    expect((await build(holding(CURRENT))).json()).toEqual({ ok: true, already: true });
   });
 });

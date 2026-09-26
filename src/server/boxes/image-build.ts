@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProbeResult } from './box-manager.js';
+import { type CliVersions, cliDrift, describePins, pinFlags } from './cli-versions.js';
 import { BASE_IMAGE, DEFAULT_IMAGE, dockerBin } from './containers.js';
 
 // BUILDING THE AGENT IMAGE, from inside the product rather than from a developer's terminal.
@@ -32,10 +33,14 @@ export function buildArgs(
   // Named, because there are two of them now — the base and the web layer that stands on it. The
   // default is the web layer, so every caller that predates the split asks for what it always did.
   file = 'Dockerfile.agent',
+  // THE CLI VERSIONS THIS IMAGE HOLDS, passed in rather than read here so the argv stays a pure function
+  // of its arguments. Only Dockerfile.base consumes the build args; the web layer is given them too and
+  // ignores them, so one rule covers both images: each is labelled with what it holds.
+  versions: CliVersions = {},
 ): string[] {
   // `-f` as well as the context, because the file is not named `Dockerfile`. Both are inside the context
   // directory, which is what lets the whole thing travel with the package.
-  return ['build', '-f', join(context, file), '-t', image, context];
+  return ['build', '-f', join(context, file), '-t', image, ...pinFlags(versions), context];
 }
 
 export interface BuildResult {
@@ -54,9 +59,10 @@ export function buildAgentImage(
   onLine: (line: string) => void,
   image: string = DEFAULT_IMAGE,
   file = 'Dockerfile.agent',
+  versions: CliVersions = {},
 ): Promise<BuildResult> {
   return new Promise((settle) => {
-    const child = spawn(dockerBin(), buildArgs(image, agentBuildContext(), file), {
+    const child = spawn(dockerBin(), buildArgs(image, agentBuildContext(), file, versions), {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let last = '';
@@ -83,47 +89,111 @@ export function buildAgentImage(
 }
 
 type Prober = { probe(image?: string): Promise<ProbeResult> };
-type Builder = (onLine: (line: string) => void, image?: string, file?: string) => Promise<BuildResult>;
+type Builder = (
+  onLine: (line: string) => void,
+  image?: string,
+  file?: string,
+  versions?: CliVersions,
+) => Promise<BuildResult>;
+type Ensured = 'present' | 'built' | 'failed' | 'no-docker';
 
-// BUILD IT IF IT IS NOT THERE, and do nothing at all if it is.
+// WHAT A PRESENT IMAGE THAT HAS DRIFTED FROM THE HOST GETS. The button rebuilds it — that is what it is
+// pressed for. The start only says so: a rebuild there is minutes of `npm install` after every host
+// update, `npm run dev` restarts on every save and would kill it half way, and the image it replaces still
+// runs agents. So each caller states which, and there is no default for one to inherit by accident.
+export type WhenStale = 'rebuild' | 'report';
+
+interface Step {
+  service: Prober;
+  onLine: (line: string) => void;
+  build: Builder;
+  image: string;
+  file: string;
+  host: () => Promise<CliVersions>;
+  // What this image should hold if it is built: the host's for the base, the base's for the web layer.
+  pins: () => Promise<CliVersions>;
+  whenStale: WhenStale;
+  // Set for the web layer once the base has been reported: it stands on the base and holds the same
+  // CLIs, so a second line would be the same news.
+  quiet: boolean;
+}
+
+// And what the image holds afterwards, which is what the layer above it is labelled with.
+interface Stepped {
+  outcome: Ensured;
+  holds: CliVersions;
+  reported: boolean;
+}
+
+// BUILD IT IF IT IS NOT THERE, rebuild it if it has drifted and the caller asked for that, and otherwise
+// do nothing at all.
 //
 // A MISSING DAEMON IS NOT A MISSING IMAGE. `probe()` answers both as "not ok", and building against a
 // daemon that is not running would spend a failed `docker build` to discover what the probe already
 // knew — so this asks specifically whether the image is the thing that is absent.
-async function ensureOneImage(
-  service: Prober,
-  onLine: (line: string) => void,
-  image: string,
-  file: string,
-  build: Builder,
-): Promise<'present' | 'built' | 'failed' | 'no-docker'> {
-  const before = await service.probe(image);
-  if (before.ok) return 'present';
-  if (before.missing !== 'image') return 'no-docker';
-  onLine(`Building the agent image ${image}. This takes a few minutes the first time.`);
-  const result = await build(onLine, image, file);
+async function ensureOneImage(step: Step): Promise<Stepped> {
+  const { image, onLine } = step;
+  const before = await step.service.probe(image);
+  if (!before.ok && before.missing !== 'image') return { outcome: 'no-docker', holds: {}, reported: false };
+  const drift = before.ok ? cliDrift(before.built ?? {}, await step.host()) : null;
+  if (before.ok && (drift === null || step.whenStale === 'report')) {
+    if (drift !== null && !step.quiet) onLine(`${image} ${drift}. Rebuild it from Settings › Agent sandbox.`);
+    return { outcome: 'present', holds: before.built ?? {}, reported: drift !== null };
+  }
+  onLine(
+    drift === null
+      ? `Building the agent image ${image}. This takes a few minutes the first time.`
+      : `Rebuilding ${image}, which ${drift}. This takes a few minutes.`,
+  );
+  const pins = await step.pins();
+  const result = await step.build(onLine, image, step.file, pins);
   if (result.ok) {
     onLine(`Built ${image}.`);
-    return 'built';
+    return { outcome: 'built', holds: pins, reported: false };
   }
   onLine(`Could not build ${image}: ${result.last}`);
-  return 'failed';
+  return { outcome: 'failed', holds: {}, reported: false };
 }
 
 // BASE FIRST, because the web layer's FROM names it — built the other way round, the web build fails
 // on a fresh machine with "pull access denied", which reads like a registry problem rather than an
 // ordering one. Idempotent for the same reason the one-image version was: an ordinary start costs two
-// `docker image inspect`s. The builder is injectable ONLY so the ordering is testable without a
-// daemon; production callers never pass it. decision 75.
+// `docker image inspect`s and one reading of the host's CLIs. The builder is injectable ONLY so the
+// ordering is testable without a daemon; production callers never pass it. decision 75.
+//
+// THE HOST IS READ AT MOST ONCE, and only once docker has answered: two spawns to learn nothing, on a
+// machine whose daemon is down, is the probe-before-build argument again.
 export async function ensureAgentImages(
   service: Prober,
   onLine: (line: string) => void,
-  opts: { build?: Builder } = {},
-): Promise<'present' | 'built' | 'failed' | 'no-docker'> {
+  opts: { host: () => Promise<CliVersions>; whenStale: WhenStale; build?: Builder },
+): Promise<Ensured> {
   const build = opts.build ?? buildAgentImage;
-  const base = await ensureOneImage(service, onLine, BASE_IMAGE, 'Dockerfile.base', build);
-  if (base === 'failed' || base === 'no-docker') return base;
-  const web = await ensureOneImage(service, onLine, DEFAULT_IMAGE, 'Dockerfile.agent', build);
-  if (web === 'present' && base === 'built') return 'built';
-  return web;
+  let reading: Promise<CliVersions> | undefined;
+  const host = (): Promise<CliVersions> => {
+    reading ??= opts.host();
+    return reading;
+  };
+  const common = { service, onLine, build, host, whenStale: opts.whenStale };
+  const base = await ensureOneImage({
+    ...common,
+    image: BASE_IMAGE,
+    file: 'Dockerfile.base',
+    pins: async () => {
+      const versions = await host();
+      for (const line of describePins(versions)) onLine(line);
+      return versions;
+    },
+    quiet: false,
+  });
+  if (base.outcome === 'failed' || base.outcome === 'no-docker') return base.outcome;
+  const web = await ensureOneImage({
+    ...common,
+    image: DEFAULT_IMAGE,
+    file: 'Dockerfile.agent',
+    pins: async () => base.holds,
+    quiet: base.reported,
+  });
+  if (web.outcome === 'present' && base.outcome === 'built') return 'built';
+  return web.outcome;
 }

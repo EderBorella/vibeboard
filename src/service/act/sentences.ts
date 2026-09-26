@@ -116,7 +116,7 @@ export function reviewLine(card: Card, review: RunRecord, passed: boolean, conte
 // A review that ran and answered nothing. It says so plainly rather than reporting the run's own outcome: a
 // review whose turn went perfectly and which decided nothing has not passed anything.
 export function inconclusiveLine(card: Card, review: RunRecord, context: TickContext): string {
-  return `Iteration ${context.iteration + 1}: ${card.id}'s review ended as ${review.status} and reported no verdict, so nothing was decided and it stays in review.${said(review)}`;
+  return `Iteration ${context.iteration + 1}: ${card.id}'s review ended as ${review.status} and reported no verdict, so nothing was decided and it is still open.${said(review)}`;
 }
 
 // The smoke command's result, handed to the diary as EVIDENCE and not as a verdict — which is why the line

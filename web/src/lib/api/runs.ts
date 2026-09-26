@@ -232,6 +232,17 @@ export function forgiveCardAttempts(board: BoardName, card: string): Promise<{ f
   return post<{ forgiven: number }>(`/api/runs/${board}/${encodeURIComponent(card)}/forgive`, {});
 }
 
+// THE STRONGER ONE, for a card its own SUCCESSES stopped. `forgiveCardAttempts` spares a run that
+// succeeded on purpose — clearing a creating run that worked frees the loop to create children again —
+// and a card whose every remaining record is a success is therefore one it cannot move at all. This
+// clears those too, which is why it is a separate call with a separate confirmation rather than a flag.
+//
+// Answers the same count, and the caller has to say so for the same reason: zero means this card had
+// nothing counting against it, and reporting success there sends someone away from the real problem.
+export function resetCardAttempts(board: BoardName, card: string): Promise<{ forgiven: number }> {
+  return post<{ forgiven: number }>(`/api/runs/${board}/${encodeURIComponent(card)}/reset`, {});
+}
+
 // THE SAME ACTION FOR THE BOOTSTRAP, which has no card to address. Its attempts are counted over the
 // project's own runs, so `forgiveCardAttempts` cannot reach them — measured on 2026-08-16, when an
 // unreachable OpenCode server spent all three of a project's derivation attempts and the only remedy was

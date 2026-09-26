@@ -92,9 +92,9 @@ describe('a run about the project rather than a card', () => {
   // id alone `zzzz` sorts first, and it is the older run.
   //
   // Nothing consuming this list is order-sensitive today, so this is a latent bug rather than a live one. It
-  // is pinned because the identical flaw in core/bounds.ts made `latestWorkRun` answer with the wrong run in
-  // half the end-to-end trace's runs, and there it decided whether a task whose gates failed once could ever
-  // pass — a bug that presented as a test flaking.
+  // is pinned because the identical flaw in core/bounds.ts made its latest-work-run lookup answer with the
+  // wrong run in half the end-to-end trace's runs, and there it decided whether a task whose gates failed once
+  // could ever pass — a bug that presented as a test flaking.
   it('orders two runs from the same second by when they started, not by their ids', async () => {
     const root = await tempDir();
     const first = cardRun({ run: '20260803-101500-zzzz', started: '2026-08-03T10:15:00.100Z' });

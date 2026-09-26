@@ -1,14 +1,13 @@
 import { burnsAttempt } from './accounting.js';
-import { phaseForRun } from './phases.js';
+import { type PhaseName, phaseForRun } from './phases.js';
 import type { RunRecord } from './runs.js';
 import type { Card } from './types.js';
-import type { Verification } from './verify.js';
 
 // Every count in §5 that `accounting.ts` does not already answer. Pure, and every one of them is a QUERY
 // over records already on disk plus the board — no new stored counter to drift out of step (decision 46).
 //
-// Which phase a run belongs to is asked of the TABLE rather than restated here (`phaseForRun`), so the two
-// skills a verdict lands on and the one skill that judges them have a single home.
+// Which phase a run belongs to is asked of the TABLE rather than restated here (`phaseForRun`), so the skills
+// a verdict lands on and the skill that judges them have a single home.
 
 // Ordering is by WHEN THE RUN STARTED, with the id as the tie-break, so no caller has to pass runs in
 // any particular order.
@@ -17,7 +16,7 @@ import type { Verification } from './verify.js';
 // mattered. A run id is `YYYYMMDD-HHMMSS-` plus a RANDOM four-character suffix (src/server/app.ts:149),
 // so it is only sortable to the second and two runs inside one second sort at random. An implement run
 // and the fix that followed it land in the same second routinely — the end-to-end trace hit it in half
-// its runs — and when the fix sorted first, `latestWorkRun` answered with the implement run, whose
+// its runs — and when the fix sorted first, the latest-work-run lookup answered with the implement run, whose
 // failed gates verdict was therefore still outstanding: the task was re-stamped back to `in-progress`
 // and fixed again until the cap blocked a task whose gates had failed exactly once. That is the same
 // failure as the one the review trigger was corrected for, arriving through the ordering instead.
@@ -37,39 +36,101 @@ export const startedAt = (run: RunRecord): number => {
   return Number.isFinite(at) ? at : 0;
 };
 
-const latest = (runs: RunRecord[]): RunRecord | undefined =>
-  [...runs].sort((a, b) => startedAt(a) - startedAt(b) || a.run.localeCompare(b.run)).at(-1);
+// ONE COMPARISON FOR EVERY "WHICH CAME FIRST" IN THIS FILE. `latest` ranks by it and `fixedSince` asks it of
+// two records directly; a second copy is a second thing to get wrong, and the paragraph above is the record
+// of that having happened three times already.
+const inOrder = (a: RunRecord, b: RunRecord): number =>
+  startedAt(a) - startedAt(b) || a.run.localeCompare(b.run);
 
-// A run whose WORK a verdict is written onto: the engineering phases whose exit is `review`, which is
-// `implement` and `fix`. Read off the table rather than listed again — and a review run is excluded by
-// construction, because a reviewer does not judge itself.
-const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.exitPass === 'review';
+const latest = (runs: RunRecord[]): RunRecord | undefined => [...runs].sort(inOrder).at(-1);
 
-const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.name === 'task-review';
-
-// The verdict this task currently stands under, or nothing. FILTERED TO RUNS THAT CARRY ONE, which is what
-// makes a dead `fix` leave the earlier failure standing: the task was sent back, the fix produced no
-// judgement of its own, and the finding is still outstanding. Reading the latest settled run instead would
-// clear a real failure because the run after it died.
+// A run whose WORK a verdict is written onto: a dispatching phase that BUILDS rather than judges, which the
+// table already says as `bounded: 'skill'`. Since the work moved up to the story too (decision 83) those are
+// a story's break-down, its implement and its fix — every run a story-level verdict can land on, and a task
+// has none of its own any more.
 //
-// Pass or fail, both: the caller reads `passed`. P3 dispatches when there is no FAILED verdict, P5 when
-// there is one, and P4r re-stamps from whichever it is — three questions, one lookup.
-export function outstandingVerdict(runs: RunRecord[], card: string): Verification | undefined {
-  return verdictRun(runs, card)?.verification;
+// `exitPass === 'review'` was the marker and could not survive the judgement moving up: no phase exits to a
+// review column any more, so it selected nothing at all.
+//
+// `bounded: 'skill'` IS NOT "EVERY RUN BUT A JUDGING ONE", and the comment here claimed it was. The feature
+// checkup carries it too, so a feature's checkup run reads as one of that feature's work runs. Nothing is
+// wrong today because nothing asks: `latestCompletedWorkRun` is the only caller and its one call site is
+// `judgeStory`, which is handed a STORY. But the property a reader would take from "excluded by
+// construction" is not one this predicate has, and a second caller reached from the feature loop would
+// find it out the hard way.
+const isWorkRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'skill';
+
+const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.board)?.bounded === 'review';
+
+// THE PHASE THAT ANSWERS A SEND-BACK. Named rather than read off `skill === 'fix'`, which would also match
+// that skill dispatched by hand onto a board no phase owns — a task's own fix among them, which is what a
+// person dispatching `fix` on an engineering card is doing since decision 83 retired the phase.
+//
+// A LIST OF ONE, and it stays a list: it was two until the work moved up to the story, and `fix` is still a
+// skill two boards offer.
+const FIX_PHASES: readonly PhaseName[] = ['story-fix'];
+
+const isFixRun = (run: RunRecord): boolean => {
+  const p = phaseForRun(run.skill, run.board);
+  return p !== undefined && FIX_PHASES.includes(p.name);
+};
+
+// `outstandingVerdict` AND `verdictRun` WERE HERE, and they went with the task loop (decision 83). They
+// answered "the latest work run that CARRIES a verdict", which was how a task in `in-progress` told a fix
+// from an implement — a question no card is asked now that the work and the judgement are both the story's,
+// and `judgeStory` reads the latest completed work run's OWN verdict for the reason written beside it in
+// core/lifecycle/tick.ts. Recorded rather than silently dropped because the difference between the two
+// lookups is a bug this machine has had twice.
+
+// THE RUN UNDER JUDGEMENT, which is what a `review` is handed as `previous` and what a send-back's verdict is
+// read off. Not filtered on carrying a verdict — the whole point is that this one has none yet — and the
+// review must be told WHICH run it is judging, or an earlier successful run on the same card becomes the work
+// it grades.
+//
+// COMPLETED ONLY (decision 87), which it was not while a send-back left its tasks in `done`. A fix that died,
+// was cancelled or never reached a model left the finding exactly where it was — its tasks are still
+// re-opened — and reading its absent verdict as "nothing was sent back" handed the story to an implement that
+// is never told the finding. Nor is a dead run ever what a judge grades, which is decision 40's third clause
+// one step earlier than `afterCardRun` asserts it.
+//
+// BOTH OUTCOMES AN AGENT MAY WRITE, and identically (decision 40): which of them it claimed is not evidence
+// of what it delivered, and the judgement after it is.
+const completed = (run: RunRecord): boolean => run.status === 'success' || run.status === 'attention';
+
+export function latestCompletedWorkRun(runs: RunRecord[], card: string): RunRecord | undefined {
+  return latest(runs.filter((r) => r.card === card && isWorkRun(r) && completed(r)));
 }
 
-// THE RUN THAT CARRIES THE VERDICT, which is what a `fix` is handed as `previous`: the findings are on the
-// run, not on the card, and a fix told to go and look for them is a fix guessing. Its own export rather than
-// a second filter at the call site, so "the latest work run that was judged" has one definition.
-export function verdictRun(runs: RunRecord[], card: string): RunRecord | undefined {
-  return latest(runs.filter((r) => r.card === card && isWorkRun(r) && r.verification !== undefined));
+// WHERE A STORY'S VERDICT LIVES WHEN THERE IS NO WORK RUN TO HANG ONE ON (decision 81). A story that skipped
+// its break-down because it arrived carrying tasks (decision 50), every one of them already SETTLED — an
+// import, or work somebody finished by hand — has no run of its own, so `recordVerdict`
+// had nothing to write the judgement onto and wrote it nowhere: every later tick read no verdict, dispatched
+// the judgement again, and `story-fix` was unreachable — the send-back could never be answered and the
+// review total stopped the whole project. A review run is itself a record, so that is where its verdict goes
+// in that case, and this reads it back.
+//
+// FILTERED TO ONE THAT CARRIES A VERDICT: a review that answered nothing left the story exactly where it
+// stood, so it is no more the answer than no review at all.
+//
+// SECOND TO `latestCompletedWorkRun` AT EVERY CALL SITE, never instead of it. The moment a fix has answered,
+// the fix is the run under judgement and the review before it is history — reading this first would send the
+// story back again after every fix, on a finding the fix had already addressed.
+export function reviewVerdictRun(runs: RunRecord[], card: string): RunRecord | undefined {
+  return latest(runs.filter((r) => r.card === card && isReviewRun(r) && r.verification !== undefined));
 }
 
-// THE RUN UNDER JUDGEMENT, which is what a `review` is handed as `previous`. Not filtered on carrying a
-// verdict — the whole point is that this one has none yet — and the review must be told WHICH run it is
-// judging, or an earlier successful run on the same card becomes the work it grades.
-export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | undefined {
-  return latest(runs.filter((r) => r.card === card && isWorkRun(r)));
+// HAS ANYTHING ANSWERED THIS CARD'S SEND-BACK SINCE THAT RUN? The question that tells "the judging point is
+// being asked the same thing over again" from "the card was sent back, work answered it, and this is the
+// next judgement" — one event while a task's review could not fail, two since decision 80 gave the story's
+// judgement an `exitFail`.
+//
+// A FEATURE HAS NO FIX PHASE, so this is false for every feature by construction. That used to be the
+// whole of the story and it left the feature checkup with NO hatch at all — a finished feature whose
+// checkup had created one story, and whose story was then delivered, could not be closed by anything
+// (decision 86). The feature's analogue is `cardsCreatedBy` below, read as terminal; this one stays the
+// story's, and says so.
+export function fixedSince(runs: RunRecord[], card: string, since: RunRecord): boolean {
+  return runs.some((r) => r.card === card && isFixRun(r) && inOrder(r, since) > 0);
 }
 
 // HOW A CARD'S OWN WORK LAST ENDED, which is what a checkup is told about each of its children (ruling 60).
@@ -79,20 +140,25 @@ export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | unde
 // run of any kind described that task to the checkup as having succeeded. Same conflation as the one the
 // review trigger was corrected for, one module over.
 //
-// NOT `latestWorkRun`, which is the right predicate for a task and answers nothing for anything else: it is
-// engineering-only by construction — the phases whose exit is `review` — and a story's own runs are its
-// break-down and its checkup, so filtering to work runs would tell a feature checkup nothing at all about
-// any of its children.
+// NOT `latestCompletedWorkRun`, and the difference is what counts as a card's OWN work. That one selects the
+// phases the table marks `bounded: 'skill'`, which is the lifecycle's own set — a story's break-down,
+// implement and fix, and nothing on engineering at all since decision 83 — and only the runs of them that
+// completed. A checkup is describing a CHILD, and a child's last run may be a skill a person dispatched by
+// hand, or one that died, both of which belong in that sentence. Excluding the reviews and nothing else is the
+// rule that matches the question.
 export function latestOwnRun(runs: RunRecord[], card: string): RunRecord | undefined {
   return latest(runs.filter((r) => r.card === card && !isReviewRun(r)));
 }
 
 // INCONCLUSIVE reviews, not reviews — finding A. `BURNS.success` is true (accounting.ts:98), deliberately,
 // and `attemptsUsed` filters on `burnsAttempt` — so a cap over every review run would stop the loop
-// `stalled` on a perfectly healthy task after three completed reviews, while the spec's own arithmetic row
-// expects `attemptCap + 1` of them per task.
+// `stalled` on a perfectly healthy story after three completed reviews, while the spec's own arithmetic row
+// expects `attemptCap + 1` of them.
 //
-// A review is inconclusive when it burned an attempt and answered nothing. That is not a blocked task:
+// A STORY, and no longer a task: since decision 80 the only judging point below a feature is the story's,
+// so this and the total below are asked of one card kind and the wording had stopped saying which.
+//
+// A review is inconclusive when it burned an attempt and answered nothing. That is not a blocked card:
 // `blocked` means judged unfixable, and a dead API key or a full disk is an infrastructure failure rather
 // than work nobody can fix — so this bound stops the loop naming THE REVIEW.
 export function inconclusiveReviews(runs: RunRecord[], card: string): number {
@@ -100,23 +166,29 @@ export function inconclusiveReviews(runs: RunRecord[], card: string): number {
     .length;
 }
 
-// EVERY REVIEW THIS TASK HAS COST, which is the bound the spec's arithmetic row already states: per task at
-// most `attemptCap` fix runs and `attemptCap + 1` review runs.
+// EVERY REVIEW THIS STORY HAS COST, which is the bound the spec's arithmetic row already states: at most
+// `attemptCap` fix runs and `attemptCap + 1` review runs.
 //
 // It exists because `inconclusiveReviews` counts one way a review can repeat and the review phase's trigger
-// admits others. The trigger dispatches whenever the LATEST WORK RUN carries no `verification`, so any failure
-// to record a verdict — `POST …/verification` refused non-fatally, for instance — leaves the work run exactly
-// as it was while the review itself answered perfectly. Nothing counts that: the review has a verdict, so it is
-// not inconclusive, and `dispatches: 1` resets the idle counter so `MAX_IDLE_TICKS` never arrives either. The
-// task pays for a full review, every tick, for as long as the write keeps failing.
+// admits others. The trigger dispatches whenever the LATEST COMPLETED WORK RUN carries no `verification`, so
+// any failure to record a verdict — `POST …/verification` refused non-fatally, for instance — leaves the work
+// run exactly as it was while the review itself answered perfectly. Nothing counts that: the review has a
+// verdict, so it is not inconclusive, and `dispatches: 1` resets the idle counter so `MAX_IDLE_TICKS` never
+// arrives either. The story pays for a full review, every tick, for as long as the write keeps failing.
+//
+// IT IS NO LONGER THE BOUND FOR A STORY WITH NO WORK RUN, which is what it was quietly doing and doing badly:
+// there was nowhere to record that story's verdict at all, so this counted to four and stopped the project
+// with a sentence blaming the server for a write nobody had attempted. `reviewVerdictRun` gives that verdict
+// a home (decision 81); what is left here is the case the sentence actually describes — a verdict the server
+// refused to write.
 //
 // A TOTAL rather than a second special case, chosen deliberately: it catches every way a review can repeat
 // without progress, including the ones nobody has thought of, where counting the unrecordable verdict as
 // inconclusive would blur what that word means and still only cover the one route. And `attemptCap + 1` cannot
-// stall a healthy task, because it is exactly the healthy maximum — implement, then a review and a fix for each
-// of `attemptCap` send-backs, then the review that passes.
+// stall a healthy story, because it is exactly the healthy maximum — the work, then a review and a fix for
+// each of `attemptCap` send-backs, then the review that passes.
 //
-// Filtered on `burnsAttempt`, like `attemptsUsed`: a review you cancelled is not a review the task spent.
+// Filtered on `burnsAttempt`, like `attemptsUsed`: a review you cancelled is not a review the card spent.
 export function reviewsRun(runs: RunRecord[], card: string): number {
   return runs.filter((r) => r.card === card && isReviewRun(r) && burnsAttempt(r)).length;
 }
@@ -138,6 +210,35 @@ export function reviewsRun(runs: RunRecord[], card: string): number {
 // seeing the archive would be strictly more correct — and a second creating round after a person archives a
 // story is not a failure worth an extra read of the archive on every tick.
 export function creatingRoundSpent(cards: Card[], runs: RunRecord[], card: string, skill: string): boolean {
-  const mine = new Set(runs.filter((r) => r.card === card && r.skill === skill).map((r) => r.run));
-  return cards.some((c) => c.createdBy !== undefined && mine.has(c.createdBy));
+  return creatingRun(cards, runs, card, skill) !== undefined;
+}
+
+// WHICH RUN SPENT IT, for the caller that has to ask what happened AFTER. `creatingRoundSpent` answers the
+// yes/no above and is the whole of what decision 47 needs; separating a story's send-back from a second ask
+// needs the round's position in the order as well (decision 81).
+export function creatingRun(
+  cards: Card[],
+  runs: RunRecord[],
+  card: string,
+  skill: string,
+): RunRecord | undefined {
+  const creators = new Set(cards.map((c) => c.createdBy).filter((id) => id !== undefined));
+  return latest(runs.filter((r) => r.card === card && r.skill === skill && creators.has(r.run)));
+}
+
+// WHAT THAT ROUND ACTUALLY MADE, as it stands on the board now — the other half of the question
+// `creatingRun` answers, and the feature's substitute for `fixedSince` (decision 86). A story's
+// send-back is answered by a FIX RUN; a feature's checkup is answered by the work it asked for being
+// finished, and there is no run on the feature to read that off.
+//
+// HERE RATHER THAN AT THE CALL SITE, so `Card.createdBy` is read in one module. Ruling 58's whole point
+// is that the board answers this and the run's own `created` list — the agent's claim about itself —
+// does not, and a second reading of the field somewhere else is a second chance to reach for the wrong
+// one.
+//
+// The LIVE board, like `creatingRoundSpent`: `readBoard` walks the configured columns only, so a card
+// somebody archived is not here. That direction is the safe one — an archived card cannot hold the
+// hatch shut over work that no longer exists.
+export function cardsCreatedBy(cards: Card[], run: RunRecord): Card[] {
+  return cards.filter((c) => c.createdBy === run.run);
 }

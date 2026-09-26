@@ -83,3 +83,20 @@ export function assistCredentialSection(apiBase: string, token: string): string 
     ...endpointsFor('assist'),
   ].join('\n');
 }
+
+// FIX BOARD'S, and the same generator again (decision 88): what a repair may call is `repair`'s rows in the one
+// table, so this cannot promise an endpoint the scope does not hold. Its lifetime is said differently because it
+// IS different — the credential ends when this turn does, not when the conversation does.
+export function repairCredentialSection(apiBase: string, token: string): string {
+  return [
+    `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
+    'It is for THIS repair and stops working the moment you finish answering. Never put it in a card, a',
+    'file, or a message.',
+    '',
+    'You are authorised to repair the board through these endpoints and nothing else. Use them rather than',
+    'writing files under `.vibeboard/` — every one of those paths is denied to you by the OS, so a write there',
+    'fails rather than doing something surprising:',
+    '',
+    ...endpointsFor('repair'),
+  ].join('\n');
+}

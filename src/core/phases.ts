@@ -16,16 +16,15 @@ export type PhaseName =
   | 'feature-breakdown-skip'
   | 'story-breakdown'
   | 'story-breakdown-skip'
-  | 'task-implement'
-  | 'task-review'
-  | 'task-review-remove'
-  | 'task-fix'
-  | 'story-checkup'
+  | 'story-satisfied'
+  | 'story-implement'
+  | 'story-fix'
+  | 'story-review'
   | 'feature-checkup';
 
 export interface Phase {
   name: PhaseName;
-  skill?: string; // absent = the loop acts alone (the two skips, task-review-remove)
+  skill?: string; // absent = the loop acts alone (the two break-down skips)
   board?: BoardName; // absent for the bootstrap: a project run has no card
   entry?: string; // column slug stamped before the dispatch
   exitPass?: string;
@@ -70,52 +69,86 @@ export const PHASES: readonly Phase[] = [
     exitPass: 'in-progress',
     bounded: 'none',
   },
-  // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
+  // THE OTHER WAY A BREAK-DOWN DOES NOT HAPPEN (decision 85), and the difference from the skip above is
+  // the exit. That one says "this story already has its tasks, work them"; this one says "this story's one
+  // acceptance criterion is a command the project declares as a gate, and it already passes" — so there is
+  // nothing to break down, nothing to implement, and nothing for a judge to add that the exit code has not
+  // already said.
+  //
+  // `exitPass: done` FOR THAT REASON, and it is the only phase that closes a story without a run. Four
+  // cards in a measured trial asked for work an earlier story's scaffold had already done, and each paid a
+  // full implement and a full review to find out.
+  //
+  // No skill: the loop carries it out alone, exactly as it does the two skips. The evidence is a command's
+  // exit code, which is the most deterministic thing in this design, and handing that to an agent would
+  // make a settled fact a judgement.
   {
-    name: 'task-implement',
-    skill: 'implement',
-    board: 'engineering',
-    entry: 'in-progress',
-    exitPass: 'review',
-    bounded: 'skill',
-  },
-  // No entry stamp: the card is already in review, and a move to where it is would be a write for
-  // nothing. Bounded over INCONCLUSIVE reviews rather than reviews (spec, the review cycle row): a
-  // successful review burns an attempt, so counting them all would stall a healthy task at three.
-  {
-    name: 'task-review',
-    skill: 'review',
-    board: 'engineering',
-    exitPass: 'done',
-    exitFail: 'in-progress',
-    bounded: 'review',
-  },
-  // "Has this already been done": the judgement happened and only the move failed. Re-stamp, never
-  // re-judge.
-  {
-    name: 'task-review-remove',
-    board: 'engineering',
-    exitPass: 'done',
-    exitFail: 'in-progress',
-    bounded: 'none',
-  },
-  // No entry stamp: its trigger is a task already in `in-progress`, so there is no move to make.
-  {
-    name: 'task-fix',
-    skill: 'fix',
-    board: 'engineering',
-    exitPass: 'review',
-    bounded: 'skill',
-  },
-  // Stays in `product/in-progress` while it runs, so no entry stamp. It creates on its OWN board —
-  // sibling stories (decision 47) — and ruling 61 stamps those too.
-  {
-    name: 'story-checkup',
-    skill: 'checkup-story',
+    name: 'story-satisfied',
     board: 'product',
     exitPass: 'done',
-    creates: 'product',
+    bounded: 'none',
+  },
+  // THE WORK OF A WHOLE STORY, IN ONE RUN (decision 83). It replaces the per-task implement and the per-task
+  // fix: one agent given a story and the tasks under it did three tasks' work in 18 turns and 50k of context
+  // against 41 turns and 148k, for equivalent code and equivalent defect detection.
+  //
+  // ON PRODUCT, and that is the whole of the change — the unit of work is the story, and the tasks under it
+  // are the record of what was asked rather than the thing dispatched. They stay on the board (the format is
+  // frozen) and are stamped into `review` TOGETHER when this run completes — delivered, awaiting judgement,
+  // and never `done`, which only a passing `story-review` writes (decision 87): `Group` in core/actions.ts
+  // carries which ones and which columns, `deliverGroup` in service/act/group.ts does the writing.
+  //
+  // `entry` AND `exitPass` ARE THE SAME COLUMN, and they are both declared rather than left out. A story is
+  // already in `in-progress` every time this phase is reached — `derivePosition` picks the open story out of
+  // `todo` or `in-progress`, and `storyPhase` has already skipped the break-down for either entering column
+  // — so both stamps are no-ops today and are written down for the day the derivation changes. Neither is
+  // WRITTEN while the card is already there: `stampEntry` in service/act/index.ts skips one and
+  // `afterCardRun` in service/act/outcomes.ts skips the other, because a move to where a card stands is a
+  // write for nothing and a diary line about an event that did not happen.
+  //
+  // No `creates`: an implement run has no board to create cards on, and the endpoint reads this.
+  {
+    name: 'story-implement',
+    skill: 'implement-story',
+    board: 'product',
+    entry: 'in-progress',
+    exitPass: 'in-progress',
     bounded: 'skill',
+  },
+  // WHERE A SENT-BACK STORY'S WORK IS REDONE, and without it a refused judgement has nowhere to go: the
+  // story sits settled in `in-progress` carrying a failed verdict, and every later tick re-stamps it to
+  // where it already is. ONE budget across both send-back kinds — a story the gates sent back and one the
+  // judge sent back spend one count — which is the whole of the bound now that the per-task fix it used to
+  // share that rule with has gone (decision 83).
+  //
+  // No `exitPass`: a fix does not close a story, the judge does. The story stays where it is, and the next
+  // tick finds a work run carrying no verdict — which is the judgement's own trigger.
+  //
+  // IT CARRIES A GROUP, as the implement does (decision 87): the tasks the send-back re-opened into
+  // `in-progress`, delivered back into `review` when it completes, so the judgement after it has something
+  // to judge and the board does not call re-opened work finished.
+  { name: 'story-fix', skill: 'fix', board: 'product', bounded: 'skill' },
+  // THE ONE JUDGEMENT A STORY GETS (decision 80), and it absorbs the story checkup. At story granularity
+  // "does this do what the card asked" and "do the tasks under it compose into it" are the same question,
+  // and asking both paid two cold starts for one answer.
+  //
+  // Stays in `product/in-progress` while it runs, so no entry stamp. It keeps the checkup's authority to
+  // create on its OWN board — sibling stories (decision 47) — and ruling 61 stamps those too.
+  //
+  // ITS VERDICT MOVES THE TASKS TOO (decision 87), which the table cannot express because they are not its
+  // card: a pass closes every task waiting in `review` before the story, and a send-back re-opens them.
+  // `Judged` in core/actions.ts carries which ones and where.
+  //
+  // Bounded over INCONCLUSIVE judgements rather than judgements (spec, the review cycle row): a successful
+  // one burns an attempt, so counting them all would stall a healthy story at three.
+  {
+    name: 'story-review',
+    skill: 'review-story',
+    board: 'product',
+    exitPass: 'done',
+    exitFail: 'in-progress',
+    creates: 'product',
+    bounded: 'review',
   },
   // `creates: product` on a `features` card: a feature checkup's product is stories under the feature
   // it ran on, which is why `creates` is declared apart from `board`.

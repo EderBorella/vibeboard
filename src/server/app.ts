@@ -8,6 +8,7 @@ import { listRuns } from '../store/run-store.js';
 import { registerAuth } from './auth/auth.js';
 import { CredentialStore } from './auth/credentials.js';
 import { DeviceStore } from './auth/devices.js';
+import { registerRepairAudit } from './auth/repair-audit.js';
 import { PendingRequests } from './auth/signin.js';
 import { registerAuthRoutes, registerSigninRoutes } from './auth/signin-routes.js';
 import { AutopilotRuntime } from './autopilot/autopilot-runtime.js';
@@ -244,7 +245,7 @@ export function buildApp(
   });
   // Told on every change, including the ones no endpoint drives — switching chat or project revokes it,
   // and a button that still reads "Authorised" is a person believing they hold authority they do not.
-  copilotAuthority.onChange((authorised) => broadcast({ type: 'copilot:authority', authorised }));
+  copilotAuthority.onChange(() => broadcast(copilotAuthority.announcement));
   const ctx: AppCtx = {
     session,
     copilot,
@@ -277,13 +278,15 @@ export function buildApp(
     async (api) => {
       // First inside the scope, so it runs for every route below it and for nothing outside.
       registerAuth(api, credentials, () => session.root);
+      // Straight after, because it reads what that hook decided about the caller.
+      registerRepairAudit(api);
       registerSigninRoutes(api, ctx);
       await registerProjectRoutes(api, ctx);
       await registerWizardRoutes(api, ctx);
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
-      await registerCopilotRoutes(api, ctx);
+      await registerCopilotRoutes(api, ctx, turns);
       await registerSandboxRoutes(api, ctx);
       await registerBoxRoutes(api, ctx);
       await registerSettingsRoutes(api);

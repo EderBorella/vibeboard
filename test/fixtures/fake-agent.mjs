@@ -18,6 +18,7 @@
 //   verdict:v — writes a success report carrying `verdict: v`, for a review run
 //   create:…  — creates cards through the API, one POST per card, then PUTs its own link list
 //   createlinks:… — the same cards, but with `links` on the POST and no PUT. See `createCards` below.
+//   probe:b:id — calls a fixed set of routes with its own credential and records each status. See below.
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -44,26 +45,28 @@ if (process.env.VIBEBOARD_SHIM_ARGS) {
 // The contract puts the path on a line of its own inside a fenced block, so match a whole line
 // rather than a folder this shim would otherwise have to keep in step with core/layout.ts.
 const match = prompt.match(/^[\w./-]+\.report\.md$/m);
-// `[\w:]` and not `\w`: a behaviour may carry arguments, colon-separated, and `\w` excludes the colon — so
+// `[\w:-]` and not `\w`: a behaviour may carry arguments, colon-separated, and `\w` excludes the colon — so
 // `[[behaviour:create:features:2]]` matched NOTHING and fell through to the `?? 'success'` default. The
 // failure was silent and looked exactly like a machine bug: cards never appeared and the loop refused the
 // creating phase for producing nothing. Every existing single-word marker still matches, with no arguments.
+// The HYPHEN for the same reason, found the same way: `verdict:sent-back` is the only verdict that is not
+// `done`, and without it the judge's send-back fell through to a report with no verdict at all.
 // A marker may also be scoped to ONE CARD: `[[behaviour@E-004:create:engineering:1]]`, which only this shim's
 // own card obeys. It exists for a card whose BODY nobody can seed — the smoke-harness feature is created by the
 // loop with a canned body (src/core/harness-feature.ts), so the usual route of putting the chain in the card is
 // closed for it, and a marker in the SKILL body wins over every card's because the skill sits higher in the
 // prompt. Scoped, it drives exactly one card and every other card still falls through to its own.
 //
-// `@` is not in `[\w:]`, so the unscoped pattern below cannot see a scoped marker: a skill carrying only a
+// `@` is not in `[\w:-]`, so the unscoped pattern below cannot see a scoped marker: a skill carrying only a
 // scoped one leaves every other card reading its own body, which is what makes this additive.
 const scopedMarker = (id) => {
   if (id === undefined) return undefined;
   const escaped = id.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-  return (prompt.match(new RegExp(`\\[\\[behaviour@${escaped}:([\\w:]+)\\]\\]`)) ?? [])[1];
+  return (prompt.match(new RegExp(`\\[\\[behaviour@${escaped}:([\\w:-]+)\\]\\]`)) ?? [])[1];
 };
 const [behaviour = 'success', ...behaviourArgs] = (
   scopedMarker((prompt.match(/^## The card: (\S+)$/m) ?? [])[1]) ??
-  (prompt.match(/\[\[behaviour:([\w:]+)\]\]/) ?? [])[1] ??
+  (prompt.match(/\[\[behaviour:([\w:-]+)\]\]/) ?? [])[1] ??
   'success'
 ).split(':');
 
@@ -175,6 +178,12 @@ async function createCards(mode, args) {
   return created;
 }
 
+// A CREATING RUN THAT IS ALSO A JUDGING ONE, which the story's judgement is: it may write sibling stories
+// for what was MISSED (decision 47) and it MUST answer a verdict, because a report with none passes nothing.
+// Decided from the PROMPT rather than from a second marker, which is how a real agent decides it too — and a
+// shim that could only do one of the two could not express the phase at all.
+const judging = prompt.includes('## Judging (required)');
+
 if (behaviour === 'create' || behaviour === 'createlinks') {
   // A creating run: it changes no files at all, so what it produced is only visible on the board — which is
   // exactly why `createdNothing` compares the board before and after rather than reading this report.
@@ -184,7 +193,7 @@ if (behaviour === 'create' || behaviour === 'createlinks') {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(
       path,
-      `---\noutcome: success\nsummary: created ${created.length} card${created.length === 1 ? '' : 's'}\ncreated: [${created.join(', ')}]\n---\n## What I did\n\nOne POST per card.\n`,
+      `---\noutcome: success\nsummary: created ${created.length} card${created.length === 1 ? '' : 's'}\n${judging ? 'verdict: done\n' : ''}created: [${created.join(', ')}]\n---\n## What I did\n\nOne POST per card.\n`,
       'utf8',
     );
   }
@@ -198,6 +207,51 @@ if (behaviour === 'create' || behaviour === 'createlinks') {
     session_id: 'shim-run',
     total_cost_usd: 0.0125,
     usage: { input_tokens: 5, cache_read_input_tokens: 95, output_tokens: 7 },
+  });
+  process.exit(0);
+} else if (behaviour === 'probe') {
+  // WHAT A CREDENTIAL REALLY BUYS, asked of the running server by the agent holding it. Every other test of a
+  // scope asks `allows` directly or injects a request; this is the token the route minted, read out of the
+  // prompt the way a model reads it and sent over HTTP the way a model sends it, so neither end is a fake.
+  // Fix board's grant is the subject (decision 88): two routes it must reach, three it must not, and the
+  // statuses are recorded rather than judged here — the test decides what each one should have been.
+  const [board, card] = behaviourArgs;
+  const status = async (method, path, body) => {
+    const res = await fetch(`${apiBase}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${leakedCred}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+    return res.status;
+  };
+  const probed = {
+    reset: await status('POST', `/api/runs/${board}/${card}/reset`),
+    place: await status('POST', `/api/cards/${board}/${card}/place`, {
+      toColumnSlug: 'backlog',
+      beforeId: null,
+    }),
+    start: await status('POST', '/api/autopilot/start'),
+    fixBoard: await status('POST', '/api/copilot/fix-board'),
+    authorise: await status('POST', '/api/copilot/authority', { enabled: true }),
+  };
+  if (process.env.VIBEBOARD_SHIM_ARGS) {
+    appendFileSync(process.env.VIBEBOARD_SHIM_ARGS, `${JSON.stringify({ probed })}\n`);
+  }
+  say({
+    type: 'assistant',
+    message: { content: [{ type: 'text', text: 'probed' }] },
+    session_id: 'shim-run',
+  });
+  say({
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    result: 'probed',
+    num_turns: 1,
+    duration_ms: 10,
+    session_id: 'shim-run',
+    total_cost_usd: 0,
+    usage: { input_tokens: 5, output_tokens: 1 },
   });
   process.exit(0);
 } else if (behaviour === 'chatty') {

@@ -9,9 +9,10 @@ import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
 import { afterProjectRun } from './bootstrap.js';
 import { CHECKUP_PHASES, type CheckupEvidence, checkupEvidence } from './checkup.js';
+import { claimGroup } from './group.js';
 import { afterCardRun, countsTheBoard, liveCount } from './outcomes.js';
 import { refused, stop } from './refusals.js';
-import { inSetup, reviewTask } from './review.js';
+import { inSetup, reviewStory } from './review.js';
 import { commitMessage } from './sentences.js';
 import { settle } from './settle.js';
 
@@ -19,12 +20,17 @@ import { settle } from './settle.js';
 //
 // THE ORDINARY DISPATCH, which is every phase but one:
 //
-//   commit → stamp the entry column → dispatch → wait for the record to settle → stamp the exit column → diary
+//   commit → stamp the entry column → claim the group → dispatch → wait for the record to settle
+//          → deliver the group → stamp the exit column → diary
 //
-// AND THE REVIEW, which is deterministic first (decision 51) and so does not take that path at all:
+// The two group steps are the story's implement and its fix (decisions 83 and 87) and are no-ops everywhere
+// else: they are the phases whose run delivers cards other than its own.
+//
+// AND THE STORY'S JUDGEMENT, which is deterministic first (decision 51) and so does not take that path at all:
 //
 //   commit → run the gates HERE, in this process → send-back with the command's own output if they fail
-//          → only if they pass, dispatch a `review` run → write its verdict onto the run it judged → stamp
+//          → only if they pass, dispatch a `review-story` run → write its verdict onto the run it judged
+//          → move the tasks it judged → stamp
 //
 // Four rules, each of which is a decision rather than an implementation detail:
 //
@@ -42,7 +48,7 @@ import { settle } from './settle.js';
 //        no say;
 //      * a `failed` run NEVER advances its card, which is asserted on its own (see `recordFailedRun` in
 //        outcomes.ts) because "it produced nothing" does not cover a run that died after touching one file.
-//    What judges the work itself is the `task-review` phase, which is a separate run with no authority over
+//    What judges the work itself is the `story-review` phase, which is a separate run with no authority over
 //    the card it judges.
 // 3. THE CARD IS MOVED THROUGH THE ENDPOINT, and so is everything else this writes. The loop holds a
 //    `service` credential and goes through the same validation as an agent (decision 10). Two exceptions,
@@ -57,7 +63,7 @@ import { settle } from './settle.js';
 //   `gates`  — the gate commands, run here, failing closed; and the two correctness refusals that write the
 //              same mode because they are the loop's own check: a run that left NOTHING behind, and a
 //              card-only phase whose board did not grow;
-//   `review` — what the `review` run answered, written onto the run it judged (ruling 57).
+//   `review` — what the `review-story` run answered, written onto the run it judged (ruling 57).
 //
 // It also runs the SMOKE command before a feature checkup and hands the result over as evidence (ruling 55).
 // Both commands are refused outright while a gate document is unread — see `refuseWhileGateDocumentUnread` in
@@ -126,8 +132,8 @@ export async function performAction(
 type Stamp = Extract<TickAction, { kind: 'stamp' }>;
 export type Dispatch = Extract<TickAction, { kind: 'dispatch' }>;
 
-// A move the loop makes with no run behind it: the two break-down skips, the re-stamp of a task whose verdict
-// was already decided, and a task that has used every fix attempt. No dispatch and no cost — the judgement
+// A move the loop makes with no run behind it: the two break-down skips, the re-stamp of a story whose verdict
+// was already decided and of each task it closes, and a card that has used every fix attempt. No dispatch and no cost — the judgement
 // either already happened or was never needed.
 async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
   const moved = await stamp(deps, action.card, action.to, action.why);
@@ -169,9 +175,9 @@ function requestFor(action: Dispatch, checkup?: CheckupEvidence): DispatchReques
   };
 }
 
-// THE ENTRY STAMP, and only where the phase names one. `task-review` and `task-fix` name none because the
-// card is already where they want it, and a move to where a card already is would be a write for nothing —
-// and a diary line about an event that did not happen. The bootstrap names none because it has no card.
+// THE ENTRY STAMP, and only where the phase names one. The two fixes and the story's judgement name none
+// because the card is already where they want it, and a move to where a card already is would be a write for
+// nothing — and a diary line about an event that did not happen. The bootstrap names none: it has no card.
 //
 // AND ONLY WHERE THE CARD IS NOT THERE ALREADY, which the phase table cannot express: a break-down RETRY has
 // the same entry column as the attempt before it, so the card is already in `todo` and this wrote "moved to
@@ -183,6 +189,17 @@ async function stampEntry(deps: ActDeps, action: Dispatch): Promise<ActResult | 
   const stamped = await stamp(deps, card, entry, `auto-pilot is starting its ${action.phase} phase.`);
   if (stamped.ok) return undefined;
   return await refused(deps, `could not move ${card.id} to ${entry}`, stamped.reason, stamped.fatal);
+}
+
+// EVERY STAMP THAT PRECEDES A DISPATCH, in the order they are written: the card into its entry column, then
+// the cards one level down this run is for (decision 83). The group's is BEFORE the dispatch because it is
+// part of the dispatch's own input — the prompt lists every card the story links to with the column it
+// stands in, and that is how the run is told which tasks are its own.
+//
+// One function rather than two guards at the call site, and it is the complexity budget that decides: the
+// second guard took `dispatch` past what the gate allows, and flattening beats a suppression.
+async function stampsBefore(deps: ActDeps, action: Dispatch): Promise<ActResult | undefined> {
+  return (await stampEntry(deps, action)) ?? (await claimGroup(deps, action));
 }
 
 // One dispatch, card or project. The two differ in exactly three places and share everything else, so they
@@ -202,21 +219,19 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     return stop(deps, 'stalled', `Auto-pilot stopped before ${what}: ${committed.reason}`);
   }
 
-  // DECISION 51: the review phase is DETERMINISTIC FIRST, so it does not take the ordinary path at all — its
+  // DECISION 51: the judging phase is DETERMINISTIC FIRST, so it does not take the ordinary path at all — its
   // gates run in this process and a model is dispatched only if they pass. Placed after the commit, because
   // whatever the last run left behind must be recoverable before anything else happens.
-  if (action.phase === 'task-review' && card) {
-    return await reviewTask(
-      deps,
-      card,
-      action.previous,
-      { setupSubtree: await inSetup(deps, card) },
-      context,
-    );
+  //
+  // THE STORY'S, since decision 80. Its own gathering too: a story's judgement is told what is under the card
+  // the way the checkup it absorbed was, and `reviewStory` reads `CHECKUP_PHASES` for that rather than the
+  // block below, which it never reaches.
+  if (action.phase === 'story-review' && card) {
+    return await reviewStory(deps, action, card, { setupSubtree: await inSetup(deps, card) }, context);
   }
 
-  const refusedEntry = await stampEntry(deps, action);
-  if (refusedEntry) return refusedEntry;
+  const refusedStamp = await stampsBefore(deps, action);
+  if (refusedStamp) return refusedStamp;
 
   // HOW BIG THE BOARD WAS BEFORE, for a phase whose only product is cards. Read here rather than counted from
   // the run's own `created` list, which is the agent's claim about itself (decision 43): that list would refuse

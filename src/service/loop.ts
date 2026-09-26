@@ -9,6 +9,7 @@ import { decideTick, type TickAction } from '../core/tick.js';
 import { BOARDS, type BoardName, type Card } from '../core/types.js';
 import type { DeclaredCommands } from '../store/project/foundation.js';
 import type { BoardClient, Failed } from './board-client.js';
+import type { SatisfiedWorld } from './satisfied.js';
 
 // The loop, and it holds no decisions of its own. Every tick is: read the world, hand it to `decideTick`,
 // carry the one action out, write down what happened. The reasoning is in `src/core/tick.ts`, which is pure
@@ -44,6 +45,11 @@ export interface LoopDeps {
   // credential. FRESH EVERY TICK, never captured — an agent rewrites both documents while the loop runs, and
   // the whole point of the comparison is to see what the project says NOW.
   commands: () => Promise<DeclaredCommands>;
+  // WHICH BREAK-DOWN CANDIDATE'S CRITERION ALREADY PASSES (decision 85), off the same disk the commands
+  // above come from and for the same reason: there is no route that runs a command for a `service`
+  // credential, and the tick may not spawn anything. FRESH EVERY TICK like the commands — what it caches,
+  // and what makes that safe, is `satisfied.ts`'s own business rather than this file's.
+  satisfied: (world: SatisfiedWorld) => Promise<string[]>;
   // Carrying out one action. Task 8's `act.ts`; injected so this file's sequencing is testable on its own,
   // and so the loop cannot quietly grow a second place where work happens.
   act: (action: TickAction, context: TickContext) => Promise<ActResult>;
@@ -78,6 +84,15 @@ export interface ActResult {
   // board of freshly-derived features looks exactly like one derived last week — see the decision row for
   // what that costs as well as what it buys.
   stop?: { reason: StopReason; detail?: string };
+  // A SEND-BACK THIS ACTION HAD NOWHERE TO RECORD, by card id (decision 82). A story's gates failed and the
+  // card carries no run of any kind — no work run, because it arrived with every task under it already
+  // settled and so was never implemented, and no review run, because the gates run before the judge is
+  // dispatched. Nothing on disk says it happened, so the loop carries it to the next `decideTick`, which
+  // routes the story to its fix on it.
+  //
+  // NOT a decision: `act` reports what it did and could not do, exactly as `dispatches` does. Which row the
+  // machine is in is still the tick's answer.
+  unrecordedSendBack?: string;
 }
 
 // Why the loop ended. Returned rather than thrown so the caller — a process whose exit code nobody reads —
@@ -106,10 +121,16 @@ interface Progress {
   iterations: number;
   // Consecutive ticks that dispatched nothing — see MAX_IDLE_TICKS.
   idle: number;
+  // The send-backs `act` had nowhere to write down — see `unrecordedSendBacks` on `TickInput`. IN MEMORY AND
+  // NOWHERE ELSE, deliberately: it is true of exactly one tick, because the fix it buys is itself a record
+  // and every judgement after that lands on one. A loop restarted inside that window re-runs the gates once
+  // and arrives at the same place, which is the cost of not inventing a state file for a fact with a
+  // one-tick life (decision 39's rule about not storing the position, one size down).
+  unrecorded: Set<string>;
 }
 
 export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
-  const progress: Progress = { iterations: 0, idle: 0 };
+  const progress: Progress = { iterations: 0, idle: 0, unrecorded: new Set() };
 
   for (;;) {
     // RULE 1. Every tick, before anything else: another process may have written a stop since the last one.
@@ -119,7 +140,7 @@ export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
       return { reason: state.reason ?? 'stopped', detail: state.detail, iterations: progress.iterations };
     }
 
-    const world = await gather(deps);
+    const world = await gather(deps, progress.unrecorded);
     if ('failed' in world) {
       const ended = await afterFailedRead(deps, world.failed, progress);
       if (ended) return ended;
@@ -166,6 +187,10 @@ async function carryOut(
   progress: Progress,
 ): Promise<LoopEnded | undefined> {
   const result = await deps.act(action, { iteration: state.iteration, columns });
+  // UNCONDITIONALLY, before the branch below reads `dispatches`: what act could not write down is true
+  // whatever the action spent, and hanging it off either branch would tie it to a number it has nothing to
+  // do with.
+  if (result.unrecordedSendBack !== undefined) progress.unrecorded.add(result.unrecordedSendBack);
   if (result.dispatches > 0) {
     progress.iterations += result.dispatches;
     progress.idle = 0;
@@ -202,6 +227,9 @@ async function carryOut(
 // what the setup barrier's honesty depends on.
 async function gather(
   deps: LoopDeps,
+  // Carried in rather than read here, because it is the only thing the tick is told that came from the loop
+  // itself rather than from the world — see `Progress.unrecorded`.
+  unrecorded: ReadonlySet<string>,
 ): Promise<{ input: Omit<Parameters<typeof decideTick>[0], 'state'> } | { failed: Failed }> {
   const board = await deps.client.board();
   if (!board.ok) return { failed: board };
@@ -211,10 +239,20 @@ async function gather(
   const cards: Card[] = BOARDS.flatMap((name) => board.value.boards[name] ?? []);
   const columns = {} as Record<BoardName, string[]>;
   for (const name of BOARDS) columns[name] = boardColumnSlugs(board.value.config, name);
+  const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
+  // Read in the same gather as the board, so the commands the tick compares are the ones declared while
+  // this board was true.
+  const commands = await deps.commands();
+  // Hoisted out of the input below because the criterion check reads it too: a run in flight means the tick
+  // is about to wait, and measuring a criterion against a tree an agent is editing is both wasted and wrong
+  // (see `satisfied.ts`). One list, so the two cannot be told different things about one board.
+  const inFlight = runs.value.runs
+    .filter((r) => r.status === 'queued' || r.status === 'running')
+    .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill }));
 
   return {
     input: {
-      ap: board.value.config.autopilot ?? DEFAULT_AUTOPILOT,
+      ap,
       cards,
       columns,
       runs: runs.value.runs,
@@ -224,13 +262,19 @@ async function gather(
       // Identities, not a count. `attemptsUsed` deliberately does not count an unfinished run, so the card
       // being worked stays eligible — and above a concurrency of one the pick would otherwise hand out the
       // same card twice.
-      inFlight: runs.value.runs
-        .filter((r) => r.status === 'queued' || r.status === 'running')
-        .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill })),
+      inFlight,
       problems: board.value.problems,
-      // Read in the same gather as the board, so the commands the tick compares are the ones declared while
-      // this board was true.
-      commands: await deps.commands(),
+      commands,
+      unrecordedSendBacks: [...unrecorded],
+      // AFTER the board and the commands and from both, because that is what it is about: the story this
+      // board says the machine is in the middle of, and the gates this project says it runs. A command is
+      // spawned only where those two meet on a break-down candidate.
+      satisfied: await deps.satisfied({
+        cards,
+        commands,
+        inFlight,
+        ...(ap.focus === undefined ? {} : { focus: ap.focus }),
+      }),
     },
   };
 }

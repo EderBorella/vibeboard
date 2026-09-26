@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   startAutopilot: vi.fn(),
   softStopAutopilot: vi.fn(),
   killAutopilot: vi.fn(),
+  fixBoard: vi.fn(),
   acknowledgeGates: vi.fn(),
   patchConfig: vi.fn(),
   // Re-exported by the module under test's import of ../api, so the real one must be present.
@@ -51,6 +52,7 @@ beforeEach(() => {
   api.startAutopilot.mockReset().mockResolvedValue({ state: IDLE });
   api.softStopAutopilot.mockReset().mockResolvedValue({ state: IDLE });
   api.killAutopilot.mockReset().mockResolvedValue({ state: IDLE });
+  api.fixBoard.mockReset().mockResolvedValue({ chat: 'chat-9' });
   api.acknowledgeGates.mockReset().mockResolvedValue({ ok: true });
   api.patchConfig.mockReset().mockResolvedValue({});
 });
@@ -116,6 +118,7 @@ const show = (
     onChanged?: () => void;
     onBackendChanged?: () => void;
     onSettings?: () => void;
+    onRepairing?: () => void;
   } = {},
 ) =>
   render(
@@ -130,6 +133,7 @@ const show = (
       onChanged={over.onChanged ?? (() => {})}
       onBackendChanged={over.onBackendChanged ?? (() => {})}
       onSettings={over.onSettings ?? (() => {})}
+      onRepairing={over.onRepairing ?? (() => {})}
     />,
   );
 
@@ -348,6 +352,73 @@ describe('the stops are on the bar, not behind Settings', () => {
     show({ state: { ...IDLE, state: 'running', iteration: 1 } });
     fireEvent.click(await screen.findByRole('button', { name: /^stop$/i }));
     await waitFor(() => expect(api.softStopAutopilot).toHaveBeenCalled());
+  });
+});
+
+// FIX BOARD (decision 88): the owner placed it directly after the emergency stop, and it asks before it hands
+// the copilot powers the Authorise button never gives.
+describe('Fix board', () => {
+  const STALLED: AutopilotState = {
+    state: 'stopped',
+    iteration: 3,
+    reason: 'stalled',
+    detail: 'E-004 is stuck.',
+  };
+
+  it('sits directly after the emergency stop', async () => {
+    show({ state: STALLED });
+    const kill = await screen.findByTestId('ap-kill');
+    const row = kill.parentElement;
+    const children = Array.from(row?.children ?? []);
+    expect(children.indexOf(screen.getByTestId('ap-fix-board'))).toBe(children.indexOf(kill) + 1);
+  });
+
+  it('asks first, naming the powers it hands over, and does nothing if you decline', async () => {
+    const onRepairing = vi.fn();
+    show({ state: STALLED, onRepairing });
+    fireEvent.click(await screen.findByTestId('ap-fix-board'));
+
+    expect(await screen.findByText(/Hand this board to the copilot to repair\?/)).toBeTruthy();
+    // The half a person must hear: elevated, for one conversation, and what it cannot do.
+    expect(screen.getByText(/elevated powers over this board/)).toBeTruthy();
+    expect(screen.getByText(/It cannot start auto-pilot/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => expect(screen.queryByText(/Hand this board to the copilot/)).toBeNull());
+    expect(api.fixBoard).not.toHaveBeenCalled();
+    expect(onRepairing).not.toHaveBeenCalled();
+  });
+
+  // The panel opens BEFORE the request, so the conversation is on screen when its first words arrive.
+  it('opens the copilot and then asks the server, on confirmation', async () => {
+    const order: string[] = [];
+    const onRepairing = vi.fn(() => order.push('panel'));
+    api.fixBoard.mockImplementation(async () => {
+      order.push('request');
+      return { chat: 'chat-9' };
+    });
+    show({ state: STALLED, onRepairing });
+    fireEvent.click(await screen.findByTestId('ap-fix-board'));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Fix board' }));
+    await waitFor(() => expect(api.fixBoard).toHaveBeenCalledTimes(1));
+    expect(order).toEqual(['panel', 'request']);
+  });
+
+  it('shows the server’s refusal verbatim', async () => {
+    api.fixBoard.mockRejectedValue(new Error('The copilot is answering another message.'));
+    show({ state: STALLED });
+    fireEvent.click(await screen.findByTestId('ap-fix-board'));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Fix board' }));
+    expect((await screen.findByTestId('ap-bar-error')).textContent).toBe(
+      'The copilot is answering another message.',
+    );
+  });
+
+  it('is disabled under a running loop, with the reason as its title', async () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 2 } });
+    const button = await screen.findByTestId('ap-fix-board');
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(button.getAttribute('title')).toMatch(/Soft-stop it/);
   });
 });
 

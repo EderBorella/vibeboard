@@ -8,6 +8,7 @@ import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { backendCheck } from './boxes/backend-liveness.js';
 import { BoxManager } from './boxes/box-manager.js';
 import { BoxService } from './boxes/box-service.js';
+import { hostCli } from './boxes/cli-versions.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
 import { credentialCheck } from './boxes/credential-freshness.js';
 import { ensureAgentImages } from './boxes/image-build.js';
@@ -75,7 +76,14 @@ const boxes = new BoxService({
 // A FAILED BUILD DOES NOT STOP THE SERVER. The board, the explorer and settings all work without agents;
 // refusing to boot would take a working product away over a prerequisite the user can be told about, and
 // the banner below already says agents are disabled and why.
-await ensureAgentImages(boxes, (line) => process.stderr.write(`${line}\n`));
+//
+// AN IMAGE WHOSE CLIs ARE NOT THE HOST'S IS REPORTED HERE, NOT REBUILT. That would be minutes of
+// `npm install` on the first start after every host update, `npm run dev` restarts on each save and would
+// kill it half way, and the image it would replace still runs agents. Settings offers the rebuild instead.
+await ensureAgentImages(boxes, (line) => process.stderr.write(`${line}\n`), {
+  host: hostCli.refresh,
+  whenStale: 'report',
+});
 
 // One shot for the BANNER, which is a statement about this moment and is printed once.
 const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
@@ -103,6 +111,9 @@ const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE, {
     backend: () => session.config?.copilot.backend,
     url: knownOpencodeUrl,
   }),
+  // AND WHETHER THE IMAGES' CLIs ARE THE HOST'S, which refuses nothing and is what puts the rebuild in
+  // front of somebody in Settings. The cached reading, because this runs behind the sandbox TTL.
+  host: hostCli.current,
 });
 const app = buildApp(session, {
   logger: logging.options,

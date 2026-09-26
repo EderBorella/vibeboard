@@ -67,6 +67,13 @@ export async function setAuthority(enabled: boolean): Promise<{ authorised: bool
   return post('/api/copilot/authority', { enabled });
 }
 
+// Fix board: the server opens a new conversation, grants it `repair` for one turn and starts that turn, then
+// answers with the conversation's id. Nothing here grants anything — there is no call that elevates an
+// existing conversation, which is why this is one request rather than the socket's three verbs.
+export async function fixBoard(): Promise<{ chat: string }> {
+  return post('/api/copilot/fix-board', {});
+}
+
 export interface SigninDevice {
   id: string;
   label: string;

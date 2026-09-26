@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
+import { endpointsFor } from '../src/server/auth/auth.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
+import { SEED_SKILLS } from '../src/store/project/seed-skills.js';
 import { fixedSandbox, TEST_SANDBOX, tempDir } from './helpers.js';
 
 // Where a RUN may create a card, what vertical it belongs to, and which run made it — all three enforced at
@@ -120,10 +122,11 @@ describe('which board a run may create a card on', () => {
     expect(res.json().error).toContain('POST /api/suggestions');
   });
 
-  // DECISION 47: a story checkup may create the siblings it believes were missed, on its own board.
-  it('lets a story checkup create a card on product — its own board', async () => {
+  // DECISION 47: a story's judgement may create the siblings it believes were missed, on its own board —
+  // the authority it kept when it absorbed the story checkup (decision 80).
+  it('lets a story judgement create a card on product — its own board', async () => {
     const { app, store, root } = await open();
-    const run = store.mintRun('work', 'run-6', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-6', root, 'P-001', { board: 'product', skill: 'review-story' });
     const res = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'backlog',
@@ -230,9 +233,9 @@ describe('the column a created card enters', () => {
 
   // RULING 61. The bug it prevents is the one that manufactures a false success: unstamped, a checkup's
   // sibling could be created straight into `product/done`, where it becomes `complete`'s positive evidence.
-  it('stamps a story checkup’s sibling into product/backlog, not the column it asked for', async () => {
+  it('stamps a story judgement’s sibling into product/backlog, not the column it asked for', async () => {
     const { app, store, root } = await open();
-    const run = store.mintRun('work', 'run-9', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-9', root, 'P-001', { board: 'product', skill: 'review-story' });
     const created = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'done',
@@ -374,8 +377,8 @@ describe('the vertical a run’s new card belongs to', () => {
   });
 
   // RULING 61's other half: a sibling inherits the group of the card the run is ABOUT, not that card's
-  // parent's — otherwise a story checkup's siblings would land in no vertical at all.
-  it('stamps a story checkup’s sibling with the group of the card it ran on', async () => {
+  // parent's — otherwise a story judgement's siblings would land in no vertical at all.
+  it('stamps a story judgement’s sibling with the group of the card it ran on', async () => {
     const { app, store, root } = await open();
     // A person's story, already labelled with its feature's vertical.
     const story = await create(app, admin, {
@@ -386,7 +389,7 @@ describe('the vertical a run’s new card belongs to', () => {
     });
     const run = store.mintRun('work', 'run-15', root, story.json().id, {
       board: 'product',
-      skill: 'checkup-story',
+      skill: 'review-story',
     });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',
@@ -739,11 +742,11 @@ describe('the parent a run’s new card hangs off', () => {
   });
 
   // THE CASE THAT MAKES "link to the run's own card" WRONG, and getting it wrong would silently do nothing: a
-  // story checkup creates SIBLINGS on its own board, and a sibling linked to its sibling is nobody's child.
-  it('is the card ABOVE the run’s own card for a story checkup, which creates siblings', async () => {
+  // story judgement creates SIBLINGS on its own board, and a sibling linked to its sibling is nobody's child.
+  it('is the card ABOVE the run’s own card for a story judgement, which creates siblings', async () => {
     const { app, store, root } = await open();
     // The scaffolded P-001 already hangs off F-001, which is the vertical the sibling belongs in.
-    const run = store.mintRun('work', 'run-p4', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const run = store.mintRun('work', 'run-p4', root, 'P-001', { board: 'product', skill: 'review-story' });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',
       columnSlug: 'backlog',
@@ -781,7 +784,7 @@ describe('the parent a run’s new card hangs off', () => {
     expect(linksIn(story)).toEqual([]);
   });
 
-  it('creates the card anyway when a story checkup’s own card has no feature above it', async () => {
+  it('creates the card anyway when a story judgement’s own card has no feature above it', async () => {
     const { app, store, root } = await open();
     const loose = await create(app, admin, {
       board: 'product',
@@ -790,7 +793,7 @@ describe('the parent a run’s new card hangs off', () => {
     });
     const run = store.mintRun('work', 'run-p7', root, loose.json().id, {
       board: 'product',
-      skill: 'checkup-story',
+      skill: 'review-story',
     });
     const sibling = await create(app, bearer(run.token), {
       board: 'product',
@@ -831,5 +834,135 @@ describe('the parent a run’s new card hangs off', () => {
     });
     expect(linksIn(story)).toEqual(['F-001']);
     expect(await linksOn(app, 'features', 'F-001')).toContain(story.json().id);
+  });
+});
+
+// DECISION 85, AT THE DOOR THE AGENT ACTUALLY KNOCKS ON. `createForRequest` spreads its whole body into the
+// card, so `satisfiedBy` arrived unexamined: `42`, `{ cmd: 'npm test' }`, `['npm test']` and `null` were all
+// answered 200 and serialized into the frontmatter as a YAML scalar, a map and a list — under a key the
+// frozen on-disk format says is `string | undefined`.
+//
+// REFUSED RATHER THAN DROPPED, which is the rule the PATCH route forty lines below the create already
+// follows: answering 200 over a card that did not carry the field tells the caller — very often a
+// break-down agent — that it succeeded, so it never tries the other spelling.
+//
+// AND THE PARSER'S GUARD IS NOT A SUBSTITUTE FOR THIS. `parseCardContent` reads a non-string back as absent,
+// which is what keeps a card ALREADY on disk inert (test/card.test.ts); it does nothing to stop one being
+// written, and the two together are what make the field safe rather than either alone.
+describe('the criterion a created card names', () => {
+  const productIds = async (app: FastifyInstance): Promise<string[]> => {
+    const res = await app.inject({ method: 'GET', url: '/api/state', headers: admin });
+    const { snapshot } = res.json() as { snapshot: { boards: Record<string, { id: string }[]> } };
+    return snapshot.boards.product.map((c) => c.id);
+  };
+
+  it('writes a string satisfiedBy onto the card', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-sb', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const created = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'The lint gate passes',
+      satisfiedBy: 'npm run lint',
+    });
+    expect(created.statusCode).toBe(200);
+    expect(created.json().satisfiedBy).toBe('npm run lint');
+  });
+
+  // `null` is in the list on purpose: it is what a JSON encoder emits for an absent value, so it is the one
+  // an agent sends by accident rather than by malice — and `typeof null` is `'object'`, which is how a
+  // hand-rolled check misses it.
+  it.each([
+    ['a number', 42],
+    ['a boolean', true],
+    ['a map', { cmd: 'npm test' }],
+    ['a list', ['npm test']],
+    ['null', null],
+  ])('refuses %s by name, and creates no card at all', async (_what, value) => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-sb', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const before = await productIds(app);
+    const created = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'The lint gate passes',
+      satisfiedBy: value,
+    });
+    expect(created.statusCode).toBe(400);
+    // BY NAME, because a refusal that does not say which field sends the caller to fix the wrong one.
+    expect(created.json().error).toContain('satisfiedBy');
+    // And nothing half-written: a card created without the criterion it was asked for is the silent
+    // success this refusal exists to replace.
+    expect(await productIds(app)).toEqual(before);
+  });
+
+  // A PERSON AT THE BROWSER IS HELD TO IT TOO. The refusal is about the shape of the on-disk format rather
+  // than about the lifecycle, so it cannot sit inside the run-only rules — an admin write reaches
+  // `createCard` down the same path.
+  it('refuses it from an admin caller as well, which is the browser and the copilot', async () => {
+    const { app } = await open();
+    const created = await create(app, admin, {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'Hand-made',
+      satisfiedBy: ['npm test'],
+    });
+    expect(created.statusCode).toBe(400);
+    expect(created.json().error).toContain('satisfiedBy');
+  });
+});
+
+// H1. THE CATALOGUE AND THE SKILL ARE IN ONE PROMPT AND CONTRADICTED EACH OTHER. `endpointsFor('work', …)`
+// rendered the create as `{ board, columnSlug, title, description?, body? }` while the seeded `break-down`
+// skill, three sections down the same prompt, said "send `satisfiedBy` on the create, carrying that command
+// copied exactly". auth.ts is explicit that the payload shape belongs to that table rather than to a
+// comment, and `runs/prompt/credential.ts` exists to stop precisely this drift — an agent that trusts the
+// generated list does not send the key, and the whole of decision 85 lands inert on every real project.
+//
+// HELD FROM BOTH ENDS, because nothing held it from either: test/run-prompt.test.ts asserts the catalogue's
+// route SET against the scope table and never a row's payload against what that route accepts. Backwards,
+// the field the skill names must appear in the row; forwards, every optional field the row advertises is
+// driven through the real endpoint and has to come back on the card.
+describe('the payload shape the create advertises', () => {
+  const CREATE_ROW = /^- `POST \/api\/cards`.*?`\{ ([^}]*) \}`/;
+
+  const advertised = (): string[] => {
+    const row = endpointsFor('work', 'F-001').find((line) => CREATE_ROW.test(line));
+    const named = row === undefined ? undefined : CREATE_ROW.exec(row)?.[1];
+    if (named === undefined) throw new Error('no `POST /api/cards` payload shape in the work catalogue');
+    return named.split(', ');
+  };
+
+  it('names the field the seeded break-down skill tells an agent to send', () => {
+    const skill = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    // Anchored on the instruction rather than on the bare word: the skill mentions the key twice, and only
+    // this sentence is the one telling an agent to put it in a create body.
+    expect(skill).toContain('send `satisfiedBy` on the');
+    expect(advertised()).toContain('satisfiedBy?');
+  });
+
+  it('honours every optional field it advertises, through the real endpoint', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-cat', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const optional = advertised()
+      .filter((field) => field.endsWith('?'))
+      .map((field) => field.slice(0, -1));
+    // Two would be satisfied by the pair that was already there, so a row that lost the new field while
+    // keeping the old ones would pass a bare "not empty".
+    expect(optional).toHaveLength(3);
+    for (const field of optional) {
+      // A DECLARED gate for the criterion. A string the project does not declare is written to the card
+      // just the same, so the endpoint half would pass either way — but a fixture the rule would ignore
+      // makes the test read as though it proves more than it does.
+      const sent = field === 'satisfiedBy' ? 'npm run lint' : `what the agent sent for ${field}`;
+      const created = await create(app, bearer(run.token), {
+        board: 'product',
+        columnSlug: 'backlog',
+        title: `A story about ${field}`,
+        [field]: sent,
+      });
+      expect(created.statusCode, field).toBe(200);
+      expect(created.json()[field], field).toBe(sent);
+    }
   });
 });

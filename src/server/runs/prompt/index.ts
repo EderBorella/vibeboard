@@ -243,8 +243,8 @@ export function buildRunPrompt(input: PromptInputs): string {
   parts.push(...checkupSections(input.checkup));
   const judging = input.review !== undefined;
   if (input.previous) parts.push(previousSection(input.previous, judging));
-  // Last of the context and immediately before the contract: the user's words are the most
-  // specific instruction in the prompt and must not be buried above the card.
+  // Last of the context: the user's words are the most specific instruction in the prompt and must not be
+  // buried above the card.
   if (input.userPrompt?.trim()) {
     parts.push(section('What the user asked for on top of the skill', input.userPrompt.trim()));
   }
@@ -267,7 +267,7 @@ export function buildRunPrompt(input: PromptInputs): string {
     );
   }
   // Last before the contract, where the instructions about the work itself end.
-  parts.push(...commentSections(phaseName, judging));
+  parts.push(...commentSections(phaseName, judging, input.card?.id));
   const contract = contractFor(input);
   parts.push(
     section(

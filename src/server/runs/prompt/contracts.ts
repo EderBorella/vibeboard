@@ -107,7 +107,7 @@ function gateEvidence(review: NonNullable<PromptInputs['review']>): string[] {
     return [
       'The gates have already passed. Auto-pilot ran every command the project declares, in its own process,',
       'before dispatching you — so the suite is green and there is no need to run it again. What a gate cannot',
-      'express is the one question left for you: does this do what the card asked.',
+      'express is left for you, and that is the two questions below.',
     ];
   }
   // Only reachable for a review a person dispatched by hand: the gate result is the loop's own fact and is
@@ -138,6 +138,11 @@ export function reviewLines(
     '',
     ...gateEvidence(review),
     '',
+    // TWO QUESTIONS, said here because this is the text a judge reads last (decision 91): the comment rule it
+    // was given above is otherwise outweighed by "judge the work against the card".
+    'Two questions decide the verdict: does the work do what the card asked, and does every comment it added',
+    'keep the comment rule above. A `no` to either is `sent-back`.',
+    '',
     ...(judged ? [...judgedLines(judged), ''] : []),
     'Write your report to:',
     '',
@@ -155,7 +160,8 @@ export function reviewLines(
     '---',
     '## What I judged',
     '',
-    'The findings: what the card asked for, what the work does, and where they differ. A `fix` run is handed',
+    'The findings: what the card asked for, what the work does, where they differ, and each comment that breaks',
+    'the comment rule, quoted with its file. A `fix` run is handed',
     'exactly this, so be specific enough that someone could disagree with it.',
     '```',
     '',

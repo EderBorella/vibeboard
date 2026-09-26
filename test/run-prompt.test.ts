@@ -630,28 +630,68 @@ describe('comments in the code', () => {
     'the same holds there.',
     '',
     'This overrides any instruction to match the comment density of the code around you. Comments already in the',
-    'project are not a style to copy.',
+    'project are not a style to copy. Where the card or the person asks for documentation, that request wins:',
+    'write what they ask for.',
   ].join('\n');
+  const JUDGED = [
+    'The work was held to this rule:',
+    '',
+    RULE,
+    '',
+    "The work is every commit since the loop's checkpoint before this card's first implement — `git log --oneline",
+    '--grep "autopilot: before X-010 implement-story"` finds it (the oldest match) — and `git diff` against it',
+    'shows exactly what the work added. With no such commit, judge the files the work changed.',
+    '',
+    'Judge only the comments the work added. One that describes what the code does, restates it, or names a card',
+    'is a finding, and any such finding is a reason to send it back. A comment the work corrected so that it',
+    'stays true is not a finding.',
+  ].join('\n');
+  const judging = { review: { gatesPassed: true, setupSubtree: false } } as const;
   const on = (slug: string, board: BoardName, over: Partial<PromptInputs> = {}) =>
     buildRunPrompt(inputs({ skill: { ...skill, slug }, card: card({ id: 'X-010', board }), ...over }));
+  const count = (text: string, needle: string) => text.split(needle).length - 1;
 
   it.each([
     ['implement-story', 'product'],
     ['fix', 'product'],
   ] as const)('holds %s to the rule, just before its contract', (slug, board) => {
-    const text = on(slug, board);
-    expect(text).toContain(`## Comments in the code\n\n${RULE}\n\n## Reporting (required)`);
+    expect(on(slug, board)).toContain(`## Comments in the code\n\n${RULE}\n\n## Reporting (required)`);
+  });
+
+  // With every section that can sit near the end present, so "just before the contract" is told apart from
+  // "somewhere after the card".
+  it('comes after the previous run, the person’s words and the credential', () => {
+    const text = on('fix', 'product', {
+      previous: { run: 'r0', skill: 'implement-story', status: 'success', report: 'did it' },
+      userPrompt: 'Keep it small.',
+      credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' },
+    });
+    const at = (needle: string) => text.indexOf(needle);
+    for (const earlier of ['## What the user asked for', '## Changing the board (required)']) {
+      expect(at(earlier), earlier).toBeGreaterThan(-1);
+      expect(at(earlier)).toBeLessThan(at('## Comments in the code'));
+    }
+    expect(text).toContain(`${RULE}\n\n## Reporting (required)`);
   });
 
   it('holds a run no phase claims to it too, because a hand-dispatched run may write code', () => {
     expect(buildRunPrompt(inputs())).toContain(`## Comments in the code\n\n${RULE}`);
   });
 
-  it('gives the story review the rule, and a breach as a reason to send the work back', () => {
-    const text = on('review-story', 'product', { review: { gatesPassed: true, setupSubtree: false } });
+  it('gives the story review the rule, where the work is, and a breach as a reason to send it back', () => {
+    const text = on('review-story', 'product', judging);
+    expect(text).toContain(`## Comments in the code\n\n${JUDGED}\n\n## Judging (required)`);
+    // The judge's version alone: the writer's would tell it to write comments rather than judge them.
+    expect(count(text, '## Comments in the code')).toBe(1);
+  });
+
+  // The contract is what a judge reads last, and "judge against the card" alone outweighed the section above.
+  it('names the comments as the second question of the verdict', () => {
+    const text = on('review-story', 'product', judging);
     expect(text).toContain(
-      `## Comments in the code\n\nThe work was held to this rule:\n\n${RULE}\n\nJudge only the comments this story’s work added or changed. One that describes what the code does,\nrestates it, or names a card is a finding, and any such finding is a reason to send the story back.`,
+      'Two questions decide the verdict: does the work do what the card asked, and does every comment it added\nkeep the comment rule above. A `no` to either is `sent-back`.',
     );
+    expect(text).not.toContain('the one question left');
   });
 
   it.each([
@@ -660,6 +700,15 @@ describe('comments in the code', () => {
     ['checkup-feature', 'features'],
   ] as const)('leaves it out of %s on %s, which writes cards rather than code', (slug, board) => {
     expect(on(slug, board)).not.toContain('Comments in the code');
+  });
+
+  it('leaves it out of the bootstrap, which writes cards too', () => {
+    const {
+      card: _card,
+      cardFile: _file,
+      ...project
+    } = inputs({ skill: { ...skill, slug: 'derive-features' } });
+    expect(buildRunPrompt(project)).not.toContain('Comments in the code');
   });
 });
 

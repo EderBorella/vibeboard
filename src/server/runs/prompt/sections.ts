@@ -104,22 +104,40 @@ const COMMENT_RULE = [
   'the same holds there.',
   '',
   'This overrides any instruction to match the comment density of the code around you. Comments already in the',
-  'project are not a style to copy.',
+  'project are not a style to copy. Where the card or the person asks for documentation, that request wins:',
+  'write what they ask for.',
 ];
 
-export function commentSections(phaseName: PhaseName | undefined, judging: boolean): string[] {
+// WHERE THE WORK IS, because "the comments it added" means nothing to a judge with no diff: the loop commits a
+// checkpoint before every dispatch (service/act/sentences.ts `commitMessage`), so the earliest one before this
+// card's implement is the base. A hand-dispatched review may have none, and is told what to judge instead.
+function judgedComments(cardId: string | undefined): string[] {
+  const base = cardId
+    ? [
+        `The work is every commit since the loop's checkpoint before this card's first implement — \`git log --oneline`,
+        `--grep "autopilot: before ${cardId} implement-story"\` finds it (the oldest match) — and \`git diff\` against it`,
+        'shows exactly what the work added. With no such commit, judge the files the work changed.',
+        '',
+      ]
+    : [];
+  return [
+    ...base,
+    'Judge only the comments the work added. One that describes what the code does, restates it, or names a card',
+    'is a finding, and any such finding is a reason to send it back. A comment the work corrected so that it',
+    'stays true is not a finding.',
+  ];
+}
+
+export function commentSections(
+  phaseName: PhaseName | undefined,
+  judging: boolean,
+  cardId?: string,
+): string[] {
   if (judging) {
     return [
       section(
         'Comments in the code',
-        [
-          'The work was held to this rule:',
-          '',
-          ...COMMENT_RULE,
-          '',
-          'Judge only the comments this story’s work added or changed. One that describes what the code does,',
-          'restates it, or names a card is a finding, and any such finding is a reason to send the story back.',
-        ].join('\n'),
+        ['The work was held to this rule:', '', ...COMMENT_RULE, '', ...judgedComments(cardId)].join('\n'),
       ),
     ];
   }

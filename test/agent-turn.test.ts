@@ -424,6 +424,14 @@ describe('the opencode backend', () => {
     return { result: await turn.done, events, argv: [] };
   };
 
+  // OpenCode does not expand CLAUDE.md's imports, so the bundled document is its only copy of the card
+  // conventions, and a card run keeps it there (decision 89).
+  it('keeps the bundled document for a card run, which has no other copy of the conventions', async () => {
+    client.opencodeTurn.mockResolvedValue('s');
+    await opencodeTurn({ card: true });
+    expect(client.opencodeTurn.mock.calls[0][0].system).toContain('# You are the VibeBoard copilot');
+  });
+
   it('asks the client for exactly what it was given', async () => {
     client.opencodeTurn.mockResolvedValue('oc-session');
     const { result } = await opencodeTurn({ sessionId: 'previous' });

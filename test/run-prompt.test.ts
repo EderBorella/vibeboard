@@ -173,9 +173,9 @@ describe('buildRunPrompt', () => {
   it.each([true, false])('says what is read-only and what is unreachable (browser: %s)', (browser) => {
     const text = buildRunPrompt(inputs({ browser }));
     expect(text).toContain(
-      'Everything under `.vibeboard/` that decides anything is read-only in here, and so are `CLAUDE.md` and\n`AGENTS.md`. A write there fails; it is not a broken tool.',
+      'Everything under `.vibeboard/` that decides anything is read-only in here: a write there fails, and\nthat is not a broken tool.',
     );
-    expect(text).toContain('a refused connection to a local address is that rule, not an outage.');
+    expect(text).toContain('a refused\nconnection to a local address is that rule, not an outage.');
   });
 
   it('puts the columns straight after the card, before the linked cards', () => {
@@ -547,8 +547,30 @@ describe('the foundation section', () => {
       inputs({ skill: { ...skill, slug }, card: card({ id: 'P-010', board: 'product' }), foundation: gates }),
     );
 
-  it('hands a break-down the gate commands and the path, not the prose', () => {
-    const text = onStory('break-down');
+  const onFeature = (slug: string) =>
+    buildRunPrompt(
+      inputs({
+        skill: { ...skill, slug },
+        card: card({ id: 'F-010', board: 'features' }),
+        foundation: gates,
+      }),
+    );
+  const onProject = (slug: string) => {
+    const {
+      card: _card,
+      cardFile: _file,
+      ...project
+    } = inputs({ skill: { ...skill, slug }, foundation: gates });
+    return buildRunPrompt(project);
+  };
+
+  it.each([
+    ['a story break-down', () => onStory('break-down')],
+    ['a feature break-down', () => onFeature('break-down')],
+    ['a feature checkup', () => onFeature('checkup-feature')],
+    ['the bootstrap', () => onProject('derive-features')],
+  ])('hands %s the gate commands and the path, not the prose', (_name, render) => {
+    const text = render();
     expect(text).toContain(
       'The gates, run from the project root:\n\n- tests: `npm test`\n\nWhy each exists, and what no gate can catch, is in CODE-QUALITY.md, listed above.',
     );

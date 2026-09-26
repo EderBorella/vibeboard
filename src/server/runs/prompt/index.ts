@@ -89,8 +89,9 @@ export interface PromptInputs {
   // The user's own words for this dispatch.
   userPrompt?: string;
   // The documents this run is bound by. Four as paths — the agent has a Read tool, and inlining a
-  // document it may not need is tokens spent on nothing — and CODE-QUALITY.md inlined, because its
-  // gates bind every run and an agent that has to go and fetch them will sometimes not bother.
+  // document it may not need is tokens spent on nothing — and the gates inlined, because they bind
+  // every run and an agent that has to go and fetch them will sometimes not bother: CODE-QUALITY.md in
+  // full for the runs that write or judge code, `gates` alone for the rest (`GATE_LIST_ONLY`).
   // Absent when the project has no foundation yet, and then the section is left out entirely rather
   // than promising a folder with nothing in it.
   foundation?: { paths: string[]; codeQuality?: string; gates?: Gate[] };

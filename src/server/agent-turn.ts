@@ -122,7 +122,7 @@ function claudeBin(bin: string | undefined): string {
   return bin ?? process.env.VIBEBOARD_CLAUDE_BIN ?? 'claude';
 }
 
-// The bundled VibeBoard instructions, appended to every turn's system prompt so the copilot
+// The bundled VibeBoard instructions, appended to every copilot turn's system prompt so the copilot
 // knows the model/conventions without spending tokens rediscovering them. Cached after first
 // read; resolved next to this module (copied into dist by the build).
 let cachedInstructions: string | undefined;
@@ -149,11 +149,13 @@ function projectInstructions(cwd: string): string {
   }
 }
 
-// A CARD RUN IS NOT THE COPILOT, so it is not told it is: the bundled document is the copilot's persona,
-// and what a run needs of it — the container, the read-only paths, what a 403 means — is in its own
-// prompt (runs/prompt/). The project's instructions and the mode's persona reach both.
-function systemPrompt(cwd: string, persona: string | undefined, card: boolean): string {
-  return [card ? '' : vibeboardInstructions(), projectInstructions(cwd), persona]
+// A CLAUDE CARD RUN IS NOT THE COPILOT, so it is not told it is: the bundled document is the copilot's
+// persona, and what a run needs of it — the container, the read-only paths, what a 403 means — is in its
+// own prompt (runs/prompt/), with the card conventions arriving through CLAUDE.md's imports. OpenCode
+// keeps the document for every turn: it does not expand those imports (store/project/control.ts), so the
+// document is its only copy of the conventions. The project's instructions and the persona reach all.
+function systemPrompt(cwd: string, persona: string | undefined, copilot: boolean): string {
+  return [copilot ? vibeboardInstructions() : '', projectInstructions(cwd), persona]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -161,7 +163,7 @@ function systemPrompt(cwd: string, persona: string | undefined, card: boolean): 
 function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } {
   const { permission, persona } = resolveMode(opts.mode);
   const card = opts.card === true;
-  const appendPrompt = systemPrompt(opts.cwd, persona, card);
+  const appendPrompt = systemPrompt(opts.cwd, persona, !card);
   const args = [
     '-p',
     '--output-format',
@@ -267,7 +269,7 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
         text: opts.text,
         model: opts.model,
         variant: opts.effort,
-        system: systemPrompt(opts.cwd, opts.mode === 'research' ? RESEARCH_PERSONA : '', opts.card === true),
+        system: systemPrompt(opts.cwd, opts.mode === 'research' ? RESEARCH_PERSONA : '', true),
         sessionId: opts.sessionId,
         signal: abort.signal,
         onEvent,
@@ -297,10 +299,13 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
   // is a path INSIDE the container (`/state/claude`), passed to `docker exec -e`; the host path is a
   // digest directory that means nothing in there. Unboxed — tests only, now that docker is required —
   // it is the host path in the spawn's own environment.
+  // A card run's switches go where the CLI reads them: `docker exec -e` when boxed — the host's docker
+  // client has no use for them — and the spawn's own environment otherwise.
   const cardEnv = opts.card ? CARD_ENV : {};
   const boxEnv = isolationEnabled() ? { ...boxEnvFor('claude-code'), ...cardEnv } : cardEnv;
-  const env =
-    !sandbox.ok && isolationEnabled()
+  const env = sandbox.ok
+    ? process.env
+    : isolationEnabled()
       ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir(), ...cardEnv }
       : { ...process.env, ...cardEnv };
   // Confinement is applied here because one Claude turn is one process. This THROWS rather than

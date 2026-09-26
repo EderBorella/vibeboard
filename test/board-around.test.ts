@@ -21,6 +21,7 @@ const card = (id: string, board: BoardName, links: string[] = [], columnSlug = '
 const board = [
   card('F-001', 'features', ['P-001', 'P-002', 'P-003', 'P-009']),
   card('F-002', 'features'),
+  card('F-009', 'features', [], ARCHIVE_SLUG),
   card('P-001', 'product', ['F-001', 'E-001', 'E-002'], 'done'),
   card('P-002', 'product', ['F-001', 'E-003']),
   card('P-003', 'product', ['F-001']),
@@ -35,6 +36,7 @@ const ids = (cards: Card[] | undefined): string[] | undefined => cards?.map((c) 
 describe('the board around a card', () => {
   it('gives a story break-down its feature, the stories beside it with their tasks, and its own tasks', () => {
     const around = boardAroundFor('story-breakdown', at('P-002'), board);
+    expect(around?.of).toBe('story');
     expect(around?.parent?.id).toBe('F-001');
     // The archived P-009 is not beside it: an archived card is not on the board.
     expect(around?.siblings.map((s) => [s.card.id, ids(s.children)])).toEqual([
@@ -46,7 +48,9 @@ describe('the board around a card', () => {
 
   it('gives a feature break-down the other features and its own stories', () => {
     const around = boardAroundFor('feature-breakdown', at('F-001'), board);
+    expect(around?.of).toBe('feature');
     expect(around?.parent).toBeUndefined();
+    // The archived F-009 is not beside it, for the same reason an archived story is not.
     expect(around?.siblings.map((s) => [s.card.id, ids(s.children)])).toEqual([['F-002', []]]);
     expect(ids(around?.children)).toEqual(['P-001', 'P-002', 'P-003']);
   });

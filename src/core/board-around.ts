@@ -7,6 +7,8 @@ import type { Card } from './types.js';
 // before it had read a line of code. The loop already holds that board, so it hands over the slice the
 // question needs — what is under the card, and what sits beside it.
 export interface BoardAround {
+  // What the slice is around, which is what an empty one means: no other features, or no feature at all.
+  of: 'feature' | 'story';
   // The card one level up, when there is one. A feature has none.
   parent?: Card;
   // The parent's other children, each with its own children — or, for a feature, the other features alone.
@@ -16,7 +18,8 @@ export interface BoardAround {
 }
 
 // Which phases get one. The two break-downs, because "what already exists" is their first question; the
-// feature checkup, because it is told the same, and it may create stories that another feature holds.
+// feature checkup, because it is told the same, and the features beside it are where a capability it finds
+// missing may already belong.
 const SLICED: ReadonlySet<PhaseName> = new Set(['story-breakdown', 'feature-breakdown', 'feature-checkup']);
 
 export function boardAroundFor(
@@ -28,11 +31,12 @@ export function boardAroundFor(
   const children = phase === 'feature-checkup' ? {} : { children: childrenOf(card, cards) };
   if (card.board === 'features') {
     const others = liveCards(cards).filter((c) => c.board === 'features' && c.id !== card.id);
-    return { siblings: others.map((c) => ({ card: c, children: [] })), ...children };
+    return { of: 'feature', siblings: others.map((c) => ({ card: c, children: [] })), ...children };
   }
   const parent = parentOf(card, cards);
   const beside = parent ? childrenOf(parent, cards).filter((c) => c.id !== card.id) : [];
   return {
+    of: 'story',
     ...(parent ? { parent } : {}),
     siblings: beside.map((c) => ({ card: c, children: childrenOf(c, cards) })),
     ...children,

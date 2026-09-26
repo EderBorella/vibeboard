@@ -45,7 +45,7 @@ const RULES: Record<string, Rule> = {
   'GET /api/state': {
     scopes: READ_SCOPES,
     describe:
-      'the whole board, as `{ open, snapshot: { config, boards: { features, product, engineering } } }` — each board a list of cards with `id`, `title`, `columnSlug`, `links` and `body`.',
+      'the whole board and the project config. The cards are under `snapshot.boards.features`, `.product` and `.engineering`, each a list of cards with `id`, `title`, `columnSlug`, `links` and `body`.',
   },
   'GET /api/config': {
     scopes: READ_SCOPES,

@@ -75,7 +75,7 @@ export function columnsSection(boardColumns: BoardColumns[]): string {
 export function linkedSection(linked: Card[], projectRoot: string, from?: Card): string {
   const lines = linked.map((c) => `${cardLine(c)}\n  file: ${relative(projectRoot, c.filePath)}`);
   const intent = linked
-    .filter((c) => from?.board !== 'features' && c.board === 'product' && c.body.trim() !== '')
+    .filter((c) => from?.board === 'engineering' && c.board === 'product' && c.body.trim() !== '')
     .map((c) => `### ${c.id} — ${c.title}\n\n${c.body.trim()}`);
   return [lines.join('\n'), ...intent].join('\n\n');
 }
@@ -129,9 +129,6 @@ export function foundationSection(
   return lines.join('\n');
 }
 
-// WHAT IS UNDER THIS CARD, as the loop already knows it. Every line here is a fact the checkup would otherwise
-// have had to fetch, and cannot: `GET /api/runs` is `service`-only and the diary has no read row at all
-// (ruling 60). So it is told, and the prompt never suggests it go and look.
 // Where each card sits, as one line: the slice carries titles, never bodies, so it stays a list.
 const place = (c: Card): string => `**${c.id}** (${c.board}/${c.columnSlug}) — ${c.title}`;
 
@@ -149,19 +146,29 @@ export function aroundSection(around: BoardAround): string {
     `- ${place(card)}`,
     ...children.map((c) => `  - ${place(c)}`),
   ]);
-  const heading = around.parent
-    ? `It sits under ${place(around.parent)}. Beside it, under ${around.parent.id}:`
-    : 'The other features:';
   return [
     'The board as it stood when this run was dispatched, so you do not need to fetch it to see what exists.',
     '',
     ...under,
-    ...(beside.length > 0
-      ? [heading, ...beside]
-      : [around.parent ? `It sits under ${place(around.parent)}, alone.` : 'There are no other features.']),
+    ...whereItSits(around, beside),
   ].join('\n');
 }
 
+// One answer per case, because an empty slice means different things: no other features, a story alone
+// under its feature, or a story nobody linked to one.
+function whereItSits(around: BoardAround, beside: string[]): string[] {
+  if (around.of === 'feature')
+    return beside.length > 0 ? ['The other features:', ...beside] : ['There are no other features.'];
+  if (!around.parent) return ['It sits under no feature.'];
+  const parent = place(around.parent);
+  return beside.length > 0
+    ? [`It sits under ${parent}. Beside it, under ${around.parent.id}:`, ...beside]
+    : [`It sits under ${parent}, alone.`];
+}
+
+// WHAT IS UNDER THIS CARD, as the loop already knows it. Every line here is a fact the checkup would otherwise
+// have had to fetch, and cannot: `GET /api/runs` is `service`-only and the diary has no read row at all
+// (ruling 60). So it is told, and the prompt never suggests it go and look.
 function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
   const children = checkup.children.map((c) => {
     const ended = c.outcome
@@ -185,13 +192,15 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
           ...checkup.suggestions.map((s) => `- ${s.id}: ${s.title}`),
         ]
       : ['There are no open suggestions on this project.']),
-    // THE GATES ARE NOT A FEATURE CHECKUP'S TO RUN (decision 90). Every checkup measured ran them, six times
-    // a run on average, and could only ever learn what closing each story had already required.
+    // THE GATES ARE NOT A FEATURE CHECKUP'S TO RUN (decision 90). Every checkup measured ran them, six times a
+    // run on average. It says the loop runs them rather than that they passed: a story can also close through
+    // one gate (`story-satisfied`), with none in the setup subtree, or by a person's move.
     ...(checkup.feature
       ? [
           '',
-          'Auto-pilot closes a story only after its gates pass, so they have passed on every story above that is',
-          'done. Do not run them again: they cannot tell you anything this list does not.',
+          'Running the gates is auto-pilot’s job, not this checkup’s: it runs the project’s gates before every',
+          'story’s review, and again on anything you create. Do not run them here — what this checkup adds is',
+          'what no gate can measure.',
         ]
       : []),
   ].join('\n');

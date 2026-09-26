@@ -310,6 +310,24 @@ describe('buildRunPrompt', () => {
     expect(text).not.toContain('Users lose their session daily.');
   });
 
+  // Quoted only to a task, whose intent it is: a story linked from another story is a neighbour, not a reason.
+  it('does not quote a story linked from a story', () => {
+    const text = buildRunPrompt(
+      inputs({
+        card: card({ id: 'P-002', board: 'product', title: 'Remember me' }),
+        linked: [
+          card({
+            id: 'P-001',
+            board: 'product',
+            title: 'Stay signed in',
+            body: 'Users lose their session daily.',
+          }),
+        ],
+      }),
+    );
+    expect(text).not.toContain('Users lose their session daily.');
+  });
+
   it('skips the quote for a product card with an empty body', () => {
     const text = buildRunPrompt(
       inputs({ linked: [card({ id: 'P-002', board: 'product', title: 'Empty', body: '   ' })] }),
@@ -538,6 +556,7 @@ describe('the board around the card', () => {
     const text = buildRunPrompt(
       inputs({
         around: {
+          of: 'story',
           parent: feature('F-001'),
           siblings: [
             { card: story('P-001', 'done'), children: [task('E-001'), task('E-002')] },
@@ -565,7 +584,9 @@ describe('the board around the card', () => {
   });
 
   it('lists the other features for a feature, and nothing under it when it is its checkup', () => {
-    const text = buildRunPrompt(inputs({ around: { siblings: [{ card: feature('F-002'), children: [] }] } }));
+    const text = buildRunPrompt(
+      inputs({ around: { of: 'feature', siblings: [{ card: feature('F-002'), children: [] }] } }),
+    );
     expect(text).toContain(
       'to see what exists.\n\nThe other features:\n- **F-002** (features/in-progress) — F-002 title',
     );
@@ -574,15 +595,24 @@ describe('the board around the card', () => {
 
   it('says so when a story stands alone under its feature', () => {
     const text = buildRunPrompt(
-      inputs({ around: { parent: feature('F-001'), siblings: [], children: [task('E-003', 'backlog')] } }),
+      inputs({
+        around: { of: 'story', parent: feature('F-001'), siblings: [], children: [task('E-003', 'backlog')] },
+      }),
     );
     expect(text).toContain(
       'Under this card:\n- **E-003** (engineering/backlog) — E-003 title\n\nIt sits under **F-001** (features/in-progress) — F-001 title, alone.',
     );
   });
 
+  // A story nobody linked to a feature is reachable by a hand break-down, and "no other features" is not what it is.
+  it('says a story with no feature sits under none', () => {
+    const text = buildRunPrompt(inputs({ around: { of: 'story', siblings: [], children: [] } }));
+    expect(text).toContain('Under this card: nothing yet.\n\nIt sits under no feature.');
+    expect(text).not.toContain('There are no other features.');
+  });
+
   it('comes straight after the linked cards, and not at all without a slice', () => {
-    const text = buildRunPrompt(inputs({ linked: [story('P-001')], around: { siblings: [] } }));
+    const text = buildRunPrompt(inputs({ linked: [story('P-001')], around: { of: 'story', siblings: [] } }));
     expect(text.indexOf('## Linked cards')).toBeLessThan(text.indexOf('## What is already on the board'));
     expect(buildRunPrompt(inputs())).not.toContain('What is already on the board');
   });
@@ -1149,9 +1179,9 @@ describe('the checkup’s evidence', () => {
   // THE GATES ARE NOT THE FEATURE CHECKUP'S TO RUN (decision 90): closing each story already required them.
   it('tells the FEATURE checkup the gates have passed on its done stories, and not to run them', () => {
     expect(checkingUp({ feature: true })).toContain(
-      'Auto-pilot closes a story only after its gates pass, so they have passed on every story above that is\ndone. Do not run them again: they cannot tell you anything this list does not.',
+      'Running the gates is auto-pilot’s job, not this checkup’s: it runs the project’s gates before every\nstory’s review, and again on anything you create. Do not run them here — what this checkup adds is\nwhat no gate can measure.',
     );
-    expect(checkingUp()).not.toContain('Do not run them again');
+    expect(checkingUp()).not.toContain('Do not run them here');
   });
 
   // RULING 66'S SECOND FIX. A project reached `complete` with every gate green and the tool it built printed

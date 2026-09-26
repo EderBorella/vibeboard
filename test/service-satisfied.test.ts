@@ -206,7 +206,7 @@ describe('satisfiedChecker — what a person can see afterwards', () => {
     expect(wrote[0]).toEqual({
       kind: 'lifecycle',
       card: 'P-001',
-      text: "Measuring P-001's acceptance criterion before its break-down: `npm test`.",
+      text: "Measuring P-001's acceptance criterion before its task is written: `npm test`.",
     });
   });
 
@@ -217,8 +217,8 @@ describe('satisfiedChecker — what a person can see afterwards', () => {
     const { wrote, check } = checker({ code: 1 });
     for (let i = 0; i < 20; i += 1) expect(await check(board())).toEqual([]);
     expect(wrote.map((e) => e.text)).toEqual([
-      "Measuring P-001's acceptance criterion before its break-down: `npm test`.",
-      "P-001's acceptance criterion `npm test` does not pass yet, so it is being broken down as usual.",
+      "Measuring P-001's acceptance criterion before its task is written: `npm test`.",
+      "P-001's acceptance criterion `npm test` does not pass yet, so it is being worked as usual.",
     ]);
   });
 

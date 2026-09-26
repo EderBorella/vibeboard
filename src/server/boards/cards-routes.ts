@@ -347,6 +347,21 @@ function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: st
 
 // THE WHOLE OF A CREATE, in a function of its own for the same reason `lifecycleRulesForCreate` is one: the route
 // stays a flat sequence of "ask, then answer", and the sequence is where every refusal's ORDER lives.
+// THE ONE CREATE THAT NAMES ITS PARENT (decision 92). The loop's own credential writes each story's one task, and a
+// run's parent is derived from the card it is about — the loop is about none, so the task would land unlinked and
+// the story would still look empty. So the `service` scope may name one parent, and only where none was derived:
+// every rule above still applies, and `createLinkedCard` still refuses a second parent.
+function withLoopParent(
+  ruled: { effective: CreateCardInput; links: string[] } | { error: string },
+  scope: string | undefined,
+  asked: unknown,
+): { effective: CreateCardInput; links: string[] } | { error: string } {
+  if ('error' in ruled || scope !== 'service' || ruled.links.length > 0 || !Array.isArray(asked))
+    return ruled;
+  const parent = asked.find((id): id is string => typeof id === 'string');
+  return parent === undefined ? ruled : { ...ruled, links: [parent] };
+}
+
 async function createForRequest(
   ctx: AppCtx,
   cred: (RunCredential & { scope?: string }) | undefined,
@@ -366,7 +381,7 @@ async function createForRequest(
   if (mistyped) return { code: 400, error: mistyped };
   // A run is held to the lifecycle; a person at the browser is not.
   const ruled = cred?.run
-    ? await lifecycleRulesForCreate(ctx, cred, input)
+    ? withLoopParent(await lifecycleRulesForCreate(ctx, cred, input), cred.scope, asked)
     : { effective: input, links: Array.isArray(asked) ? asked : [] };
   // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
   if ('error' in ruled) return { code: 409, error: ruled.error };

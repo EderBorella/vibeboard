@@ -187,20 +187,24 @@ describe('two runs in a row that never reached a model stop the loop', () => {
   // test could never reach the accounting it is about. The fourth is the shape of a recovered project — the
   // boxes were rebuilt, the card got a real attempt and genuinely failed — and it breaks the streak because
   // it reached a model. It burns one of the three, leaving two, so the story is dispatched again.
+  // ON THE IMPLEMENT, because a story's break-down is written by the loop now (decision 92) and has no attempts.
   it('still dispatches a story whose every attempt so far was an infrastructure failure', () => {
     const cards = [
       card('F-001', 'features', 'in-progress', 10, ['P-001']),
-      card('P-001', 'product', 'todo', 10, ['F-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
     ];
     const runs: RunRecord[] = [
-      ...Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () => dead('P-001', 'product', 'break-down')),
+      ...Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () =>
+        dead('P-001', 'product', 'implement-story'),
+      ),
       // Explicitly later, because `consecutiveInfrastructureFailures` orders by `started` and every run this
       // fixture makes shares one timestamp — leaving the order to the sort's stability would make this test
       // pass for a reason nobody wrote down.
-      { ...run('P-001', 'product', 'break-down', 'failed'), started: '2026-08-05T11:00:00Z' },
+      { ...run('P-001', 'product', 'implement-story', 'failed'), started: '2026-08-05T11:00:00Z' },
     ];
     const action = decideTick(input({ cards, runs }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', card: { id: 'P-001' } });
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-implement', card: { id: 'P-001' } });
   });
 });
 
@@ -635,11 +639,37 @@ describe('decideTick — the feature loop', () => {
 describe('decideTick — the story loop', () => {
   const feature = (links: string[]) => card('F-001', 'features', 'in-progress', 10, links);
 
-  it('stamps a backlog story into todo and dispatches break-down', () => {
-    const cards = [feature(['P-001']), card('P-001', 'product', 'backlog', 10, ['F-001'])];
-    const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', skill: 'break-down' });
-    expect(action.kind === 'dispatch' && action.card?.id).toBe('P-001');
+  // DECISION 92: the loop writes a story's one task itself, and the story goes straight to its implement.
+  it('writes a story’s one task from it, and moves it to where its implement picks it up', () => {
+    const story = {
+      ...card('P-001', 'product', 'backlog', 10, ['F-001']),
+      title: 'Stay signed in',
+      description: 'A session survives a restart.',
+    };
+    const action = decideTick(input({ cards: [feature(['P-001']), story] }));
+    expect(action).toEqual({
+      kind: 'create',
+      phase: 'story-task',
+      card: story,
+      task: {
+        board: 'engineering',
+        column: 'backlog',
+        title: 'Stay signed in',
+        description: 'A session survives a restart.',
+        body: "The whole of P-001, as one task: its acceptance criterion is the story's.",
+      },
+      to: 'in-progress',
+      why: 'auto-pilot wrote its one task from it, so it goes straight to its implement.',
+    });
+  });
+
+  it('writes a story’s task into whichever column engineering names first', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const columns = { ...COLUMNS, engineering: ['queue', 'in-progress', 'review', 'blocked', 'done'] };
+    expect(decideTick(input({ cards, columns }))).toMatchObject({
+      kind: 'create',
+      task: { column: 'queue' },
+    });
   });
 
   it('skips break-down for a story that already has a task', () => {
@@ -658,12 +688,18 @@ describe('decideTick — the story loop', () => {
   // DECISION 45's 2026-08-13 CORRECTION, and this test used to assert the stop it replaces. A story that
   // cannot be broken down is left blocked and the loop carries on: the run that produced this ruling had one
   // redundant story stop a whole project with three untouched features queued behind it.
-  it('blocks a story whose break-down has used every attempt, rather than stopping the project', () => {
-    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
-    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'break-down') }));
+  // THE CAP IS THE IMPLEMENT'S NOW (decision 92): a story's break-down is the loop's own and cannot fail, so the
+  // story that cannot be done is the one whose implement has used every attempt.
+  it('blocks a story whose implement has used every attempt, rather than stopping the project', () => {
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
+    ];
+    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'implement-story') }));
     expect(action).toMatchObject({
       kind: 'stamp',
-      phase: 'story-breakdown',
+      phase: 'story-implement',
       card: { id: 'P-001' },
       to: 'blocked',
     });
@@ -681,8 +717,8 @@ describe('decideTick — the story loop', () => {
       card('P-002', 'product', 'backlog', 20, ['F-001']),
     ];
     expect(decideTick(input({ cards }))).toMatchObject({
-      kind: 'dispatch',
-      phase: 'story-breakdown',
+      kind: 'create',
+      phase: 'story-task',
       card: { id: 'P-002' },
     });
   });
@@ -707,12 +743,16 @@ describe('decideTick — the story loop', () => {
   // it and put the story where `readBoard` never looks — the old stop is the honest answer, and it names
   // what the board is missing rather than the card.
   it('stops stalled, naming the missing column, when product has no blocked column', () => {
-    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
+    ];
     const action = decideTick(
       input({
         cards,
         columns: WITHOUT_PRODUCT_BLOCKED,
-        runs: threeRunsOf('P-001', 'product', 'break-down'),
+        runs: threeRunsOf('P-001', 'product', 'implement-story'),
       }),
     );
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
@@ -831,8 +871,8 @@ describe('decideTick — the story loop', () => {
       card('P-002', 'product', 'backlog', 20, ['F-001']),
     ];
     expect(decideTick(input({ cards }))).toMatchObject({
-      kind: 'dispatch',
-      phase: 'story-breakdown',
+      kind: 'create',
+      phase: 'story-task',
       card: { id: 'P-002' },
     });
   });

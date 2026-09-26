@@ -212,18 +212,20 @@ export class BoardClient {
     return this.#call('POST', `/cards/${board}/${card}/move`, { toColumnSlug });
   }
 
-  // ONE CARD, through the same endpoint an agent creates through. The loop creates exactly one card in the whole
-  // lifecycle — the smoke-harness feature at the bootstrap's exit (ruling 66) — and it goes this way rather than
+  // THROUGH THE SAME ENDPOINT an agent creates through. The loop creates the smoke-harness feature at the
+  // bootstrap's exit (ruling 66) and each story's one task, and it goes this way rather than
   // by writing a file for the reason decision 10 gives: the id, the entry column and the `createdBy` stamp are
   // all the endpoint's to assign, and a second write path would be a second answer to each of them.
   //
-  // NO `links` AND NO `columnSlug` CHOICE WORTH MAKING (ruling 65, and `stampForRun`): a feature is the top of
-  // its own vertical, and a card a run creates enters its board's first column whatever the caller asked for.
+  // AND A STORY'S ONE TASK (decision 92), which is why `links` is here: the loop's credential is not a run's, so the
+  // endpoint takes the link it is given (ruling 65 confines only runs to the derived one) and writes both sides.
   create(input: {
     board: BoardName;
     columnSlug: string;
     title: string;
+    description?: string;
     body?: string;
+    links?: string[];
   }): Promise<Answer<Card>> {
     return this.#call('POST', '/cards', input);
   }

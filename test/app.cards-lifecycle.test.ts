@@ -724,6 +724,43 @@ describe('the parent a run’s new card hangs off', () => {
     expect(await linksOn(app, 'product', 'P-001')).toContain(task.json().id);
   });
 
+  // THE LOOP'S OWN CREATE (decision 92): the service credential is about no card, so nothing is derived, and it
+  // names the story whose one task this is. Both sides are written, as for every derived parent.
+  it('is the story the loop names, for the task it writes', async () => {
+    const { app, store, root } = await open();
+    const loop = store.mintRun('service', 'svc-1', root);
+    const task = await create(app, bearer(loop.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'The whole of the story',
+      links: ['P-001'],
+    });
+    expect(task.statusCode).toBe(200);
+    expect(linksIn(task)).toEqual(['P-001']);
+    expect(await linksOn(app, 'product', 'P-001')).toContain(task.json().id);
+  });
+
+  it('is one parent however many the loop names, and none a run names', async () => {
+    const { app, store, root } = await open();
+    const loop = store.mintRun('service', 'svc-2', root);
+    const two = await create(app, bearer(loop.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Named twice',
+      links: ['P-001', 'P-002'],
+    });
+    expect(linksIn(two)).toEqual(['P-001']);
+    // A RUN STILL CANNOT NAME ONE: its parent is derived from the card it is about, whatever it sends.
+    const run = store.mintRun('work', 'run-p9', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const task = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Asked for a different parent',
+      links: ['P-002'],
+    });
+    expect(linksIn(task)).toEqual(['P-001']);
+  });
+
   it('is the run’s own card for a feature checkup, which creates one board down', async () => {
     // The orphan that costs the most, and the only one that is silent: a story invisible to `allSettled` lets
     // the feature close to `done` with real work parked for ever and nothing said.

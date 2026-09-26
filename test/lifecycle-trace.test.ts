@@ -290,6 +290,8 @@ function step(entry: DiaryEntry): string {
   if (moved) return `move ${entry.board}/${moved[1]} ${moved[2]}`;
   const setup = entry.text.match(/^(\S+) is this project's scaffolding feature/);
   if (setup) return `flag ${setup[1]} setup`;
+  const task = entry.text.match(/^(\S+) written from (\S+), as its one task\./);
+  if (task) return `task ${task[2]} ${task[1]}`;
   const harness = entry.text.match(/^(\S+) is this project's smoke harness/);
   if (harness) return `harness ${harness[1]}`;
   const smoke = entry.text.match(/ran the smoke command before (\S+) checkup — it (passed|did not pass)/);
@@ -418,7 +420,15 @@ async function assertHierarchy(project: TestProject): Promise<void> {
   }
   for (const card of cards.filter(madeByRun)) {
     const run = byRun.get(card.createdBy as string);
-    // A project run has no card: the bootstrap's features sit under nothing, by design.
+    // THE LOOP'S OWN, which no run record names (decision 92): a story's one task, written under that story.
+    if (run === undefined && card.board === 'engineering') {
+      const story = parentOf(card, cards);
+      expect(story?.board, `${card.id}, written by the loop, hangs under a story`).toBe('product');
+      want[(story as Card).id].push(card.id);
+      continue;
+    }
+    // A project run has no card: the bootstrap's features sit under nothing, by design — and nor does the
+    // smoke-harness feature the loop writes beside them.
     if (run?.card === undefined) continue;
     const own = cards.find((c) => c.id === run.card);
     const above = parentBoardOf(card.board);
@@ -471,9 +481,10 @@ for (const mode of MODES) {
 
     it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
       const started = await start({
-        // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
-        // creates, so one `break-down` skill serves both levels — and each board is named literally, so the
-        // endpoint's own rule about where a phase may create is what decides, not the shim.
+        // One feature and one story under it. The chain travels through the cards the shim creates, and each
+        // board is named literally, so the endpoint's own rule about where a phase may create is what decides.
+        // The chain's `engineering:2` is never read (decision 92): no story break-down runs, and the loop writes
+        // each story's one task itself.
         skills: {
           ...HAPPY,
           'derive-features': creates(mode, 'features:1:product:1:engineering:2'),
@@ -499,24 +510,21 @@ for (const mode of MODES) {
         'move features/F-001 todo',
         'move features/F-001 in-progress',
         'ran F-001 break-down',
-        'move product/P-001 todo',
+        // DECISION 92: NO STORY BREAK-DOWN. The loop writes the story's one task, linked in the same call, and the
+        // story goes straight to where its implement picks it up.
+        'task P-001 E-001',
         'move product/P-001 in-progress',
-        'ran P-001 break-down',
-        // DECISION 83: ONE RUN, AND BOTH TASKS. They are claimed together before the dispatch — which is how
-        // the run is told which tasks are its own — and delivered together after it, so there is no window in
-        // which the story is half-judgeable. No per-task dispatch, and the run line names the STORY.
+        // DECISION 83: THE TASK IS CLAIMED BEFORE THE DISPATCH, which is how the run is told it is its own, and
+        // the run line names the STORY.
         //
-        // DECISION 87: DELIVERED, NOT DONE. The run's ending is its own word about itself, so its tasks wait in
-        // Review and the story's judgement is what closes them.
+        // DECISION 87: DELIVERED, NOT DONE. The run's ending is its own word about itself, so its task waits in
+        // Review and the story's judgement is what closes it.
         'move engineering/E-001 in-progress',
-        'move engineering/E-002 in-progress',
         'move engineering/E-001 review',
-        'move engineering/E-002 review',
         'ran P-001 implement-story',
-        // AND THEN THE ONE JUDGEMENT, which closes the tasks, then the story, and absorbs what the story
+        // AND THEN THE ONE JUDGEMENT, which closes the task, then the story, and absorbs what the story
         // checkup asked.
         'move engineering/E-001 done',
-        'move engineering/E-002 done',
         'move product/P-001 done',
         'review P-001 pass',
         'smoke F-001 pass',
@@ -527,13 +535,12 @@ for (const mode of MODES) {
         'move features/F-002 todo',
         'move features/F-002 in-progress',
         'ran F-002 break-down',
-        'move product/P-002 todo',
+        'task P-002 E-002',
         'move product/P-002 in-progress',
-        'ran P-002 break-down',
-        'move engineering/E-003 in-progress',
-        'move engineering/E-003 review',
+        'move engineering/E-002 in-progress',
+        'move engineering/E-002 review',
         'ran P-002 implement-story',
-        'move engineering/E-003 done',
+        'move engineering/E-002 done',
         'move product/P-002 done',
         'review P-002 pass',
         'smoke F-002 pass',
@@ -542,19 +549,16 @@ for (const mode of MODES) {
         'stopped complete',
       ]);
 
-      // THE COST, WHICH IS THE POINT OF DECISIONS 80 AND 83. Two tasks under P-001 cost five dispatches
-      // before either — implement, review, implement, review, checkup — three after the judgement moved up,
-      // and two here: one run that does both tasks, and the one judgement.
+      // THE COST, WHICH IS THE POINT OF DECISIONS 80, 83 AND 92. A story costs two dispatches: the one run that
+      // does its work, and the one judgement. Its break-down, a third, is the loop's own now.
       expect(await dispatches(started.project, started.argsLog)).toEqual([
         'dispatch project derive-features',
         'dispatch F-001 break-down in features/todo',
-        'dispatch P-001 break-down in product/todo',
         // THE STORY, in the column it is judged from: no entry stamp was needed and none was written.
         'dispatch P-001 implement-story in product/in-progress',
         'dispatch P-001 review-story in product/in-progress',
         'dispatch F-001 checkup-feature in features/in-progress',
         'dispatch F-002 break-down in features/todo',
-        'dispatch P-002 break-down in product/todo',
         'dispatch P-002 implement-story in product/in-progress',
         'dispatch P-002 review-story in product/in-progress',
         'dispatch F-002 checkup-feature in features/in-progress',
@@ -937,12 +941,13 @@ for (const mode of MODES) {
         skills: {
           ...HAPPY,
           'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
-          // The checkup finds something missing and creates one story for it, carrying a task of its own.
+          // The checkup finds something missing and creates one story for it; the loop writes its task.
           'checkup-feature': creates(mode, 'product:1:engineering:1'),
         },
       });
-      // Seven ticks: bootstrap, the feature's break-down, the story's, E-001's implement, P-001's judgement,
-      // the feature checkup that creates P-002, and P-002's own break-down. Stopped there because the seeded
+      // Seven ticks: bootstrap, the feature's break-down, the loop writing P-001's task, E-001's implement,
+      // P-001's judgement, the feature checkup that creates P-002, and the loop writing P-002's task (decision
+      // 92). Stopped there because the seeded
       // checkup creates on EVERY run, so left to itself this project never closes — which is decision 47's
       // own bound and is asserted in test/tick.test.ts rather than paid for here.
       const ended = await drive(started, { ticks: 7 });
@@ -955,10 +960,9 @@ for (const mode of MODES) {
         // No `move features/F-001 done` before it, and none after: the checkup created work, so its feature
         // is not finished.
         'ran F-001 checkup-feature',
-        // L2, over the story that checkup created.
-        'move product/P-002 todo',
+        // L2, over the story that checkup created: its task is the loop's, so no break-down runs.
+        'task P-002 E-002',
         'move product/P-002 in-progress',
-        'ran P-002 break-down',
       ]);
       expect(traced).not.toContain('move features/F-001 done');
       expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
@@ -994,12 +998,11 @@ for (const mode of MODES) {
       expect(traced.slice(traced.indexOf('review P-001 pass'))).toEqual([
         'review P-001 pass',
         // P-001 closes and the sibling joins the queue: L2 walks it, which it can only do if the feature owns it.
-        'move product/P-002 todo',
+        // Its task is the loop's to write (decision 92), and it can only write it under a story it can see.
+        'task P-002 E-002',
         'move product/P-002 in-progress',
-        'ran P-002 break-down',
-        // And L3 under that, on the task the sibling's own break-down produced — the whole vertical below a card
-        // no phase would ever have reached if it were hung off its sibling. The run is the STORY's and the
-        // task is claimed and delivered by it (decisions 83 and 87).
+        // And L3 under that — the whole vertical below a card no phase would ever have reached if it were hung
+        // off its sibling. The run is the STORY's and the task is claimed and delivered by it (decisions 83, 87).
         'move engineering/E-002 in-progress',
         'move engineering/E-002 review',
         'ran P-002 implement-story',
@@ -1007,32 +1010,25 @@ for (const mode of MODES) {
       await assertHierarchy(started.project);
     });
 
-    // THE RUN THAT PRODUCED DECISION 45's 2026-08-13 CORRECTION, driven end to end. P-001 was delivered and
-    // closed, and then P-002 — the same story under a second title — could not be broken down, three times,
-    // because P-001's tasks had already satisfied it. Every attempt reported the truth: there is nothing to
-    // create here. The loop refused to advance a creating phase that created nothing (decision 43,
-    // correctly), burned the attempts, and then STOPPED THE ENTIRE PROJECT over one redundant story.
+    // THE RUN THAT PRODUCED DECISION 45's 2026-08-13 CORRECTION, and what the same board does now. P-002 is P-001
+    // under a second title, already delivered by it. Its break-down used to create nothing three times, burn its
+    // attempts and — until decision 45 — stop the whole project. Since decision 92 there is no story break-down
+    // to fail: the loop writes P-002's task, its implement finds the work already there, and its judgement
+    // passes it, so the redundant story costs one implement and one review and closes instead of waiting for a
+    // person.
     //
-    // ASSERTED HERE rather than only in test/tick.test.ts because the bug was not in any one half: the cap
-    // path, the position and the checkup trigger are each individually reasonable, and only walking from one
-    // to the next shows that a story nobody can break down used to take the whole board with it.
-    //
-    // The two titles are the real ones. The OVERLAP that caused it is a separate finding and belongs to
-    // `break-down`'s prompt: no deterministic check can see that these are one story, which is why the
-    // checkups are where over-scope has to be noticed.
-    it('blocks a story that cannot be broken down, and carries on with the next one', async () => {
+    // The two titles are the real ones. The OVERLAP is still a finding for the feature break-down's prompt: no
+    // deterministic check can see that these are one story.
+    it('closes a story a sibling already delivered, rather than blocking it', async () => {
       const started = await start();
-      // One feature with two stories, placed by hand: the feature arrives with its stories, so its own
-      // break-down is skipped and each story's is what this test is about. The FIRST carries a create
-      // marker and delivers a task; the SECOND carries none, so its break-down creates nothing — three
-      // times, which is `attemptCap`.
+      // One feature with two stories, placed by hand, so the feature's own break-down is skipped.
       const first = await place(
         started.project,
         'product',
         'backlog',
         'npm test is configured and working',
         [],
-        `Make the test command real.\n${creates(mode, 'engineering:1')}\n`,
+        'Make the test command real.\n',
       );
       const second = await place(
         started.project,
@@ -1046,11 +1042,9 @@ for (const mode of MODES) {
 
       const ended = await drive(started);
 
-      // THE RUN DOES NOT STOP. One story nobody can break down must not cost the project what is behind it.
       expect(ended.reason).toBe('complete');
-      expect(ended.detail).toContain('P-002');
-      expect(await columnOf(started.project, 'P-002')).toBe('blocked');
       expect(await columnOf(started.project, 'P-001')).toBe('done');
+      expect(await columnOf(started.project, 'P-002')).toBe('done');
       expect(await columnOf(started.project, 'F-001')).toBe('done');
 
       const traced = await trace(started.project);
@@ -1058,29 +1052,28 @@ for (const mode of MODES) {
         'move product/P-001 done',
         'review P-001 pass',
         // L2 moves on to the sibling, which is where the old behaviour ended the project instead.
-        'move product/P-002 todo',
-        // Three attempts, each of which created nothing — and ONE entry stamp between them, because a retry
-        // whose card is already in `todo` writes no move.
-        'ran P-002 break-down',
-        'ran P-002 break-down',
-        'ran P-002 break-down',
-        // No fourth dispatch: the stamp is the loop's own act, with no run and nothing spent.
-        'move product/P-002 blocked',
-        // And the feature reaches its checkup over a settled story it could not break down, and closes.
+        'task P-002 E-002',
+        'move product/P-002 in-progress',
+        'move engineering/E-002 in-progress',
+        'move engineering/E-002 review',
+        'ran P-002 implement-story',
+        'move engineering/E-002 done',
+        'move product/P-002 done',
+        'review P-002 pass',
         'smoke F-001 pass',
         'move features/F-001 done',
         'ran F-001 checkup-feature',
         'stopped complete',
       ]);
 
-      // EXACTLY THREE, from the run records rather than from the trace: the cap is what stops it, and a
-      // fourth attempt would be the loop paying for a judgement it already has three times over.
+      // ONE IMPLEMENT AND ONE REVIEW, from the run records rather than the trace, and no break-down at all.
       const all = await runs(started.project);
-      expect(all.filter((r) => r.card === 'P-002' && r.skill === 'break-down')).toHaveLength(3);
-      // FINDING F, incidentally proved: the shim's success report CLAIMS `created: [E-041]` and the board
-      // says otherwise, so what refused to advance the card was the board comparison and not the report.
-      expect(all.some((r) => r.card === 'P-002' && r.created?.includes('E-041'))).toBe(true);
-      expect((await board(started.project)).map((c) => c.id)).not.toContain('E-041');
+      expect(
+        all
+          .filter((r) => r.card === 'P-002')
+          .map((r) => r.skill)
+          .sort(),
+      ).toEqual(['implement-story', 'review-story']);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
@@ -1168,14 +1161,18 @@ for (const mode of MODES) {
       const started = await start();
       const story = await place(started.project, 'product', 'backlog', 'A story');
       await place(started.project, 'features', 'backlog', 'A feature', [story]);
-      const ended = await drive(started, { ticks: 2 });
+      const ended = await drive(started, { ticks: 3 });
 
       const traced = await trace(started.project);
       expect(traced).toContain('move features/F-001 in-progress');
       expect(traced).not.toContain('ran F-001 break-down');
-      // THE FIRST THING DISPATCHED IS THE STORY'S break-down, not the feature's: the feature was stamped and
-      // passed over, with no run at all, which is what a skip is.
-      expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual(['P-001 break-down']);
+      // THE FIRST THING DISPATCHED IS THE STORY'S WORK, not the feature's break-down: the feature was stamped and
+      // passed over with no run at all, which is what a skip is, and the story's task is the loop's own
+      // (decision 92) — so the first run is its implement.
+      expect(traced).toContain('task P-001 E-001');
+      expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual([
+        'P-001 implement-story',
+      ]);
       expect(ended.iterations).toBe(1);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
@@ -1241,7 +1238,7 @@ describe('a story whose criterion the tree already satisfies', { timeout: 60_000
     // this line the product looks frozen and nothing afterwards says a command was ever run.
     const entries = await diary(started.project);
     expect(entries.filter((e) => e.text.startsWith('Measuring P-001')).map((e) => e.text)).toEqual([
-      `Measuring P-001's acceptance criterion before its break-down: \`${tally(GATE_LOG)}\`.`,
+      `Measuring P-001's acceptance criterion before its task is written: \`${tally(GATE_LOG)}\`.`,
     ]);
     // Nothing about a criterion that HELD: that story is the move above, written by the stamp in the same
     // tick, and a second line would be one fact recorded twice.
@@ -1258,7 +1255,7 @@ describe('a story whose criterion the tree already satisfies', { timeout: 60_000
   // THE SAFETY DIRECTION, end to end and with the real shell: a criterion that does NOT hold changes
   // nothing at all. This is also where the cache earns its keep — five ticks in a row have this story as
   // their candidate, and `MAX_IDLE_TICKS` would allow 240.
-  it('breaks it down as before when the criterion does not hold, and measures the tree once', async () => {
+  it('works the story as before when the criterion does not hold, and measures the tree once', async () => {
     const failing = `echo ran >> ${GATE_LOG}; exit 1`;
     const started = await start({ gates: failing });
     const story = await place(
@@ -1272,44 +1269,43 @@ describe('a story whose criterion the tree already satisfies', { timeout: 60_000
     );
     await place(started.project, 'features', 'backlog', 'A test runner', [story]);
 
-    const ended = await drive(started);
+    // THREE TICKS — the feature's skip, the loop writing the story's task, its implement — and stopped before
+    // the story's review, whose gates run this same command: the count below is the measurement's alone.
+    await drive(started, { ticks: 3 });
 
-    // BROKEN DOWN, three times, exactly as it would have been before decision 85 — the card body carries no
-    // create marker, so each attempt creates nothing and the story blocks at the cap (decision 45).
+    // WORKED, exactly as a story whose criterion was never measured: its task is written and implemented.
     const all = await runs(started.project);
-    expect(all.filter((r) => r.card === 'P-001' && r.skill === 'break-down')).toHaveLength(3);
-    expect(await columnOf(started.project, 'P-001')).toBe('blocked');
-    expect(ended.reason).toBe('complete');
-    expect(ended.detail).toContain('P-001');
+    expect(all.filter((r) => r.card === 'P-001').map((r) => r.skill)).toEqual(['implement-story']);
+    expect(await trace(started.project)).toContain('task P-001 E-001');
 
     // AND THE DIARY SAYS A COMMAND RAN AND CAME BACK NO. This is the branch that left no trace at all: no
-    // card moves, no run is recorded against the measurement, and the break-downs that follow look like an
-    // ordinary story. Exactly one pair, because the answer is cached — a line per tick is decision 82's
+    // card moves, no run is recorded against the measurement, and the work that follows looks like an ordinary
+    // story. Exactly one pair, because the answer is cached — a line per tick is decision 82's
     // incident, which flooded the diary the checkup has to read.
     const texts = (await diary(started.project)).map((e) => e.text);
     expect(texts.filter((t) => t.startsWith('Measuring P-001'))).toEqual([
-      `Measuring P-001's acceptance criterion before its break-down: \`${failing}\`.`,
+      `Measuring P-001's acceptance criterion before its task is written: \`${failing}\`.`,
     ]);
     expect(texts.filter((t) => t.includes('does not pass yet'))).toEqual([
-      `P-001's acceptance criterion \`${failing}\` does not pass yet, so it is being broken down as usual.`,
+      `P-001's acceptance criterion \`${failing}\` does not pass yet, so it is being worked as usual.`,
     ]);
 
-    // ONE EXECUTION ACROSS THE WHOLE SESSION. Uncached, this command runs on every tick that has a
-    // break-down candidate: the skipped feature break-down, three break-down attempts and the block — five
-    // runs of a project's suite to learn the same thing five times.
+    // ONE EXECUTION. Uncached, this command runs on every tick that has the story as its candidate: the skipped
+    // feature break-down and the tick that writes its task — twice to learn one thing.
     expect(await ranTimes(started.project.root, GATE_LOG)).toBe(1);
   });
 });
 
 describe('a story with more tasks than one cap could pay for', { timeout: 60_000 }, () => {
+  // SIXTEEN TASKS PLACED BY HAND, because the loop writes one per story (decision 92): a story that arrives with
+  // its tasks — a person's, or one a break-down made before — is the only way a story holds this many now.
   it('delivers it in groups and closes it, rather than blocking the story that succeeded', async () => {
-    const started = await start({
-      skills: {
-        ...HAPPY,
-        'derive-features': creates('create', 'features:1:product:1:engineering:16'),
-        'break-down': HARNESS_CHAIN('create'),
-      },
-    });
+    const started = await start();
+    const placed = await place(started.project, 'product', 'backlog', 'A story with sixteen tasks');
+    for (let i = 1; i <= 16; i += 1) {
+      await place(started.project, 'engineering', 'backlog', `Task ${i} of 16`, [placed]);
+    }
+    await place(started.project, 'features', 'backlog', 'A feature', [placed]);
     const ended = await drive(started);
     expect(ended.reason).toBe('complete');
 

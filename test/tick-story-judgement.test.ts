@@ -98,14 +98,25 @@ function applyDispatch(
 //
 // The step cap is a guard rather than a bound on the scenario: a machine that re-stamps a card to where it
 // already is would otherwise hang the suite instead of failing it.
+// Whether the card the walk is about has settled, which is when the walk has nothing left to show.
+const reached = (cards: Card[], until: string): boolean =>
+  ['done', 'blocked'].includes(cards.find((c) => c.id === until)?.columnSlug ?? '');
+
+// What the executor does with a story's one task (decision 92): the task, linked both ways, then the move.
+function applyCreate(cards: Card[], action: Extract<TickAction, { kind: 'create' }>): Card[] {
+  const id = `E-${String(900 + cards.length)}`;
+  const story = action.card.id;
+  const linked = cards.map((c) => (c.id === story ? { ...c, links: [...c.links, id] } : c));
+  return move([...linked, card(id, 'engineering', action.task.column, 10, [story])], story, action.to);
+}
+
 function walk(start: Card[], runs: RunRecord[], until: string, verdicts: boolean[] = []): Step {
   let at = { cards: start, runs: [...runs] };
   const answers = [...verdicts];
   const phases: string[] = [];
   const on: string[] = [];
   for (let n = 1; n <= 20; n += 1) {
-    const settled = at.cards.find((c) => c.id === until);
-    if (settled && (settled.columnSlug === 'done' || settled.columnSlug === 'blocked')) break;
+    if (reached(at.cards, until)) break;
     const action = decideTick(input(at));
     if (action.kind === 'stop') {
       phases.push(`stop:${action.reason}`);
@@ -114,6 +125,12 @@ function walk(start: Card[], runs: RunRecord[], until: string, verdicts: boolean
     if (action.kind === 'wait') break;
     if (action.kind === 'stamp') {
       at = { ...at, cards: move(at.cards, action.card.id, action.to) };
+      continue;
+    }
+    if (action.kind === 'create') {
+      at = { ...at, cards: applyCreate(at.cards, action) };
+      phases.push(action.phase);
+      on.push(action.card.id);
       continue;
     }
     const about = action.card;
@@ -328,5 +345,22 @@ describe('a story whose fix could not deliver', () => {
       kind: 'dispatch',
       phase: 'story-implement',
     });
+  });
+});
+
+// A STORY WITH NOTHING UNDER IT (decision 92): the loop writes its one task, then the story is worked and judged
+// like any other — two dispatches, and it closes with the task done.
+describe('a story that arrives with nothing under it', () => {
+  const childless = (): Card[] => [
+    card('F-001', 'features', 'in-progress', 10, ['P-001']),
+    card('P-001', 'product', 'todo', 10, ['F-001']),
+  ];
+
+  it('gets its task from the loop, then one implement and one judgement', () => {
+    const walked = walk(childless(), [], 'P-001');
+    expect(walked.phases).toEqual(['story-task', 'story-implement', 'story-review']);
+    expect(walked.cards.find((c) => c.id === 'P-001')?.columnSlug).toBe('done');
+    const tasks = walked.cards.filter((c) => c.board === 'engineering');
+    expect(tasks.map((t) => [t.links, t.columnSlug])).toEqual([[['P-001'], 'done']]);
   });
 });

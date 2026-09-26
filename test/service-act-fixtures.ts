@@ -136,7 +136,14 @@ export function recorder(
   // flagging its own card, so the loop's stamp cannot go through it.
   const flags: { board: BoardName; card: string; body: Record<string, boolean> }[] = [];
   // Every card the LOOP itself created, which is one card in the whole lifecycle.
-  const created: { board: BoardName; columnSlug: string; title: string; body?: string }[] = [];
+  const created: {
+    board: BoardName;
+    columnSlug: string;
+    title: string;
+    description?: string;
+    body?: string;
+    links?: string[];
+  }[] = [];
   const diary: { kind: string; text: string }[] = [];
   const dispatched: string[] = [];
   // The requests themselves, not only the skill names: `previous` — which run a fix is addressing — is
@@ -222,7 +229,14 @@ export function recorder(
     },
     // The loop's ONE create: the smoke-harness feature at the bootstrap's exit (ruling 66). The id comes back
     // because the diary line names it, and a fixture that answered no id would hide a line naming `undefined`.
-    create: async (input: { board: BoardName; columnSlug: string; title: string; body?: string }) => {
+    create: async (input: {
+      board: BoardName;
+      columnSlug: string;
+      title: string;
+      description?: string;
+      body?: string;
+      links?: string[];
+    }) => {
       calls.push(`create:${input.board}/${input.columnSlug}`);
       created.push(input);
       return opts.create ?? { ok: true as const, value: { ...CARD('F-099', input.board), ...input } };

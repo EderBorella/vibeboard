@@ -1,6 +1,6 @@
 import type { StopReason } from './dispatch-gate.js';
 import type { PhaseName } from './phases.js';
-import type { Card } from './types.js';
+import type { BoardName, Card } from './types.js';
 
 // The vocabulary the tick speaks and the service carries out. FOUR members: a block is a `stamp` to the
 // blocked column and the bootstrap is a `dispatch` with no card, so neither needs a member of its own.
@@ -22,6 +22,9 @@ export type TickAction =
       judged?: Judged;
     }
   | { kind: 'stamp'; phase: PhaseName; card: Card; to: string; why: string }
+  // A card the loop writes, then the stamp that follows it (decision 92). One action rather than two ticks, so a
+  // story is never left standing in its entry column with the task written but the move not made.
+  | { kind: 'create'; phase: PhaseName; card: Card; task: TaskDraft; to: string; why: string }
   | { kind: 'wait' }; // as much is in flight as the config allows
 
 // THE CARDS ONE LEVEL DOWN THAT A DISPATCH DELIVERS (decision 83): a story's implement and its tasks, and
@@ -31,6 +34,16 @@ export type TickAction =
 // BOTH COLUMNS COME FROM THE TICK, not from the executor. Which column means "being worked" and which means
 // "delivered" is a decision about the machine, and the executor holds no decisions of its own — so the pure
 // side names them and the service does the writing.
+// WHAT THE LOOP WRITES FOR A STORY: its one task, entering the board's first column and linked to the story it
+// restates. Every field is decided by the tick; the executor only sends it.
+export interface TaskDraft {
+  board: BoardName;
+  column: string;
+  title: string;
+  description?: string;
+  body: string;
+}
+
 export interface Group {
   // In queue order. An implement's is never more than the tick's ceiling — which bounds what the run is TOLD
   // to do and what is delivered for it, not what it can see: the prompt lists every card the story links to,

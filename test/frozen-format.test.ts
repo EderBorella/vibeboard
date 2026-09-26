@@ -107,19 +107,19 @@ describe('a project written before decision 85', () => {
       card: { id: 'P-002' },
     });
 
-    // AND THE BREAK-DOWN BRANCH, which is the one decision 85 touches. The same project one story later:
-    // P-002 closed, so the machine picks up P-001 — which carries no criterion, because no card written
-    // before this could. It is broken down, and `satisfied` naming it changes nothing, because the card
-    // names no command for the loop to have run.
+    // AND THE BRANCH A CHILDLESS STORY TAKES, which decisions 85 and 92 touch. The same project one story later:
+    // P-002 closed, so the machine picks up P-001 — which carries no criterion, because no card written before
+    // decision 85 could. The loop writes its one task (decision 92), and `satisfied` naming it changes nothing,
+    // because the card names no command for the loop to have run.
     const later = cards.map((c) => (c.id === 'P-002' ? { ...c, columnSlug: 'done' } : c));
     expect(decideTick({ ...input, cards: later })).toMatchObject({
-      kind: 'dispatch',
-      phase: 'story-breakdown',
+      kind: 'create',
+      phase: 'story-task',
       card: { id: 'P-001' },
     });
     expect(decideTick({ ...input, cards: later, satisfied: ['P-001'] })).toMatchObject({
-      kind: 'dispatch',
-      phase: 'story-breakdown',
+      kind: 'create',
+      phase: 'story-task',
       card: { id: 'P-001' },
     });
   });

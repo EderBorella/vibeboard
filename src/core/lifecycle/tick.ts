@@ -351,7 +351,6 @@ const ENTERING = ['backlog', 'todo'];
 // that will not close is a judgement about work that is already done rather than work nobody could start.
 // Both still stop the loop and name themselves (the spec's own cycle table).
 const BLOCKS_AT_CAP: Partial<Record<PhaseName, string>> = {
-  'story-breakdown': 'still has nothing under it',
   'story-implement': 'still has tasks nothing has finished',
 };
 
@@ -535,9 +534,7 @@ function checkupPhase(input: TickInput, card: Card): TickAction | undefined {
 // since the judgement moved up (decision 80), and row P3 since the work did (decision 83): a task is no
 // longer a position the machine stands in, it is the record of what one dispatch was asked for.
 function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
-  if (tasks.length === 0) {
-    return alreadySatisfied(input, story, tasks) ?? dispatchPhase(input, 'story-breakdown', story);
-  }
+  if (tasks.length === 0) return alreadySatisfied(input, story, tasks) ?? taskFromStory(input, story);
   if (ENTERING.includes(story.columnSlug)) {
     return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
   }
@@ -577,6 +574,31 @@ function alreadySatisfied(input: TickInput, story: Card, tasks: Card[]): TickAct
     story,
     `its acceptance criterion \`${command}\` already passes, so there was nothing to break down and no work was done.`,
   );
+}
+
+// ROW P2, WITHOUT A RUN (decision 92). The story is its own plan: the feature break-down that wrote it cut it to
+// one acceptance criterion, and a break-down run measured over a whole feature turned each story into one task.
+// So the loop writes that task — the story restated, entering engineering's first column, linked to the story —
+// and moves the story to where its implement picks it up. Falls through on a board with no engineering column,
+// which readiness refuses before a project starts.
+function taskFromStory(input: TickInput, story: Card): TickAction | undefined {
+  const column = (input.columns.engineering ?? [])[0];
+  const to = phase('story-task').exitPass;
+  if (column === undefined || to === undefined) return undefined;
+  return {
+    kind: 'create',
+    phase: 'story-task',
+    card: story,
+    task: {
+      board: 'engineering',
+      column,
+      title: story.title,
+      ...(story.description ? { description: story.description } : {}),
+      body: `The whole of ${story.id}, as one task: its acceptance criterion is the story's.`,
+    },
+    to,
+    why: 'auto-pilot wrote its one task from it, so it goes straight to its implement.',
+  };
 }
 
 // A phase the loop carries out alone, to a column the CALLER names. The two send-back destinations and the

@@ -17,6 +17,7 @@ export type PhaseName =
   | 'story-breakdown'
   | 'story-breakdown-skip'
   | 'story-satisfied'
+  | 'story-task'
   | 'story-implement'
   | 'story-fix'
   | 'story-review'
@@ -86,6 +87,18 @@ export const PHASES: readonly Phase[] = [
     name: 'story-satisfied',
     board: 'product',
     exitPass: 'done',
+    bounded: 'none',
+  },
+  // A STORY'S ONE TASK, WRITTEN BY THE LOOP (decision 92). Its break-down had become a run that produced one
+  // task per story — a quarter of what an era spent — and a story is already cut to one acceptance criterion by
+  // the feature break-down that wrote it, so the task is the story restated as the record its implement works
+  // from. No skill: the loop writes it, linked in the same call, and the story goes straight to its implement.
+  // `story-breakdown` stays in the table for a break-down a person dispatches by hand.
+  {
+    name: 'story-task',
+    board: 'product',
+    exitPass: 'in-progress',
+    creates: 'engineering',
     bounded: 'none',
   },
   // THE WORK OF A WHOLE STORY, IN ONE RUN (decision 83). It replaces the per-task implement and the per-task

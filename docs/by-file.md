@@ -28,7 +28,7 @@ machine's closure, and it is why the purity gate is still unarmed.
 | file | pages | cites |
 |---|---|---|
 | `accounting.ts` | `decisions.md` — the spend arithmetic, and the SHAPE `GET /api/accounting` answers with (`Accounting`, `CardAccount`). The shape lived in the autopilot route module until it was the last thing making `src/service/` import from `src/server/`; the loop needs the type to read the answer, and nothing about it is a server concern | `S10` |
-| `actions.ts` | `decisions.md` — the vocabulary the tick speaks, and what a dispatch may carry with it | `decision 83`, `decision 87` |
+| `actions.ts` | `decisions.md` — the vocabulary the tick speaks, and what a dispatch may carry with it | `decision 83`, `decision 87`, `decision 92` |
 | `autopilot-cover.ts` | `decisions.md` | `decision 45`, `decision 52`, `decision 59` |
 | `autopilot-state.ts` | `decisions.md`, `security/containment.md` (its `unreviewedGates` comment explains a live rule by naming the dead profile) | `decision 15`, `decision 20`, `decision 47`, `S13`, `C2` |
 | `autopilot.ts` | `decisions.md` | `decision 40`, `decision 42`, `decision 45`, `decision 51`, `decision 52`, `decision 57`, `S5` |
@@ -41,8 +41,8 @@ machine's closure, and it is why the purity gate is still unarmed.
 | `harness-feature.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 44`, `decision 66`, `decision 67` |
 | `layout.ts` | `decisions.md`, `security/containment.md` (`SUGGESTIONS_DIR`'s comment names the dead profile; the rule is now a read-only mount). `RESUMABLE_DOCUMENTS` is the six documents setup writes — the five foundation ones plus the README — and it is here rather than beside either caller because it is a security boundary read from two places: the résumé route refuses a name outside it, and the wizard frame drops an attachment naming one | `decision 20`, `decision 78` |
 | `lifecycle/stop-sentences.ts` | `decisions.md` — the sentences a stop carries, and what each one used to say: most are corrections that named a mechanism the product no longer has | `decision 44`, `decision 45`, `decision 52`, `decision 55`, `decision 66`, `decision 74`, `decision 84` |
-| `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 54`, `decision 58`, `decision 59`, `decision 80`, `decision 81`, `decision 82`, `decision 83`, `decision 84`, `decision 85`, `decision 86`, `decision 87` |
-| `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61`, `decision 80`, `decision 83`, `decision 85`, `decision 87` |
+| `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 54`, `decision 58`, `decision 59`, `decision 80`, `decision 81`, `decision 82`, `decision 83`, `decision 84`, `decision 85`, `decision 86`, `decision 87`, `decision 92` |
+| `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61`, `decision 80`, `decision 83`, `decision 85`, `decision 87`, `decision 92` |
 | `position.ts` | `decisions.md` | `decision 38`, `decision 39` |
 | `runs/types.ts` | `decisions.md` — the record's shape; `runs.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `S11` |
 | `satisfied.ts` | `decisions.md` — whether a story's acceptance criterion is one a machine can already answer, and the one place the loop and the tick agree on WHICH command that is. The bound on it is a security property rather than a scope: the key names a declared gate, it never carries a command — and what comes back is the DOCUMENT'S string, so only a declared command can be executed by data flow rather than by the comparison holding | `decision 39`, `decision 51`, `decision 85`, `ruling 66` |
@@ -145,7 +145,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `autopilot/service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it. It resolves the loop's entry by **climbing** to whichever ancestor holds `service/main<ext>`, not by rewriting its own path: the old derivation hard-coded both the directory it sat in and its own filename, so filing it here made it answer with its OWN path — and nothing type-checks a string. `test/service-process.test.ts` asserts the resolved path exists on disk | `decision 13`, `decision 20`, `decision 47` |
 | `autopilot/routes.ts` | `decisions.md` — the readiness composer, and the accounting endpoint whose SHAPE lives in `core/accounting.ts` | `decision 12`, `decision 47` |
 | `boards/snapshot.ts` | `decisions.md` | `decision 46` |
-| `boards/cards-routes.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65` |
+| `boards/cards-routes.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65`, `decision 92` |
 | `boards/project-routes.ts` | `decisions.md` | `S7` |
 | `boxes/api-socket.ts` | `security/containment.md` — the socket **directory** is what is mounted, read-only | — |
 | `boxes/box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
@@ -177,7 +177,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 
 | file | pages | cites |
 |---|---|---|
-| `act/index.ts` | `decisions.md` — the two paths one action can take, and the four rules the order carries; `act.ts` is the re-export barrel and holds no reasoning of its own | `decision 3`, `decision 10`, `decision 40`, `decision 43`, `decision 51`, `decision 55`, `decision 57`, `decision 83`, `decision 87` |
+| `act/index.ts` | `decisions.md` — the two paths one action can take, and the four rules the order carries; `act.ts` is the re-export barrel and holds no reasoning of its own | `decision 3`, `decision 10`, `decision 40`, `decision 43`, `decision 51`, `decision 55`, `decision 57`, `decision 83`, `decision 87`, `decision 92` |
 | `act/bootstrap.ts` | `decisions.md` — the tail of the one run with no card: the scaffolding flag, then the harness feature | `decision 44`, `decision 50`, `decision 51`, `decision 66` |
 | `act/checkup.ts` | `decisions.md` — what a checkup is told, and the gate-document refusal in front of the smoke command | `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 80` |
 | `act/group.ts` | `decisions.md` — the cards one level down a dispatch delivers: claimed before it, delivered together into `review` after it | `decision 83`, `decision 87` |
@@ -186,10 +186,10 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `act/review.ts` | `decisions.md` — the gates first, in this process, and the model only after them; the judgement they precede is the STORY's | `decision 40`, `decision 51`, `decision 80`, `decision 81`, `decision 82`, `decision 87` |
 | `act/sentences.ts` | `decisions.md` — every sentence a person reads afterwards, including the run summary agents cannot append themselves | `decision 10` |
 | `act/settle.ts` | — the wait for a dispatched run, and the clamps that make it terminate | — |
-| `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66` |
+| `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66`, `decision 92` |
 | `loop.ts` | `decisions.md` — and the one fact it carries from one tick to the next, which is why `Progress` holds a set of card ids | `decision 8`, `decision 20`, `decision 39`, `decision 66`, `decision 82`, `decision 85` |
 | `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20`, `decision 85` |
-| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the four silent refusals, the diary lines that are the only record a command ran, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick. The first refusal is the in-flight one — measuring a tree an agent is editing caches an answer the edits falsify, against a HEAD they do not move | `decision 51`, `decision 73`, `decision 82`, `decision 85` |
+| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the four silent refusals, the diary lines that are the only record a command ran, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick. The first refusal is the in-flight one — measuring a tree an agent is editing caches an answer the edits falsify, against a HEAD they do not move | `decision 51`, `decision 73`, `decision 82`, `decision 85`, `decision 92` |
 | `stamp.ts` | `decisions.md` | `decision 10`, `decision 38` |
 
 ## `web/src/` — the React front end

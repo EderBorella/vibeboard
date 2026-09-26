@@ -103,7 +103,7 @@ async function passes(
   // the debug setting is on, and even then it goes to a log file rather than to anyone watching.
   await deps.client.log(
     'lifecycle',
-    `Measuring ${wanted.card}'s acceptance criterion before its break-down: \`${wanted.command}\`.`,
+    `Measuring ${wanted.card}'s acceptance criterion before its task is written: \`${wanted.command}\`.`,
     { card: wanted.card },
   );
   const result = await (deps.run ?? runCommand)(wanted.command, { cwd: deps.root });
@@ -116,7 +116,7 @@ async function passes(
   if (!passed) {
     await deps.client.log(
       'lifecycle',
-      `${wanted.card}'s acceptance criterion \`${wanted.command}\` does not pass yet, so it is being broken down as usual.`,
+      `${wanted.card}'s acceptance criterion \`${wanted.command}\` does not pass yet, so it is being worked as usual.`,
       { card: wanted.card },
     );
   }

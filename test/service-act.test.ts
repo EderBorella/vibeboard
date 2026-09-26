@@ -270,3 +270,60 @@ describe('a stamp with no run behind it', () => {
     expect(r.diary.some((d) => d.kind === 'note')).toBe(true);
   });
 });
+
+// A STORY'S ONE TASK, WRITTEN BY THE LOOP (decision 92): the create with its link, the diary line, then the move.
+describe('a task the loop writes for a story', () => {
+  const WRITE: TickAction = {
+    kind: 'create',
+    phase: 'story-task',
+    card: CARD('P-001', 'product'),
+    task: {
+      board: 'engineering',
+      column: 'backlog',
+      title: 'Stay signed in',
+      description: 'A session survives.',
+      body: 'The whole of P-001.',
+    },
+    to: 'in-progress',
+    why: 'auto-pilot wrote its one task from it, so it goes straight to its implement.',
+  };
+
+  it('creates the task linked to its story, says so, and then moves the story', async () => {
+    const r = recorder();
+    const result = await performAction(deps(r.client), WRITE, context);
+    expect(result).toEqual({ dispatches: 0 });
+    expect(r.created).toEqual([
+      {
+        board: 'engineering',
+        columnSlug: 'backlog',
+        title: 'Stay signed in',
+        description: 'A session survives.',
+        body: 'The whole of P-001.',
+        links: ['P-001'],
+      },
+    ]);
+    expect(r.diary[0]).toMatchObject({
+      kind: 'lifecycle',
+      text: 'F-099 written from P-001, as its one task.',
+    });
+    expect(r.moves).toEqual([{ card: 'P-001', to: 'in-progress' }]);
+    expect(r.requests).toEqual([]);
+  });
+
+  // Refused, nothing is moved: a story moved on with no task under it would be handed to an implement with
+  // nothing to do, and the next tick writes it again instead.
+  it('moves nothing when the create is refused, and notes why', async () => {
+    const r = recorder({ create: { ok: false, reason: 'refused with 409', fatal: false } });
+    const result = await performAction(deps(r.client), WRITE, context);
+    expect(result.stop).toBeUndefined();
+    expect(r.moves).toEqual([]);
+    expect(r.diary.some((d) => d.kind === 'note' && d.text.includes("could not write P-001's task"))).toBe(
+      true,
+    );
+  });
+
+  it('stops the loop when the refusal is one it cannot recover from', async () => {
+    const r = recorder({ create: { ok: false, reason: 'refused with 401', fatal: true } });
+    expect((await performAction(deps(r.client), WRITE, context)).stop?.reason).toBe('stalled');
+  });
+});

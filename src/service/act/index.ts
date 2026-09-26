@@ -120,16 +120,23 @@ export async function performAction(
   switch (action.kind) {
     case 'stamp':
       return await stampOnly(deps, action);
+    case 'create':
+      return await createThenStamp(deps, action);
     case 'dispatch':
       return await dispatch(deps, action, context);
     // A `wait` is the one action with nothing to do: the loop sleeps and looks again. A `stop` never reaches
     // here — the loop returns on it before carrying anything out.
-    default:
+    //
+    // NO `default`, so a new kind of action cannot fall through to doing nothing: the switch is exhaustive,
+    // and the compiler refuses a kind nobody wired in. `create` was one, and did exactly that until it was.
+    case 'wait':
+    case 'stop':
       return { dispatches: 0 };
   }
 }
 
 type Stamp = Extract<TickAction, { kind: 'stamp' }>;
+type Create = Extract<TickAction, { kind: 'create' }>;
 export type Dispatch = Extract<TickAction, { kind: 'dispatch' }>;
 
 // A move the loop makes with no run behind it: the two break-down skips, the re-stamp of a story whose verdict
@@ -141,6 +148,28 @@ async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
     return refused(deps, `could not move ${action.card.id} to ${action.to}`, moved.reason, moved.fatal);
   }
   return { dispatches: 0 };
+}
+
+// THE TASK THE LOOP WRITES FOR A STORY, and then the story's move (decision 92). Created through the endpoint with
+// its link in the same call, so the card is never there without its parent; refused, it is noted like a refused
+// stamp and the next tick asks again. Written but not moved, the next tick finds a story with a task in its entry
+// column, and the break-down skip makes the move — so no half-state here needs undoing.
+async function createThenStamp(deps: ActDeps, action: Create): Promise<ActResult> {
+  const { task, card } = action;
+  const made = await deps.client.create({
+    board: task.board,
+    columnSlug: task.column,
+    title: task.title,
+    ...(task.description ? { description: task.description } : {}),
+    body: task.body,
+    links: [card.id],
+  });
+  if (!made.ok) return refused(deps, `could not write ${card.id}'s task`, made.reason, made.fatal);
+  await deps.client.log('lifecycle', `${made.value.id} written from ${card.id}, as its one task.`, {
+    card: made.value.id,
+    board: task.board,
+  });
+  return await stampOnly(deps, { kind: 'stamp', phase: action.phase, card, to: action.to, why: action.why });
 }
 
 // WHAT IS DISPATCHED, in one place. A card run names its card and may carry the run whose findings it is

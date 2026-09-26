@@ -147,7 +147,10 @@ export function aroundSection(around: BoardAround): string {
     ...children.map((c) => `  - ${place(c)}`),
   ]);
   return [
-    'The board as it stood when this run was dispatched, so you do not need to fetch it to see what exists.',
+    // SAID AS AN ANSWER TO THE SKILL, because an existing project's skill still says "read the board first"
+    // and a live break-down handed this list fetched the whole board anyway (decision 90).
+    'This is the board read, taken when this run was dispatched, and it is complete for this card. Do not fetch',
+    '`GET /api/state` to check it: that answers every card on the project, and none of the rest is yours.',
     '',
     ...under,
     ...whereItSits(around, beside),

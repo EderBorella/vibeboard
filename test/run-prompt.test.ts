@@ -570,7 +570,8 @@ describe('the board around the card', () => {
       [
         '## What is already on the board around this card',
         '',
-        'The board as it stood when this run was dispatched, so you do not need to fetch it to see what exists.',
+        'This is the board read, taken when this run was dispatched, and it is complete for this card. Do not fetch',
+        '`GET /api/state` to check it: that answers every card on the project, and none of the rest is yours.',
         '',
         'Under this card: nothing yet.',
         '',
@@ -588,7 +589,7 @@ describe('the board around the card', () => {
       inputs({ around: { of: 'feature', siblings: [{ card: feature('F-002'), children: [] }] } }),
     );
     expect(text).toContain(
-      'to see what exists.\n\nThe other features:\n- **F-002** (features/in-progress) — F-002 title',
+      'none of the rest is yours.\n\nThe other features:\n- **F-002** (features/in-progress) — F-002 title',
     );
     expect(text).not.toContain('Under this card');
   });

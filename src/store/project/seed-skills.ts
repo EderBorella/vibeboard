@@ -94,8 +94,9 @@ product board; a **user story** breaks into **tasks** on engineering. One featur
 its stories and their tasks are a single vertical, and the whole point of breaking
 down is that the vertical can be built one card at a time.
 
-**Read the board first** and say in your report what already exists under this
-card. A card that already has children does not need breaking down again, and a
+**Read the board first** — the part of it around this card is in this prompt —
+and say in your report what already exists under this card.
+A card that already has children does not need breaking down again, and a
 second set of them costs a break-down, an implement, the gates and a review each
 for work that is already on the board.
 
@@ -380,8 +381,8 @@ it has already had every attempt it is allowed, and it is waiting for a person.
 A story carrying a blocked task is settled too, and is not work to attack.
 
 So: create work for what was MISSED, never for what was attempted and blocked.
-**Read the board first**, and create stories through \`POST /api/cards\`,
-one card per call. You get ONE round of creating at this feature: when what you
+**Read the board first** — the other features are in this prompt — and create
+stories through \`POST /api/cards\`, one card per call. You get ONE round of creating at this feature: when what you
 created is settled and you run here again, either report the feature as finished
 or say why it is not — and anything still missing goes to \`POST /api/suggestions\`.
 

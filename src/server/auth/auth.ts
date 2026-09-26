@@ -44,7 +44,8 @@ const RULES: Record<string, Rule> = {
   // Reads. An agent needs the board it is working on and the config that describes it.
   'GET /api/state': {
     scopes: READ_SCOPES,
-    describe: 'the whole board — every card on all three boards, plus the project config.',
+    describe:
+      'the whole board, as `{ open, snapshot: { config, boards: { features, product, engineering } } }` — each board a list of cards with `id`, `title`, `columnSlug`, `links` and `body`.',
   },
   'GET /api/config': {
     scopes: READ_SCOPES,

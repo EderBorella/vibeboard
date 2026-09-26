@@ -32,6 +32,7 @@ machine's closure, and it is why the purity gate is still unarmed.
 | `autopilot-cover.ts` | `decisions.md` | `decision 45`, `decision 52`, `decision 59` |
 | `autopilot-state.ts` | `decisions.md`, `security/containment.md` (its `unreviewedGates` comment explains a live rule by naming the dead profile) | `decision 15`, `decision 20`, `decision 47`, `S13`, `C2` |
 | `autopilot.ts` | `decisions.md` | `decision 40`, `decision 42`, `decision 45`, `decision 51`, `decision 52`, `decision 57`, `S5` |
+| `board-around.ts` | `decisions.md` — the slice of the board a break-down or feature checkup is handed instead of fetching it | `decision 90` |
 | `bounds.ts` | `decisions.md` | `decision 46`, `decision 47`, `decision 50`, `decision 58`, `decision 60`, `decision 80`, `decision 81`, `decision 83`, `decision 86`, `decision 87` |
 | `created.ts` | `decisions.md` | `decision 40`, `decision 43`, `decision 47` |
 | `derived-status.ts` | `decisions.md` | `decision 45`, `decision 46`, `decision 62`, `decision 86`, `decision 87` |
@@ -169,7 +170,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `runs/prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in. It also records why the `run-prompt.ts` barrel that used to front this directory is gone: NodeNext has no directory-index resolution, so a barrel is what makes a SPLIT cost its importers nothing — and filing the directory under `runs/` changed the specifier for all four importers anyway, leaving a file whose only job was to keep a path stable that nobody could still use | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |
 | `runs/prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
 | `runs/prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth/auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
-| `runs/prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60`, `decision 89` |
+| `runs/prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60`, `decision 89`, `decision 90` |
 | `suggestions/routes.ts` | `decisions.md` | `decision 49`, `decision 50` |
 
 ## `src/service/` — the auto-pilot loop, a separate process

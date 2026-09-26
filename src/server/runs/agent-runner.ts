@@ -1,3 +1,4 @@
+import type { BoardAround } from '../../core/board-around.js';
 import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import {
   parseAgentReport,
@@ -54,6 +55,8 @@ export interface DispatchInput {
   boardColumns: BoardColumns[];
   cardFile?: string;
   linked: Card[];
+  // The board around the card, for the phases that would otherwise fetch it (core/board-around.ts).
+  around?: BoardAround;
   attachments: string[];
   links: { title: string; url: string }[];
   previous?: RunRecord;
@@ -368,6 +371,7 @@ export class AgentRunner {
       ...(input.card ? { card: input.card, cardFile: input.cardFile ?? '' } : {}),
       boardColumns: input.boardColumns,
       linked: input.linked,
+      ...(input.around ? { around: input.around } : {}),
       attachments: input.attachments,
       links: input.links,
       ...(input.previous ? { previous: narrowPrevious(input.previous) } : {}),

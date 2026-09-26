@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import type { BoardAround } from '../../../core/board-around.js';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
 import { type PhaseName, phase, phaseForRun } from '../../../core/phases.js';
 import type { BoardName, Card } from '../../../core/types.js';
@@ -68,10 +69,13 @@ export function columnsSection(boardColumns: BoardColumns[]): string {
 // Linked cards: every one identified, and the *product* ones quoted in full. A product card carries
 // the intent an engineering card usually omits, which is exactly what an agent needs and the least
 // likely thing for it to think of reading.
-export function linkedSection(linked: Card[], projectRoot: string): string {
+// A STORY'S BODY IS QUOTED ONLY TO A TASK, because it is the task's intent. Linked from a feature the
+// stories are its children rather than its reason, and a feature checkup was carrying every one of them in
+// full — 24 KB on the board that was measured — to judge a list it already has (decision 90).
+export function linkedSection(linked: Card[], projectRoot: string, from?: Card): string {
   const lines = linked.map((c) => `${cardLine(c)}\n  file: ${relative(projectRoot, c.filePath)}`);
   const intent = linked
-    .filter((c) => c.board === 'product' && c.body.trim() !== '')
+    .filter((c) => from?.board !== 'features' && c.board === 'product' && c.body.trim() !== '')
     .map((c) => `### ${c.id} — ${c.title}\n\n${c.body.trim()}`);
   return [lines.join('\n'), ...intent].join('\n\n');
 }
@@ -128,6 +132,36 @@ export function foundationSection(
 // WHAT IS UNDER THIS CARD, as the loop already knows it. Every line here is a fact the checkup would otherwise
 // have had to fetch, and cannot: `GET /api/runs` is `service`-only and the diary has no read row at all
 // (ruling 60). So it is told, and the prompt never suggests it go and look.
+// Where each card sits, as one line: the slice carries titles, never bodies, so it stays a list.
+const place = (c: Card): string => `**${c.id}** (${c.board}/${c.columnSlug}) — ${c.title}`;
+
+// THE BOARD AROUND THE CARD (decision 90), in the words of the question the skill asks: what is already
+// under it, and what sits beside it. The pointer for anything else stays, with the answer's shape stated by
+// the endpoint list, so a run that does need more is not left decoding it.
+export function aroundSection(around: BoardAround): string {
+  const under =
+    around.children === undefined
+      ? []
+      : around.children.length === 0
+        ? ['Under this card: nothing yet.', '']
+        : ['Under this card:', ...around.children.map((c) => `- ${place(c)}`), ''];
+  const beside = around.siblings.flatMap(({ card, children }) => [
+    `- ${place(card)}`,
+    ...children.map((c) => `  - ${place(c)}`),
+  ]);
+  const heading = around.parent
+    ? `It sits under ${place(around.parent)}. Beside it, under ${around.parent.id}:`
+    : 'The other features:';
+  return [
+    'The board as it stood when this run was dispatched, so you do not need to fetch it to see what exists.',
+    '',
+    ...under,
+    ...(beside.length > 0
+      ? [heading, ...beside]
+      : [around.parent ? `It sits under ${place(around.parent)}, alone.` : 'There are no other features.']),
+  ].join('\n');
+}
+
 function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
   const children = checkup.children.map((c) => {
     const ended = c.outcome
@@ -151,6 +185,15 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
           ...checkup.suggestions.map((s) => `- ${s.id}: ${s.title}`),
         ]
       : ['There are no open suggestions on this project.']),
+    // THE GATES ARE NOT A FEATURE CHECKUP'S TO RUN (decision 90). Every checkup measured ran them, six times
+    // a run on average, and could only ever learn what closing each story had already required.
+    ...(checkup.feature
+      ? [
+          '',
+          'Auto-pilot closes a story only after its gates pass, so they have passed on every story above that is',
+          'done. Do not run them again: they cannot tell you anything this list does not.',
+        ]
+      : []),
   ].join('\n');
 }
 

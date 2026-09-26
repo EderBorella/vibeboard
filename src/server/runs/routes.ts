@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { boardAroundFor } from '../../core/board-around.js';
 import { findCard } from '../../core/find.js';
-import { phase } from '../../core/phases.js';
+import { phase, phaseForRun } from '../../core/phases.js';
 import { asVerification, isInFlight, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, isBoard } from '../../core/types.js';
 import { readBoard } from '../../store/cards/board.js';
@@ -148,6 +149,7 @@ async function resolveDispatch(
 
   const previous = await resolvePrevious(root, body, card.id);
   if (previous && 'error' in previous) return previous;
+  const around = boardAroundFor(phaseForRun(skill.slug, card.board)?.name, card, everyCard);
 
   return {
     input: {
@@ -160,6 +162,7 @@ async function resolveDispatch(
       ...(isCheckupEvidence(body.checkup) ? { checkup: checkupEvidenceOf(body.checkup) } : {}),
       cardFile,
       linked,
+      ...(around ? { around } : {}),
       ...(previous ? { previous: previous.run } : {}),
       userPrompt: body.prompt,
       ...(await dispatchFrame(root, config, body)),

@@ -1193,6 +1193,27 @@ describe('POST /api/runs — the foundation', () => {
     expect(prompt).not.toContain(`- ${FOUNDATION_DIR}/TESTING.md`);
   }, 30000);
 
+  // AND THE BOARD AROUND IT (decision 90), computed by the route off the board it already read — which no unit
+  // test of the section can see, and which a card run with no such phase must not be handed.
+  it('hands a break-down the board around its card, and an ordinary run none', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    const story = await productCard(project);
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'product', card: story, skill: 'break-down' },
+      })
+    ).json() as { run: RunRecord };
+    await settledOn(project, 'product', story, run.run);
+    expect(await promptFrom(argsLog)).toContain('## What is already on the board around this card');
+
+    await dispatch(project);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+    expect(await promptFrom(argsLog)).not.toContain('What is already on the board');
+  }, 30000);
+
   // AND A BREAK-DOWN GETS THE COMMANDS, NOT THE PROSE (decision 89) — through the app, because the list is
   // parsed in `dispatchFrame` and nothing in a unit test of the section can see that it is handed over.
   it('hands a break-down the gate commands rather than the document', async () => {

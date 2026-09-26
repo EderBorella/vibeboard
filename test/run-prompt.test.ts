@@ -290,6 +290,26 @@ describe('buildRunPrompt', () => {
     expect(text).not.toContain('Rotate on the hour.');
   });
 
+  // FROM A FEATURE, THE STORIES ARE ITS CHILDREN, not its intent (decision 90): a feature checkup was carrying
+  // every story under it in full, to judge a list its prompt already has.
+  it('does not quote the stories linked from a feature', () => {
+    const text = buildRunPrompt(
+      inputs({
+        card: card({ id: 'F-001', board: 'features', title: 'Sign-in' }),
+        linked: [
+          card({
+            id: 'P-001',
+            board: 'product',
+            title: 'Stay signed in',
+            body: 'Users lose their session daily.',
+          }),
+        ],
+      }),
+    );
+    expect(text).toContain('- **P-001** (product/');
+    expect(text).not.toContain('Users lose their session daily.');
+  });
+
   it('skips the quote for a product card with an empty body', () => {
     const text = buildRunPrompt(
       inputs({ linked: [card({ id: 'P-002', board: 'product', title: 'Empty', body: '   ' })] }),
@@ -501,6 +521,70 @@ describe('the endpoint catalogue the assembled prompt hands an agent', () => {
       const [, method, url] = CATALOGUE_LINE.exec(line) as RegExpExecArray;
       expect(allows(cred('assist', 'E-010'), method, url, ROOT, 'E-010'), line).toBe(true);
     }
+  });
+});
+
+// THE BOARD AROUND THE CARD (decision 90). Asserted as whole strings: this is a prompt, so the lines are the
+// behaviour, and a list that loses its indent or its heading is a list the agent reads differently.
+describe('the board around the card', () => {
+  const story = (id: string, columnSlug = 'backlog') =>
+    card({ id, board: 'product', columnSlug, title: `${id} title` });
+  const task = (id: string, columnSlug = 'done') =>
+    card({ id, board: 'engineering', columnSlug, title: `${id} title` });
+  const feature = (id: string) =>
+    card({ id, board: 'features', columnSlug: 'in-progress', title: `${id} title` });
+
+  it('lists what is under a story, its feature, and the stories beside it with their tasks', () => {
+    const text = buildRunPrompt(
+      inputs({
+        around: {
+          parent: feature('F-001'),
+          siblings: [
+            { card: story('P-001', 'done'), children: [task('E-001'), task('E-002')] },
+            { card: story('P-003'), children: [] },
+          ],
+          children: [],
+        },
+      }),
+    );
+    expect(text).toContain(
+      [
+        '## What is already on the board around this card',
+        '',
+        'The board as it stood when this run was dispatched, so you do not need to fetch it to see what exists.',
+        '',
+        'Under this card: nothing yet.',
+        '',
+        'It sits under **F-001** (features/in-progress) — F-001 title. Beside it, under F-001:',
+        '- **P-001** (product/done) — P-001 title',
+        '  - **E-001** (engineering/done) — E-001 title',
+        '  - **E-002** (engineering/done) — E-002 title',
+        '- **P-003** (product/backlog) — P-003 title',
+      ].join('\n'),
+    );
+  });
+
+  it('lists the other features for a feature, and nothing under it when it is its checkup', () => {
+    const text = buildRunPrompt(inputs({ around: { siblings: [{ card: feature('F-002'), children: [] }] } }));
+    expect(text).toContain(
+      'to see what exists.\n\nThe other features:\n- **F-002** (features/in-progress) — F-002 title',
+    );
+    expect(text).not.toContain('Under this card');
+  });
+
+  it('says so when a story stands alone under its feature', () => {
+    const text = buildRunPrompt(
+      inputs({ around: { parent: feature('F-001'), siblings: [], children: [task('E-003', 'backlog')] } }),
+    );
+    expect(text).toContain(
+      'Under this card:\n- **E-003** (engineering/backlog) — E-003 title\n\nIt sits under **F-001** (features/in-progress) — F-001 title, alone.',
+    );
+  });
+
+  it('comes straight after the linked cards, and not at all without a slice', () => {
+    const text = buildRunPrompt(inputs({ linked: [story('P-001')], around: { siblings: [] } }));
+    expect(text.indexOf('## Linked cards')).toBeLessThan(text.indexOf('## What is already on the board'));
+    expect(buildRunPrompt(inputs())).not.toContain('What is already on the board');
   });
 });
 
@@ -1060,6 +1144,14 @@ describe('the checkup’s evidence', () => {
     // has no smoke command to run, so there is nothing to say about one.
     const prompt = checkingUp();
     expect(prompt).not.toContain('The smoke command');
+  });
+
+  // THE GATES ARE NOT THE FEATURE CHECKUP'S TO RUN (decision 90): closing each story already required them.
+  it('tells the FEATURE checkup the gates have passed on its done stories, and not to run them', () => {
+    expect(checkingUp({ feature: true })).toContain(
+      'Auto-pilot closes a story only after its gates pass, so they have passed on every story above that is\ndone. Do not run them again: they cannot tell you anything this list does not.',
+    );
+    expect(checkingUp()).not.toContain('Do not run them again');
   });
 
   // RULING 66'S SECOND FIX. A project reached `complete` with every gate green and the tool it built printed

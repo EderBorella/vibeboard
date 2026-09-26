@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import type { BoardAround } from '../../../core/board-around.js';
 import { phaseForRun } from '../../../core/phases.js';
 import type { Skill } from '../../../core/skills.js';
 import type { BoardName, Card } from '../../../core/types.js';
@@ -8,6 +9,7 @@ import type { Scope } from '../../auth/credentials.js';
 import { CONTRACT_LINES, reviewLines } from './contracts.js';
 import { credentialSection, judgeCredentialSection } from './credential.js';
 import {
+  aroundSection,
   boxSection,
   checkupSections,
   columnsSection,
@@ -58,6 +60,8 @@ export interface PromptInputs {
   cardFile?: string;
   // Cards this one links to. `body` is included only where it earns its tokens — see linkedSection.
   linked: Card[];
+  // The board around the card, for the phases that would otherwise fetch it (core/board-around.ts).
+  around?: BoardAround;
   // Files the user attached, as project-root-relative paths. Paths, not content: the agent has a
   // Read tool, and inlining a doc it may not need is tokens spent on nothing.
   attachments: string[];
@@ -170,6 +174,31 @@ export function contractFor(input: PromptInputs): { heading: string; lines: stri
   return { heading: 'Reporting (required)', lines: CONTRACT_LINES };
 }
 
+// WHAT SURROUNDS THE CARD, in the order it is read: its own links, the board around them, and whatever a
+// person attached. Each is left out when it is empty — a heading over nothing is a promise the prompt breaks.
+function surroundings(input: PromptInputs): string[] {
+  const parts: string[] = [];
+  if (input.linked.length > 0) {
+    parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot, input.card)));
+  }
+  // Beside the links, which it extends: they are the card's own edges, this is what surrounds them.
+  if (input.around) {
+    parts.push(section('What is already on the board around this card', aroundSection(input.around)));
+  }
+  if (input.attachments.length > 0) {
+    parts.push(
+      section(
+        'Attached material',
+        `Read these if they bear on the task:\n${input.attachments.map((p) => `- ${p}`).join('\n')}`,
+      ),
+    );
+  }
+  if (input.links.length > 0) {
+    parts.push(section('Reference links', input.links.map((l) => `- [${l.title}](${l.url})`).join('\n')));
+  }
+  return parts;
+}
+
 export function buildRunPrompt(input: PromptInputs): string {
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
@@ -212,20 +241,7 @@ export function buildRunPrompt(input: PromptInputs): string {
       ),
     );
   }
-  if (input.linked.length > 0) {
-    parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot)));
-  }
-  if (input.attachments.length > 0) {
-    parts.push(
-      section(
-        'Attached material',
-        `Read these if they bear on the task:\n${input.attachments.map((p) => `- ${p}`).join('\n')}`,
-      ),
-    );
-  }
-  if (input.links.length > 0) {
-    parts.push(section('Reference links', input.links.map((l) => `- [${l.title}](${l.url})`).join('\n')));
-  }
+  parts.push(...surroundings(input));
   // After the linked cards and before the contract: this IS the checkup's subject.
   parts.push(...checkupSections(input.checkup));
   const judging = input.review !== undefined;

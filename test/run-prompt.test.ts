@@ -619,6 +619,50 @@ describe('the board around the card', () => {
   });
 });
 
+// COMMENTS IN CODE (decision 91). Whole strings: the wording is the behaviour, and a rule that loses its
+// override of "match the surrounding density" is a rule the existing comments outvote.
+describe('comments in the code', () => {
+  const RULE = [
+    'Write a comment only when the code cannot say **why** on its own: a constraint, a workaround, a reason a',
+    'reader would otherwise undo. Never describe what the code does, and never repeat what a name, a type or a',
+    'test already says. No file headers, no docblock restating a signature, no comment on a constant whose name',
+    'says what it is, and no card ids, run ids or references to this board anywhere in the code. Tests are code:',
+    'the same holds there.',
+    '',
+    'This overrides any instruction to match the comment density of the code around you. Comments already in the',
+    'project are not a style to copy.',
+  ].join('\n');
+  const on = (slug: string, board: BoardName, over: Partial<PromptInputs> = {}) =>
+    buildRunPrompt(inputs({ skill: { ...skill, slug }, card: card({ id: 'X-010', board }), ...over }));
+
+  it.each([
+    ['implement-story', 'product'],
+    ['fix', 'product'],
+  ] as const)('holds %s to the rule, just before its contract', (slug, board) => {
+    const text = on(slug, board);
+    expect(text).toContain(`## Comments in the code\n\n${RULE}\n\n## Reporting (required)`);
+  });
+
+  it('holds a run no phase claims to it too, because a hand-dispatched run may write code', () => {
+    expect(buildRunPrompt(inputs())).toContain(`## Comments in the code\n\n${RULE}`);
+  });
+
+  it('gives the story review the rule, and a breach as a reason to send the work back', () => {
+    const text = on('review-story', 'product', { review: { gatesPassed: true, setupSubtree: false } });
+    expect(text).toContain(
+      `## Comments in the code\n\nThe work was held to this rule:\n\n${RULE}\n\nJudge only the comments this story’s work added or changed. One that describes what the code does,\nrestates it, or names a card is a finding, and any such finding is a reason to send the story back.`,
+    );
+  });
+
+  it.each([
+    ['break-down', 'product'],
+    ['break-down', 'features'],
+    ['checkup-feature', 'features'],
+  ] as const)('leaves it out of %s on %s, which writes cards rather than code', (slug, board) => {
+    expect(on(slug, board)).not.toContain('Comments in the code');
+  });
+});
+
 // The documents a run is bound by. Four as paths — the agent has a Read tool, and inlining one it may
 // not need is tokens spent on nothing — and the gates in full, because an agent asked to go and
 // fetch the bar will sometimes not bother.

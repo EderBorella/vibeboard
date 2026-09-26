@@ -92,6 +92,42 @@ const GATE_LIST_ONLY: ReadonlySet<PhaseName> = new Set([
   'feature-checkup',
 ]);
 
+// COMMENTS IN CODE (decision 91), for every run that writes it and for the review that judges it. No prompt
+// asked for comments and a project still came out two-thirds comment: the CLI tells each run to match the
+// comment density around it, so whatever the first files did was copied by every run after, and a run with
+// no memory writes its justification for the judge into the code. So the rule says it overrides that line.
+const COMMENT_RULE = [
+  'Write a comment only when the code cannot say **why** on its own: a constraint, a workaround, a reason a',
+  'reader would otherwise undo. Never describe what the code does, and never repeat what a name, a type or a',
+  'test already says. No file headers, no docblock restating a signature, no comment on a constant whose name',
+  'says what it is, and no card ids, run ids or references to this board anywhere in the code. Tests are code:',
+  'the same holds there.',
+  '',
+  'This overrides any instruction to match the comment density of the code around you. Comments already in the',
+  'project are not a style to copy.',
+];
+
+export function commentSections(phaseName: PhaseName | undefined, judging: boolean): string[] {
+  if (judging) {
+    return [
+      section(
+        'Comments in the code',
+        [
+          'The work was held to this rule:',
+          '',
+          ...COMMENT_RULE,
+          '',
+          'Judge only the comments this story’s work added or changed. One that describes what the code does,',
+          'restates it, or names a card is a finding, and any such finding is a reason to send the story back.',
+        ].join('\n'),
+      ),
+    ];
+  }
+  // The phases that write cards rather than code have nothing to comment.
+  if (phaseName !== undefined && GATE_LIST_ONLY.has(phaseName)) return [];
+  return [section('Comments in the code', COMMENT_RULE.join('\n'))];
+}
+
 // Named as binding rather than as background reading, and as read-only rather than as a request:
 // the OS denies these paths to every agent, so an agent that tries to "fix" one gets a permission
 // error it would otherwise read as a broken tool.

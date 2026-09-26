@@ -13,6 +13,7 @@ import {
   boxSection,
   checkupSections,
   columnsSection,
+  commentSections,
   expressSection,
   foundationSection,
   linkedSection,
@@ -200,6 +201,7 @@ function surroundings(input: PromptInputs): string[] {
 }
 
 export function buildRunPrompt(input: PromptInputs): string {
+  const phaseName = phaseForRun(input.skill.slug, input.card?.board)?.name;
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
   const parts: string[] = [
@@ -234,12 +236,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   // frame everything else is read inside, and a decision an agent meets after the work is described
   // is one it has already reasoned past.
   if (input.foundation && input.foundation.paths.length > 0) {
-    parts.push(
-      section(
-        "The project's foundation",
-        foundationSection(input.foundation, phaseForRun(input.skill.slug, input.card?.board)?.name),
-      ),
-    );
+    parts.push(section("The project's foundation", foundationSection(input.foundation, phaseName)));
   }
   parts.push(...surroundings(input));
   // After the linked cards and before the contract: this IS the checkup's subject.
@@ -269,6 +266,8 @@ export function buildRunPrompt(input: PromptInputs): string {
           ),
     );
   }
+  // Last before the contract, where the instructions about the work itself end.
+  parts.push(...commentSections(phaseName, judging));
   const contract = contractFor(input);
   parts.push(
     section(

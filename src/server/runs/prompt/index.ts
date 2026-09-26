@@ -1,7 +1,9 @@
 import { relative } from 'node:path';
+import { phaseForRun } from '../../../core/phases.js';
 import type { Skill } from '../../../core/skills.js';
 import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
+import type { Gate } from '../../../store/project/foundation.js';
 import type { Scope } from '../../auth/credentials.js';
 import { CONTRACT_LINES, reviewLines } from './contracts.js';
 import { credentialSection, judgeCredentialSection } from './credential.js';
@@ -91,7 +93,7 @@ export interface PromptInputs {
   // gates bind every run and an agent that has to go and fetch them will sometimes not bother.
   // Absent when the project has no foundation yet, and then the section is left out entirely rather
   // than promising a folder with nothing in it.
-  foundation?: { paths: string[]; codeQuality?: string };
+  foundation?: { paths: string[]; codeQuality?: string; gates?: Gate[] };
   // Present when this run is a REVIEW: decision 51's second step, where a model is asked only for what a
   // command's exit code cannot express. It replaces the reporting contract with one that asks for a
   // `verdict`, and carries the two facts about the judgement that ONLY THE LOOP HOLDS — whether the gates it
@@ -202,7 +204,12 @@ export function buildRunPrompt(input: PromptInputs): string {
   // frame everything else is read inside, and a decision an agent meets after the work is described
   // is one it has already reasoned past.
   if (input.foundation && input.foundation.paths.length > 0) {
-    parts.push(section("The project's foundation", foundationSection(input.foundation)));
+    parts.push(
+      section(
+        "The project's foundation",
+        foundationSection(input.foundation, phaseForRun(input.skill.slug, input.card?.board)?.name),
+      ),
+    );
   }
   if (input.linked.length > 0) {
     parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot)));

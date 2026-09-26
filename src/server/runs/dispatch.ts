@@ -108,7 +108,8 @@ export async function dispatchFrame(
   // frontmatter, or frontmatter that will not parse, was handed to the agent under a heading
   // asserting it contained the bar, containing no bar. Readiness would refuse such a project, but
   // nothing on the dispatch path consults readiness.
-  const codeQuality = (await readGates(root)).ok
+  const gates = await readGates(root);
+  const codeQuality = gates.ok
     ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
     : undefined;
   const kind = config.box?.kind;
@@ -131,6 +132,7 @@ export async function dispatchFrame(
     foundation: {
       paths: foundation.present.map(foundationRel),
       ...(codeQuality ? { codeQuality } : {}),
+      ...(gates.ok ? { gates: gates.gates } : {}),
     },
     backend: choice.backend as Backend,
     model: choice.model,

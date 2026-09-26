@@ -95,7 +95,11 @@ interface Invocation {
   // means it never went through the wrapper at all.
   box: string;
   workdir: string;
-  env: { CLAUDE_CONFIG_DIR: string };
+  env: {
+    CLAUDE_CONFIG_DIR: string;
+    ENABLE_CLAUDEAI_MCP_SERVERS: string;
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY: string;
+  };
 }
 
 // Every spawn recorded for this test, in order. Counting them is how a test tells "the second turn
@@ -629,6 +633,75 @@ describe('runAgentTurn', () => {
     await claudeTurn({ backend: 'nonsense' as AgentTurnOptions['backend'] });
     expect(client.opencodeTurn).not.toHaveBeenCalled();
     expect(argvFromLog()).toContain('-p');
+  });
+});
+
+// A CARD RUN'S HARNESS. The CLI fails silently on a wrong flag, so the flags are asserted exactly; and
+// the copilot is asserted unchanged beside it, because the one option must not leak into the other.
+describe('a card run', () => {
+  const bundled = (): string =>
+    readFileSync(join(here, '..', 'src', 'server', 'copilot-system-prompt.md'), 'utf8');
+
+  it('is given the four tools it uses, no skills and no MCP servers', async () => {
+    const { argv } = await claudeTurn({ card: true });
+    expect(argv.filter((a) => a !== appended(argv))).toEqual([
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--include-partial-messages',
+      '--verbose',
+      '--permission-mode',
+      'bypassPermissions',
+      '--model',
+      'opus',
+      '--effort',
+      'high',
+      '--tools',
+      'Bash,Read,Edit,Write',
+      '--disable-slash-commands',
+      '--strict-mcp-config',
+    ]);
+  });
+
+  it('keeps the web when it is researching, because its persona says to search', async () => {
+    const { argv } = await claudeTurn({ card: true, mode: 'research' });
+    expect(argv[argv.indexOf('--tools') + 1]).toBe('Bash,Read,Edit,Write,WebFetch,WebSearch');
+    expect(appended(argv)).toContain('# Research mode');
+  });
+
+  it('is not told it is the copilot, and still gets the project’s instructions', async () => {
+    writeInstructions('Prefer small cards.');
+    const { argv } = await claudeTurn({ card: true });
+    expect(appended(argv)).toBe(`# Project instructions (from ${INSTRUCTIONS_FILE})\n\nPrefer small cards.`);
+    // With nothing of the project's to add, nothing is appended at all rather than an empty flag.
+    writeInstructions('');
+    expect((await claudeTurn({ card: true })).argv).not.toContain('--append-system-prompt');
+  });
+
+  it('turns the account’s connectors and memory off, inside the box and out', async () => {
+    await claudeTurn({ card: true });
+    expect(lastInvocation().env).toMatchObject({
+      ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+    });
+    await claudeTurn({ card: true, sandbox: LIVE_SANDBOX, box: 'vibeboard-abc-claude-code' });
+    expect(lastInvocation().box).toBe('vibeboard-abc-claude-code');
+    expect(lastInvocation().env).toMatchObject({
+      ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
+    });
+  });
+
+  it('leaves the copilot’s harness exactly as it was', async () => {
+    const { argv } = await claudeTurn({ sandbox: LIVE_SANDBOX, box: 'vibeboard-abc-claude-code' });
+    expect(argv).not.toContain('--tools');
+    expect(argv).not.toContain('--disable-slash-commands');
+    expect(argv).not.toContain('--strict-mcp-config');
+    expect(appended(argv)).toBe(bundled());
+    expect(lastInvocation().env).toMatchObject({
+      ENABLE_CLAUDEAI_MCP_SERVERS: '',
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '',
+    });
   });
 });
 

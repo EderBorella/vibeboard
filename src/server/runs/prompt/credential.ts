@@ -43,8 +43,12 @@ export function credentialSection(apiBase: string, token: string, scope: Scope, 
           ...endpoints,
         ]),
     '',
-    'Reading is unrestricted: `GET /api/state` is the whole board, and the files are yours to read.',
-    'Anything not listed above is not yours — say so in your report instead.',
+    // The board read is named once: where there are endpoints, the list above already carries it.
+    endpoints.length === 0
+      ? 'Reading is unrestricted: `GET /api/state` is the whole board, and the files are yours to read.'
+      : 'Reading is unrestricted, and the files are yours to read.',
+    'Anything not listed above is not yours — say so in your report instead. A `403` means exactly that:',
+    'it is a limit, not a broken tool, and writing the file by hand instead is refused too.',
   ].join('\n');
 }
 

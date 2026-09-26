@@ -131,7 +131,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | file | pages | cites |
 |---|---|---|
 | `app.ts` | `decisions.md` | `decision 8`, `decision 13`, `S11` |
-| `agent-turn.ts` | `security/containment.md` | — |
+| `agent-turn.ts` | `security/containment.md`, `decisions.md` — what a card run is given around its prompt, and why the copilot keeps the whole harness | `decision 89` |
 | `logging.ts` | `decisions.md` | `decision 20` |
 | `route-context.ts` | `decisions.md` | `decision 20` |
 | `auth/auth.ts` | `decisions.md` — `RULES` is the single answer to "who may call this", and a route absent from it is admin-only. It moved as ONE WHOLE FILE and its contents are not divided: a per-feature fragment that failed to register would silently remove rows, and `endpointsFor` iterates the table in declaration order because that order is the endpoint list every agent is given | `decision 3`, `decision 5`, `decision 10`, `decision 18`, `decision 21`, `decision 44`, `decision 51`, `decision 65`, `decision 66`, `decision 67`, `decision 86`, `decision 88` |
@@ -169,7 +169,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `runs/prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in. It also records why the `run-prompt.ts` barrel that used to front this directory is gone: NodeNext has no directory-index resolution, so a barrel is what makes a SPLIT cost its importers nothing — and filing the directory under `runs/` changed the specifier for all four importers anyway, leaving a file whose only job was to keep a path stable that nobody could still use | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |
 | `runs/prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
 | `runs/prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth/auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
-| `runs/prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60` |
+| `runs/prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60`, `decision 89` |
 | `suggestions/routes.ts` | `decisions.md` | `decision 49`, `decision 50` |
 
 ## `src/service/` — the auto-pilot loop, a separate process

@@ -1027,6 +1027,25 @@ describe('the run credential', () => {
     expect(argv.join(' ')).not.toContain(store.minted[0].token);
   });
 
+  // A RUN IS A CARD RUN, and says so to the turn: without it the CLI loads the copilot's whole harness around
+  // every run, which is the cost the flag exists to remove, and nothing else would notice.
+  it('starts its agent with a card run’s harness', async () => {
+    const root = await tempDir();
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root));
+    await settled(root, run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const { argv } = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]) as {
+      argv: string[];
+    };
+    expect(argv[argv.indexOf('--tools') + 1]).toBe('Bash,Read,Edit,Write');
+    expect(argv).toContain('--disable-slash-commands');
+    expect(argv).toContain('--strict-mcp-config');
+  });
+
   it('keeps the token out of the transcript even when the agent echoes it', async () => {
     // Transcripts live under .vibeboard/ where every agent can read them, so a run that quotes its
     // own credential would hand a concurrent run a working key.

@@ -168,6 +168,16 @@ describe('buildRunPrompt', () => {
     expect(text).toContain('say so in the report rather than\ndownloading a browser');
   });
 
+  // WHAT EVERY BOX IS, with a browser or without one. These were the copilot's lines until card runs stopped
+  // being handed its system prompt, and each is an error a run would otherwise read as a broken tool.
+  it.each([true, false])('says what is read-only and what is unreachable (browser: %s)', (browser) => {
+    const text = buildRunPrompt(inputs({ browser }));
+    expect(text).toContain(
+      'Everything under `.vibeboard/` that decides anything is read-only in here, and so are `CLAUDE.md` and\n`AGENTS.md`. A write there fails; it is not a broken tool.',
+    );
+    expect(text).toContain('a refused connection to a local address is that rule, not an outage.');
+  });
+
   it('puts the columns straight after the card, before the linked cards', () => {
     // Next to the one column the prompt already names — the card's own — so the example and the full
     // set are read together.
@@ -429,6 +439,15 @@ describe('the endpoint catalogue the assembled prompt hands an agent', () => {
   const withCredential = (scope: Scope, over: Partial<PromptInputs> = {}): PromptInputs =>
     inputs({ credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope }, ...over });
 
+  // The board read is named once — the list carries it — and what a refusal means is said where the list is.
+  it('names the board read once, and says a 403 is a limit rather than a broken tool', () => {
+    const text = buildRunPrompt(withCredential('work'));
+    expect(text.split('`GET /api/state`').length - 1).toBe(1);
+    expect(text).toContain(
+      'Reading is unrestricted, and the files are yours to read.\nAnything not listed above is not yours — say so in your report instead. A `403` means exactly that:\nit is a limit, not a broken tool, and writing the file by hand instead is refused too.',
+    );
+  });
+
   for (const scope of RUN_SCOPES) {
     it(`hands a ${scope} run exactly the rows the table grants it, in the table's own order`, () => {
       const lines = catalogue(buildRunPrompt(withCredential(scope)));
@@ -518,6 +537,31 @@ describe('the foundation section', () => {
     const text = buildRunPrompt(inputs({ foundation: { paths: ['.vibeboard/foundation/UX.md'] } }));
     expect(text).toContain('- .vibeboard/foundation/UX.md');
     expect(text).not.toContain('The gates your work must pass');
+  });
+
+  // THE PROSE GOES ONLY WHERE IT IS USED: the runs that write code and the one that judges it. The four
+  // phases that do neither get the commands — the bar itself — and the path to the argument for it.
+  const gates = { ...foundation, gates: [{ name: 'tests', command: 'npm test' }] };
+  const onStory = (slug: string) =>
+    buildRunPrompt(
+      inputs({ skill: { ...skill, slug }, card: card({ id: 'P-010', board: 'product' }), foundation: gates }),
+    );
+
+  it('hands a break-down the gate commands and the path, not the prose', () => {
+    const text = onStory('break-down');
+    expect(text).toContain(
+      'The gates, run from the project root:\n\n- tests: `npm test`\n\nWhy each exists, and what no gate can catch, is in CODE-QUALITY.md, listed above.',
+    );
+    expect(text).not.toContain('The bar.');
+  });
+
+  it.each(['implement-story', 'review-story', 'fix'])('keeps the whole document for %s', (slug) => {
+    expect(onStory(slug)).toContain('The gates your work must pass, in full:');
+    expect(onStory(slug)).toContain('The bar.');
+  });
+
+  it('keeps the whole document for a run no phase claims, which is what it did before', () => {
+    expect(buildRunPrompt(inputs({ foundation: gates }))).toContain('The bar.');
   });
 
   // Before the card's links and everything after them: the stack and the gates are the frame the

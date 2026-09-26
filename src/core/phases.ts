@@ -25,7 +25,7 @@ export type PhaseName =
 
 export interface Phase {
   name: PhaseName;
-  skill?: string; // absent = the loop acts alone (the two break-down skips)
+  skill?: string; // absent = the loop acts alone (the two skips, a satisfied story, a story's task)
   board?: BoardName; // absent for the bootstrap: a project run has no card
   entry?: string; // column slug stamped before the dispatch
   exitPass?: string;

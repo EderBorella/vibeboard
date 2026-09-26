@@ -2,7 +2,7 @@ import type { StopReason } from './dispatch-gate.js';
 import type { PhaseName } from './phases.js';
 import type { BoardName, Card } from './types.js';
 
-// The vocabulary the tick speaks and the service carries out. FOUR members: a block is a `stamp` to the
+// The vocabulary the tick speaks and the service carries out. FIVE members: a block is a `stamp` to the
 // blocked column and the bootstrap is a `dispatch` with no card, so neither needs a member of its own.
 //
 // Its own module, and that is a dependency decision: both the lifecycle machine and the loop that carries
@@ -27,13 +27,6 @@ export type TickAction =
   | { kind: 'create'; phase: PhaseName; card: Card; task: TaskDraft; to: string; why: string }
   | { kind: 'wait' }; // as much is in flight as the config allows
 
-// THE CARDS ONE LEVEL DOWN THAT A DISPATCH DELIVERS (decision 83): a story's implement and its tasks, and
-// since decision 87 its fix and the tasks a send-back re-opened. Absent everywhere else, and an absent group
-// means the run is about its own card and nothing else.
-//
-// BOTH COLUMNS COME FROM THE TICK, not from the executor. Which column means "being worked" and which means
-// "delivered" is a decision about the machine, and the executor holds no decisions of its own — so the pure
-// side names them and the service does the writing.
 // WHAT THE LOOP WRITES FOR A STORY: its one task, entering the board's first column and linked to the story it
 // restates. Every field is decided by the tick; the executor only sends it.
 export interface TaskDraft {
@@ -44,6 +37,13 @@ export interface TaskDraft {
   body: string;
 }
 
+// THE CARDS ONE LEVEL DOWN THAT A DISPATCH DELIVERS (decision 83): a story's implement and its tasks, and
+// since decision 87 its fix and the tasks a send-back re-opened. Absent everywhere else, and an absent group
+// means the run is about its own card and nothing else.
+//
+// BOTH COLUMNS COME FROM THE TICK, not from the executor. Which column means "being worked" and which means
+// "delivered" is a decision about the machine, and the executor holds no decisions of its own — so the pure
+// side names them and the service does the writing.
 export interface Group {
   // In queue order. An implement's is never more than the tick's ceiling — which bounds what the run is TOLD
   // to do and what is delivered for it, not what it can see: the prompt lists every card the story links to,

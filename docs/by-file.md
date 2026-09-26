@@ -189,7 +189,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66`, `decision 92` |
 | `loop.ts` | `decisions.md` — and the one fact it carries from one tick to the next, which is why `Progress` holds a set of card ids | `decision 8`, `decision 20`, `decision 39`, `decision 66`, `decision 82`, `decision 85` |
 | `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20`, `decision 85` |
-| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the four silent refusals, the diary lines that are the only record a command ran, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick. The first refusal is the in-flight one — measuring a tree an agent is editing caches an answer the edits falsify, against a HEAD they do not move | `decision 51`, `decision 73`, `decision 82`, `decision 85`, `decision 92` |
+| `satisfied.ts` | `decisions.md` — the half of decision 85 that spawns: the four silent refusals, the diary lines that are the only record a command ran, and the cache against HEAD without which the check would re-run a project's whole suite on every idle tick. The first refusal is the in-flight one — measuring a tree an agent is editing caches an answer the edits falsify, against a HEAD they do not move | `decision 51`, `decision 73`, `decision 82`, `decision 85` |
 | `stamp.ts` | `decisions.md` | `decision 10`, `decision 38` |
 
 ## `web/src/` — the React front end

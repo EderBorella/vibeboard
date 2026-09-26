@@ -291,7 +291,7 @@ const isFlag = oneOf(FLAGS);
 // and this field is where that confinement leaked, into an asymmetric write nothing inspects. A run's parent
 // link is now the server's to assert, so what a run sends here is not consulted; the field is off the
 // catalogue the credential advertises (server/auth/auth.ts) in the same change, because a contract that still
-// offers it keeps inviting the bug.
+// offers it keeps inviting the bug. The one exception is the loop's own create (`withLoopParent`).
 type CreateCardBody = CreateCardInput & { links?: string[] };
 
 // THE ONE FIELD ON A CREATE WHOSE TYPE IS CHECKED HERE, and it is checked because it is the only one the
@@ -345,30 +345,42 @@ function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: st
   return { patch };
 }
 
-// THE WHOLE OF A CREATE, in a function of its own for the same reason `lifecycleRulesForCreate` is one: the route
-// stays a flat sequence of "ask, then answer", and the sequence is where every refusal's ORDER lives.
 // THE ONE CREATE THAT NAMES ITS PARENT (decision 92). The loop's own credential writes each story's one task, and a
 // run's parent is derived from the card it is about — the loop is about none, so the task would land unlinked and
-// the story would still look empty. So the `service` scope may name one parent, and only where none was derived:
-// every rule above still applies, and `createLinkedCard` still refuses a second parent.
-function withLoopParent(
+// the story would still look empty. So the `service` scope may name one parent, only where none was derived, and
+// only a live card on the board directly above: the parent a derivation would have produced, never a sibling or a
+// card two boards up. The group comes from that parent, as it does for a break-down's tasks.
+async function withLoopParent(
+  ctx: AppCtx,
   ruled: { effective: CreateCardInput; links: string[] } | { error: string },
   scope: string | undefined,
   asked: unknown,
-): { effective: CreateCardInput; links: string[] } | { error: string } {
+): Promise<{ effective: CreateCardInput; links: string[] } | { error: string }> {
   if ('error' in ruled || scope !== 'service' || ruled.links.length > 0 || !Array.isArray(asked))
     return ruled;
-  const parent = asked.find((id): id is string => typeof id === 'string');
-  return parent === undefined ? ruled : { ...ruled, links: [parent] };
+  const id = asked.find((one): one is string => typeof one === 'string');
+  if (id === undefined) return ruled;
+  const above = parentBoardOf(ruled.effective.board);
+  const { root, config } = ctx.session as { root: string; config: ProjectConfig };
+  const parent = above === undefined ? undefined : await findCard(root, above, id, config);
+  if (!parent || parent.archived) {
+    return {
+      error: `A new ${ruled.effective.board} card may hang only off a live card on the board above it, and ${id} is not one.`,
+    };
+  }
+  return { effective: { ...ruled.effective, group: parent.group ?? parent.id }, links: [parent.id] };
 }
 
+// THE WHOLE OF A CREATE, in a function of its own for the same reason `lifecycleRulesForCreate` is one: the route
+// stays a flat sequence of "ask, then answer", and the sequence is where every refusal's ORDER lives.
 async function createForRequest(
   ctx: AppCtx,
   cred: (RunCredential & { scope?: string }) | undefined,
   body: CreateCardBody,
 ): Promise<{ card: Card } | { code: number; error: string }> {
   // SEPARATED at the door: `links` is the person's field, and everything else is the card. A run's copy of it goes
-  // no further than this line — the server writes that link itself.
+  // no further than `withLoopParent`, which honours it for the loop alone; for every other run the server writes
+  // the link itself.
   const { links: asked, ...input } = body;
   // The board is checked before the mutation layer sees it, because everything downstream indexes
   // `config.boards[board]` and an unknown name dereferences undefined — a stack trace and a 500, handed to the
@@ -381,7 +393,7 @@ async function createForRequest(
   if (mistyped) return { code: 400, error: mistyped };
   // A run is held to the lifecycle; a person at the browser is not.
   const ruled = cred?.run
-    ? withLoopParent(await lifecycleRulesForCreate(ctx, cred, input), cred.scope, asked)
+    ? await withLoopParent(ctx, await lifecycleRulesForCreate(ctx, cred, input), cred.scope, asked)
     : { effective: input, links: Array.isArray(asked) ? asked : [] };
   // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
   if ('error' in ruled) return { code: 409, error: ruled.error };
@@ -396,7 +408,8 @@ async function createForRequest(
   );
   if (card === 'unknown-column') return { code: 400, error: 'Unknown column' };
   // 400 and the same sentence the links route answers with: what is wrong is the shape of the hierarchy, not the
-  // lifecycle. Unreachable for a run — the one link it gets is the server's own, on the board above.
+  // lifecycle. Reached by a run only through the loop's named parent, which `withLoopParent` has already confined
+  // to the board above.
   if ('problem' in card) return { code: 400, error: card.problem };
   return { card };
 }

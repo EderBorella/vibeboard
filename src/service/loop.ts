@@ -93,6 +93,9 @@ export interface ActResult {
   // NOT a decision: `act` reports what it did and could not do, exactly as `dispatches` does. Which row the
   // machine is in is still the tick's answer.
   unrecordedSendBack?: string;
+  // The story whose one task the endpoint refused to create (decision 92) — see `unwrittenTasks` on `TickInput`.
+  // Reported, not decided: whether that blocks the story is the tick's answer.
+  unwrittenTask?: string;
 }
 
 // Why the loop ended. Returned rather than thrown so the caller — a process whose exit code nobody reads —
@@ -127,10 +130,14 @@ interface Progress {
   // and arrives at the same place, which is the cost of not inventing a state file for a fact with a
   // one-tick life (decision 39's rule about not storing the position, one size down).
   unrecorded: Set<string>;
+  // The stories whose task a create just failed to write. ONE TICK LONG, unlike `unrecorded`: it is cleared once
+  // the tick has read it, so a story a person resets out of `blocked` is written for again rather than
+  // blocked on a refusal it may no longer meet.
+  unwritten: Set<string>;
 }
 
 export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
-  const progress: Progress = { iterations: 0, idle: 0, unrecorded: new Set() };
+  const progress: Progress = { iterations: 0, idle: 0, unrecorded: new Set(), unwritten: new Set() };
 
   for (;;) {
     // RULE 1. Every tick, before anything else: another process may have written a stop since the last one.
@@ -140,7 +147,8 @@ export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
       return { reason: state.reason ?? 'stopped', detail: state.detail, iterations: progress.iterations };
     }
 
-    const world = await gather(deps, progress.unrecorded);
+    const world = await gather(deps, progress.unrecorded, [...progress.unwritten]);
+    progress.unwritten.clear();
     if ('failed' in world) {
       const ended = await afterFailedRead(deps, world.failed, progress);
       if (ended) return ended;
@@ -191,6 +199,7 @@ async function carryOut(
   // whatever the action spent, and hanging it off either branch would tie it to a number it has nothing to
   // do with.
   if (result.unrecordedSendBack !== undefined) progress.unrecorded.add(result.unrecordedSendBack);
+  if (result.unwrittenTask !== undefined) progress.unwritten.add(result.unwrittenTask);
   if (result.dispatches > 0) {
     progress.iterations += result.dispatches;
     progress.idle = 0;
@@ -230,6 +239,7 @@ async function gather(
   // Carried in rather than read here, because it is the only thing the tick is told that came from the loop
   // itself rather than from the world — see `Progress.unrecorded`.
   unrecorded: ReadonlySet<string>,
+  unwritten: string[],
 ): Promise<{ input: Omit<Parameters<typeof decideTick>[0], 'state'> } | { failed: Failed }> {
   const board = await deps.client.board();
   if (!board.ok) return { failed: board };
@@ -266,6 +276,7 @@ async function gather(
       problems: board.value.problems,
       commands,
       unrecordedSendBacks: [...unrecorded],
+      unwrittenTasks: unwritten,
       // AFTER the board and the commands and from both, because that is what it is about: the story this
       // board says the machine is in the middle of, and the gates this project says it runs. A command is
       // spawned only where those two meet on a break-down candidate.

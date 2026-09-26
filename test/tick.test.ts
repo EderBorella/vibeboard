@@ -663,6 +663,29 @@ describe('decideTick — the story loop', () => {
     });
   });
 
+  // A CREATE THE ENDPOINT REFUSED (decision 92): blocked rather than asked for again on every tick until the idle
+  // bound stalls the project — the same carry-on decision 45 made for a break-down that created nothing.
+  it('blocks a story whose task the loop could not write, rather than asking again', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const action = decideTick(input({ cards, unwrittenTasks: ['P-001'] }));
+    expect(action).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-task',
+      card: { id: 'P-001' },
+      to: 'blocked',
+    });
+    expect(action.kind === 'stamp' && action.why).toContain('could not write its one task');
+    // Another story's refusal is not this one's.
+    expect(decideTick(input({ cards, unwrittenTasks: ['P-002'] }))).toMatchObject({ kind: 'create' });
+  });
+
+  it('stops stalled, naming the missing column, when that story cannot be blocked', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const action = decideTick(input({ cards, columns: WITHOUT_PRODUCT_BLOCKED, unwrittenTasks: ['P-001'] }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain("could not write P-001's task");
+  });
+
   it('writes a story’s task into whichever column engineering names first', () => {
     const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
     const columns = { ...COLUMNS, engineering: ['queue', 'in-progress', 'review', 'blocked', 'done'] };

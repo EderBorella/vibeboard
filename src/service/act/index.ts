@@ -152,7 +152,7 @@ async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
 
 // THE TASK THE LOOP WRITES FOR A STORY, and then the story's move (decision 92). Created through the endpoint with
 // its link in the same call, so the card is never there without its parent; refused, it is noted like a refused
-// stamp and the next tick asks again. Written but not moved, the next tick finds a story with a task in its entry
+// stamp and reported, and the next tick blocks the story rather than asking again. Written but not moved, the next tick finds a story with a task in its entry
 // column, and the break-down skip makes the move — so no half-state here needs undoing.
 async function createThenStamp(deps: ActDeps, action: Create): Promise<ActResult> {
   const { task, card } = action;
@@ -164,7 +164,10 @@ async function createThenStamp(deps: ActDeps, action: Create): Promise<ActResult
     body: task.body,
     links: [card.id],
   });
-  if (!made.ok) return refused(deps, `could not write ${card.id}'s task`, made.reason, made.fatal);
+  if (!made.ok) {
+    const refusal = await refused(deps, `could not write ${card.id}'s task`, made.reason, made.fatal);
+    return { ...refusal, unwrittenTask: card.id };
+  }
   await deps.client.log('lifecycle', `${made.value.id} written from ${card.id}, as its one task.`, {
     card: made.value.id,
     board: task.board,

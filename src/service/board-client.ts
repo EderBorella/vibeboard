@@ -217,8 +217,9 @@ export class BoardClient {
   // by writing a file for the reason decision 10 gives: the id, the entry column and the `createdBy` stamp are
   // all the endpoint's to assign, and a second write path would be a second answer to each of them.
   //
-  // AND A STORY'S ONE TASK (decision 92), which is why `links` is here: the loop's credential is not a run's, so the
-  // endpoint takes the link it is given (ruling 65 confines only runs to the derived one) and writes both sides.
+  // AND A STORY'S ONE TASK (decision 92), which is why `links` is here. The loop's credential is a run credential,
+  // whose parent would be derived from the card it is about — and it is about none — so the endpoint takes the
+  // one parent the loop names, on the board above, and writes both sides (`withLoopParent`).
   create(input: {
     board: BoardName;
     columnSlug: string;

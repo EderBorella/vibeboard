@@ -1156,6 +1156,33 @@ for (const mode of MODES) {
       await assertHierarchy(started.project);
     });
 
+    // A TASK THE ENDPOINT REFUSES (decision 92), and the review that found it drove exactly this: a card already on
+    // engineering with the story's title, so the loop's create is refused as a duplicate. Asked again on every
+    // tick, that stalled the whole project 240 ticks later over one story; now the story is blocked, and the
+    // loop carries on to close its feature. It still ends `stalled`, and rightly: the namesake is live work
+    // under no story, and the ending names it beside the story waiting for a person.
+    it('blocks a story whose task cannot be written, and still closes its feature', async () => {
+      const started = await start();
+      const story = await place(started.project, 'product', 'backlog', 'A story with a namesake');
+      await place(started.project, 'engineering', 'backlog', 'A story with a namesake');
+      await place(started.project, 'features', 'backlog', 'A feature', [story]);
+      const ended = await drive(started);
+
+      expect(ended.reason).toBe('stalled');
+      expect(ended.detail).toContain('P-001 ran out of attempts and is in blocked');
+      expect(ended.detail).toContain('E-001');
+      expect(await columnOf(started.project, 'P-001')).toBe('blocked');
+      expect(await columnOf(started.project, 'F-001')).toBe('done');
+      const traced = await trace(started.project);
+      expect(traced).toContain('move product/P-001 blocked');
+      // ONE refused create, not one a tick: the next tick blocks rather than asking again.
+      const notes = (await diary(started.project)).filter((e) =>
+        e.text.includes("could not write P-001's task"),
+      );
+      expect(notes).toHaveLength(1);
+      expect((await runs(started.project)).filter((r) => r.card === 'P-001')).toEqual([]);
+    });
+
     it('skips break-down for a feature that arrives with its stories', async () => {
       // The follow-up-feature shape (decision 50), which is also the crash-and-restart shape.
       const started = await start();

@@ -479,6 +479,36 @@ describe('the loop’s sequencing', () => {
     ]);
   });
 
+  // A TASK THE LOOP COULD NOT WRITE (decision 92) is carried for exactly one tick: the next one blocks the story
+  // on it, and the one after has forgotten, so a story a person has since reset is written for again.
+  it('carries a refused task into the next tick only, which blocks the story on it', async () => {
+    const story = (): BoardView => ({
+      config: defaultConfig('T'),
+      boards: {
+        features: [aCard('F-001', 'features', 'in-progress', ['P-001'])],
+        product: [aCard('P-001', 'product', 'todo', ['F-001'])],
+        engineering: [],
+      },
+      problems: [],
+    });
+    const seen: string[] = [];
+    const { deps } = harness({
+      states: [running, running, running, { ...IDLE_STATE, state: 'stopped' }],
+      client: {
+        board: async () => ({ ok: true, value: story() }),
+        runs: async () => ({ ok: true, value: { runs: [] } }),
+        stopped: async () => ({ ok: true, value: {} }),
+        log: async () => ({ ok: true, value: {} }),
+      } as unknown as LoopDeps['client'],
+      act: async (action): Promise<ActResult> => {
+        seen.push(action.kind === 'stamp' ? `stamp ${action.to}` : action.kind);
+        return action.kind === 'create' ? { dispatches: 0, unwrittenTask: 'P-001' } : { dispatches: 0 };
+      },
+    });
+    await runLoop(deps);
+    expect(seen).toEqual(['create', 'stamp blocked', 'create']);
+  });
+
   it('stops rather than going round in circles for ever', async () => {
     // A `wait` and a `stamp` — which is what a block is — consume no iteration and no budget, so NEITHER cap
     // bounds them: an action that cannot land would repeat at one tick per interval indefinitely. This is the

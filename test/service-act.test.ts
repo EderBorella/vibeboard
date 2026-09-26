@@ -320,6 +320,8 @@ describe('a task the loop writes for a story', () => {
     expect(r.diary.some((d) => d.kind === 'note' && d.text.includes("could not write P-001's task"))).toBe(
       true,
     );
+    // Reported, so the next tick blocks the story instead of refusing the same create for 240 ticks.
+    expect(result.unwrittenTask).toBe('P-001');
   });
 
   it('stops the loop when the refusal is one it cannot recover from', async () => {

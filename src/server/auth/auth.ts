@@ -65,9 +65,9 @@ const RULES: Record<string, Rule> = {
   // already holding, which is where the column, the group and the creating run come from too. `PUT …/links`
   // stays for the run's own card: it is confined to it, and parent↔child is the only link a run can mean.
   //
-  // AND `service`, which is the loop (ruling 66). It creates exactly one card: the smoke-harness feature, at the
-  // bootstrap's exit, because a mandatory feature that depends on an agent remembering is one that will
-  // sometimes be missing. Every rule this endpoint enforces for a run still applies to it — the credential
+  // AND `service`, which is the loop (ruling 66). It creates the smoke-harness feature at the bootstrap's exit,
+  // because a mandatory feature that depends on an agent remembering is one that will sometimes be missing, and
+  // each story's one task (decision 92), the one create that names its parent. Every rule this endpoint enforces for a run still applies to it — the credential
   // carries a run id, so `lifecycleRulesForCreate` runs — and the loop is already the caller that stamps
   // `setup: true` and moves cards, so this grants no authority it does not have one door along.
   //

@@ -123,6 +123,12 @@ export interface TickInput {
   // THE LOOP'S MEMORY OF ONE TICK AND NO LONGER. The fix it buys IS a work run, so from the tick after it the
   // ordinary verdict path carries the story and `judgeStory` never reads this again.
   unrecordedSendBacks: string[];
+  // THE STORIES WHOSE ONE TASK THE LOOP COULD NOT WRITE (decision 92), reported by `act` the tick before. A create
+  // the endpoint refuses — a card of that title already on engineering, most likely — would be refused again on
+  // every tick, and nothing bounds a phase the loop carries out alone but `MAX_IDLE_TICKS`: 240 ticks later the
+  // whole project stalls over one story. So the story is blocked instead, and the loop carries on (decision 45).
+  // REQUIRED, as `unrecordedSendBacks` is, and a memory of one tick: the loop forgets it once it has been read.
+  unwrittenTasks: string[];
   // THE BREAK-DOWN CANDIDATES WHOSE ACCEPTANCE CRITERION ALREADY PASSES, by card id (decision 85). The
   // service ran the command — `satisfied.ts` beside the loop — and this is its exit code, reduced to the
   // only thing the machine needs from it. Nothing here spawns anything, exactly as with `commands`.
@@ -339,7 +345,8 @@ const ENTERING = ['backlog', 'todo'];
 // among siblings exactly as a task does. The run that produced this had P-001 delivered and closed, then
 // P-002 — the same story under another title — could not be broken down three times because P-001's tasks
 // had already satisfied it, and the loop stopped the whole project over it with three features queued
-// behind. Blocked settles the story, the feature carries on with the next one, and the checkups see it.
+// behind. Blocked settles the story, the feature carries on with the next one, and the checkups see it. The
+// break-down's own entry is gone since decision 92: the loop writes a story's task and no break-down runs.
 //
 // AND A STORY'S IMPLEMENT, since the work moved up to the story (decision 83). The per-task implement it
 // replaces settled its task at the cap and let the gates and the judge take it as it stood — there is no
@@ -534,7 +541,7 @@ function checkupPhase(input: TickInput, card: Card): TickAction | undefined {
 // since the judgement moved up (decision 80), and row P3 since the work did (decision 83): a task is no
 // longer a position the machine stands in, it is the record of what one dispatch was asked for.
 function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
-  if (tasks.length === 0) return alreadySatisfied(input, story, tasks) ?? taskFromStory(input, story);
+  if (tasks.length === 0) return alreadySatisfied(input, story, tasks) ?? taskOrBlock(input, story);
   if (ENTERING.includes(story.columnSlug)) {
     return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
   }
@@ -573,6 +580,22 @@ function alreadySatisfied(input: TickInput, story: Card, tasks: Card[]): TickAct
     'story-satisfied',
     story,
     `its acceptance criterion \`${command}\` already passes, so there was nothing to break down and no work was done.`,
+  );
+}
+
+// A story whose task the endpoint just refused is left for a person rather than asked for again — see
+// `unwrittenTasks`. The diary already carries the endpoint's own sentence, from the refusal.
+function taskOrBlock(input: TickInput, story: Card): TickAction | undefined {
+  if (!input.unwrittenTasks.includes(story.id)) return taskFromStory(input, story);
+  const used = `auto-pilot could not write ${story.id}'s task`;
+  return (
+    noBlockedColumn(input, story, used) ??
+    stampTo(
+      'story-task',
+      story,
+      input.ap.blockedColumn,
+      'auto-pilot could not write its one task — the note before this says why — so it has left it for you and carried on.',
+    )
   );
 }
 

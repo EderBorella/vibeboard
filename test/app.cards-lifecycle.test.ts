@@ -761,6 +761,56 @@ describe('the parent a run’s new card hangs off', () => {
     expect(linksIn(task)).toEqual(['P-001']);
   });
 
+  // A RUN WHOSE DERIVATION IS EMPTY still cannot name one: the bootstrap's features sit under nothing, and the
+  // scope check is what keeps the loop's rule from reaching it.
+  it('is nothing a bootstrap run names, since only the loop may name a parent', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-b1', root, undefined, { skill: 'derive-features' });
+    const made = await create(app, bearer(run.token), {
+      board: 'features',
+      columnSlug: 'backlog',
+      title: 'A feature that asked for a parent',
+      links: ['P-001'],
+    });
+    expect(made.statusCode).toBe(200);
+    expect(linksIn(made)).toEqual([]);
+  });
+
+  it('is only a live card on the board directly above, for the loop', async () => {
+    const { app, store, root } = await open();
+    const loop = store.mintRun('service', 'svc-3', root);
+    // Two boards up, and a sibling on its own board: neither is the parent a derivation would produce.
+    for (const [title, parent] of [
+      ['Under a feature', 'F-001'],
+      ['Under a task', 'E-001'],
+    ] as const) {
+      const made = await create(app, bearer(loop.token), {
+        board: 'engineering',
+        columnSlug: 'backlog',
+        title,
+        links: [parent],
+      });
+      expect(made.statusCode, parent).toBe(409);
+      expect(made.json().error).toContain('may hang only off a live card on the board above it');
+    }
+  });
+
+  it('carries its story’s group, as a break-down’s task does', async () => {
+    const { app, store, root } = await open();
+    const loop = store.mintRun('service', 'svc-4', root);
+    const task = await create(app, bearer(loop.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Grouped with its story',
+      links: ['P-001'],
+    });
+    const state = (await app.inject({ method: 'GET', url: '/api/state', headers: admin })).json() as {
+      snapshot: { boards: Record<string, { id: string; group?: string }[]> };
+    };
+    const story = state.snapshot.boards.product.find((c) => c.id === 'P-001');
+    expect(task.json().group).toBe(story?.group ?? 'P-001');
+  });
+
   it('is the run’s own card for a feature checkup, which creates one board down', async () => {
     // The orphan that costs the most, and the only one that is silent: a story invisible to `allSettled` lets
     // the feature close to `done` with real work parked for ever and nothing said.

@@ -135,7 +135,7 @@ export function recorder(
   // The two frontmatter flags, which have their own route: the PATCH allow-list is what stops a work agent
   // flagging its own card, so the loop's stamp cannot go through it.
   const flags: { board: BoardName; card: string; body: Record<string, boolean> }[] = [];
-  // Every card the LOOP itself created, which is one card in the whole lifecycle.
+  // Every card the LOOP itself created: the smoke-harness feature and each story's one task.
   const created: {
     board: BoardName;
     columnSlug: string;
@@ -227,7 +227,7 @@ export function recorder(
       flags.push({ board, card, body });
       return opts.flags ?? { ok: true as const, value: {} };
     },
-    // The loop's ONE create: the smoke-harness feature at the bootstrap's exit (ruling 66). The id comes back
+    // The loop's creates: the smoke-harness feature at the bootstrap's exit (ruling 66) and a story's task. The id comes back
     // because the diary line names it, and a fixture that answered no id would hide a line naming `undefined`.
     create: async (input: {
       board: BoardName;

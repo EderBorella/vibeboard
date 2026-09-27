@@ -251,7 +251,8 @@ a network you trust, and never expose it to the public internet.
   Waiting approval**, so what waits on you is where you look. Every board has the
   skills to take a card from backlog to done — break a feature into stories or a
   story into tasks, build a story, execute a task — and a **check** for each,
-  which moves its card to done when the work passes. A run you start by hand is
+  which moves its card to done when the work passes. Auto-pilot will not start
+  while a card is waiting on you, and names it. A run you start by hand is
   yours: auto-pilot neither counts it against a card's attempts nor reads it
 - **Execution dashboard**: every run in the project across In progress, Requires
   attention and Done, with a badge when something is waiting on you. Stop a run

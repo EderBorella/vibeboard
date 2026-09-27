@@ -149,6 +149,13 @@ describe("a person's run", () => {
     expect(await readFile(join(project.root, '.vibeboard', 'PROJECT-LOG.md'), 'utf8')).toContain(
       'moved to blocked to wait for you',
     );
+    // DECISION 99: auto-pilot will not start over a card waiting on the person, and names it.
+    const waiting = `${project.card} is waiting for your approval`;
+    const readiness = (await project.app.inject({ method: 'GET', url: '/api/autopilot/readiness' })).json();
+    expect(readiness.blockers.join(' ')).toContain(waiting);
+    const start = await project.app.inject({ method: 'POST', url: '/api/autopilot/start' });
+    expect(start.statusCode).toBe(412);
+    expect(start.json().error).toContain(waiting);
   });
 
   it('leaves its card where it was when the skill does not move cards', async () => {

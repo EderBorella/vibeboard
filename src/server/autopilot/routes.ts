@@ -14,6 +14,7 @@ import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { countLive } from '../../core/created.js';
 import { isStopReason, STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
+import { waitingOnPerson } from '../../core/hand-run.js';
 import { PHASES, phase } from '../../core/phases.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
@@ -83,13 +84,15 @@ interface Read {
   unreviewedGates: string[];
   // How many live cards there are across all three boards. Zero is a blocker, not a stop — see below.
   liveCards: number;
+  // Cards a person's run left waiting for them (decision 99), by id.
+  waiting: string[];
 }
 
 // Everything wrong with this project, in the order a person would fix it: the lifecycle first (it is
 // config), then the README (it is the input), then the documents derived from it.
 function blockersFrom(
   lifecycleProblems: string[],
-  { readme, foundation, gates, smoke, unreviewedGates, liveCards }: Read,
+  { readme, foundation, gates, smoke, unreviewedGates, liveCards, waiting }: Read,
   // Whether an empty board is a state auto-pilot can start from: a README it can derive the feature list from,
   // and the bootstrap phase's skill to derive it with. See the empty-board blocker below.
   canDerive: boolean,
@@ -113,6 +116,7 @@ function blockersFrom(
     // altogether, since the line above already names it and one problem deserves one sentence.
     ...(gates.ok || foundation.missing.includes('CODE-QUALITY.md') ? [] : [gates.reason]),
     ...(smoke.ok || foundation.missing.includes('TESTING.md') ? [] : [smoke.reason]),
+    ...(waiting.length === 0 ? [] : [waitingSentence(waiting)]),
     // LAST, because it is the last thing a person does: the README first, then the documents derived
     // from it, then the work itself.
     //
@@ -170,30 +174,45 @@ function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Rea
 // Takes the root and config rather than the context: `ensureOpen` is a type predicate over the SESSION,
 // and its narrowing does not survive being passed through a function boundary. Asking for what it needs
 // keeps the check at the call site where the 409 is sent.
-// Live cards across all three boards, THROUGH `countLive` — the same predicate the loop counts with.
-// `readBoard(...).length` was not the same answer: it excludes the archive folder and nothing else,
-// while `isLive` is two clauses, the folder AND the `archived` field, because those are written by
-// different paths. A card marked archived but still in a live column therefore counted as work here and
-// as nothing to the loop — the state core/tick.ts's half-archived stop exists precisely to name.
-async function countLiveCards(root: string, config: ProjectConfig): Promise<number> {
+async function readCards(root: string, config: ProjectConfig): Promise<Record<BoardName, Card[]>> {
   const boards = await Promise.all(BOARDS.map(async (b) => [b, await readBoard(root, b, config)] as const));
-  return countLive(Object.fromEntries(boards) as Record<BoardName, Card[]>);
+  return Object.fromEntries(boards) as Record<BoardName, Card[]>;
+}
+
+function waitingSentence(ids: string[]): string {
+  const [what, them] = ids.length === 1 ? [`${ids[0]} is`, 'it'] : [`${ids.join(', ')} are`, 'them'];
+  return `${what} waiting for your approval in Blocked / Waiting approval: a run you started left ${them} there. Move ${them} on — to Done, or back into the work — before starting auto-pilot, which reads a blocked card as one it gave up on.`;
 }
 
 async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {
-  const [readme, foundation, gates, smoke, catalogue, state, liveCards] = await Promise.all([
+  const [readme, foundation, gates, smoke, catalogue, state, boards, runs] = await Promise.all([
     readmeGate(root),
     foundationStatus(root),
     readGates(root),
     readSmokeCommand(root),
     readSkills(root, config),
     readAutopilotState(root, new Date().toISOString()),
-    countLiveCards(root, config),
+    readCards(root, config),
+    listRuns(root),
   ]);
+  const waiting = waitingOnPerson(config, Object.values(boards).flat(), runs).map((c) => c.id);
   return composeReadiness(
     config,
     catalogue.skills.map((s) => s.slug),
-    { readme, foundation, gates, smoke, unreviewedGates: state.unreviewedGates ?? [], liveCards },
+    {
+      readme,
+      foundation,
+      gates,
+      smoke,
+      unreviewedGates: state.unreviewedGates ?? [],
+      // THROUGH `countLive` — the same predicate the loop counts with. `readBoard(...).length` was not the same
+      // answer: it excludes the archive folder and nothing else, while `isLive` is two clauses, the folder AND the
+      // `archived` field, because those are written by different paths. A card marked archived but still in a
+      // live column therefore counted as work here and as nothing to the loop — the state core/tick.ts's
+      // half-archived stop exists precisely to name.
+      liveCards: countLive(boards),
+      waiting,
+    },
   );
 }
 

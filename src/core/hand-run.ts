@@ -38,3 +38,22 @@ export function finishColumn(e: HandRunEnding): string | undefined {
   const blocked = (config.autopilot ?? DEFAULT_AUTOPILOT).blockedColumn;
   return boardColumnSlugs(config, card.board).includes(blocked) ? blocked : undefined;
 }
+
+const lastRunOn = (runs: RunRecord[], card: string): RunRecord | undefined =>
+  runs
+    .filter((r) => r.card === card)
+    .reduce<RunRecord | undefined>(
+      (last, r) => (last === undefined || r.started >= last.started ? r : last),
+      undefined,
+    );
+
+// WAITING ON THE PERSON (decision 99): a card in the blocked column whose last run was one they started. To
+// auto-pilot a blocked card is one it gave up on, so it would skip these and could close a feature over them.
+export function waitingOnPerson(config: ProjectConfig, cards: Card[], runs: RunRecord[]): Card[] {
+  const blocked = (config.autopilot ?? DEFAULT_AUTOPILOT).blockedColumn;
+  return cards.filter((c) => {
+    if (!BLOCKED_BOARDS.includes(c.board) || c.columnSlug !== blocked) return false;
+    const last = lastRunOn(runs, c.id);
+    return last !== undefined && isHandRun(last);
+  });
+}

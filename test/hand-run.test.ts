@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { burnsAttempt } from '../src/core/accounting.js';
-import { finishColumn, startColumn } from '../src/core/hand-run.js';
+import { finishColumn, startColumn, waitingOnPerson } from '../src/core/hand-run.js';
 import { parseRun, type RunRecord, serializeRun } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
@@ -106,5 +106,33 @@ describe('a run a person started', () => {
   it('burns none of the loop’s attempts, where the same run of the loop’s would', () => {
     expect(burnsAttempt(record({ status: 'failed' }))).toBe(false);
     expect(burnsAttempt(record({ status: 'failed', dispatchedBy: undefined }))).toBe(true);
+  });
+});
+
+// DECISION 99: what auto-pilot refuses to start over — a card a person's run left in blocked, and only that.
+describe('the cards waiting on the person', () => {
+  const at = (id: string, columnSlug: string, board: Card['board'] = 'engineering'): Card => ({
+    ...card(columnSlug, board),
+    id,
+  });
+  const on = (id: string, started: string, over: Partial<RunRecord> = {}): RunRecord =>
+    record({ run: `${id}-${started}`, card: id, started, ...over });
+
+  it('are the blocked cards whose last run a person started', () => {
+    const cards = [
+      at('E-001', 'blocked'),
+      at('E-002', 'blocked'),
+      at('E-003', 'blocked'),
+      at('E-004', 'review'),
+    ];
+    const runs = [
+      on('E-001', '2026-09-27T10:00:00Z'),
+      // The loop gave up on this one after a person's run: its last word is the loop's.
+      on('E-002', '2026-09-27T10:00:00Z'),
+      on('E-002', '2026-09-27T11:00:00Z', { dispatchedBy: undefined }),
+      on('E-003', '2026-09-27T10:00:00Z', { dispatchedBy: undefined }),
+      on('E-004', '2026-09-27T10:00:00Z'),
+    ];
+    expect(waitingOnPerson(config, cards, runs).map((c) => c.id)).toEqual(['E-001']);
   });
 });

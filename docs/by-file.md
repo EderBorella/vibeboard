@@ -39,7 +39,7 @@ machine's closure, and it is why the purity gate is still unarmed.
 | `dispatch-gate.ts` | `decisions.md` | `decision 47`, `S10`, `S13` |
 | `entry-column.ts` | `decisions.md` | `decision 37` (superseded — the row says so) |
 | `harness-feature.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 44`, `decision 66`, `decision 67` |
-| `hand-run.ts` | `decisions.md` — where a person's run puts its card as it starts and as it ends | `decision 95` |
+| `hand-run.ts` | `decisions.md` — where a person's run puts its card as it starts and as it ends | `decision 95`, `decision 99` |
 | `layout.ts` | `decisions.md`, `security/containment.md` (`SUGGESTIONS_DIR`'s comment names the dead profile; the rule is now a read-only mount). `RESUMABLE_DOCUMENTS` is the six documents setup writes — the five foundation ones plus the README — and it is here rather than beside either caller because it is a security boundary read from two places: the résumé route refuses a name outside it, and the wizard frame drops an attachment naming one | `decision 20`, `decision 78` |
 | `lifecycle/stop-sentences.ts` | `decisions.md` — the sentences a stop carries, and what each one used to say: most are corrections that named a mechanism the product no longer has | `decision 44`, `decision 45`, `decision 52`, `decision 55`, `decision 66`, `decision 74`, `decision 84` |
 | `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 54`, `decision 58`, `decision 59`, `decision 80`, `decision 81`, `decision 82`, `decision 83`, `decision 84`, `decision 85`, `decision 86`, `decision 87`, `decision 92`, `decision 93` |
@@ -145,7 +145,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `auth/signin-terminal.ts` | `security/containment.md` — the `VIBEBOARD_TOKEN_FILE` warning it prints | — |
 | `autopilot/autopilot-runtime.ts` | `decisions.md` | `decision 12`, `decision 13`, `decision 47` |
 | `autopilot/service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it. It resolves the loop's entry by **climbing** to whichever ancestor holds `service/main<ext>`, not by rewriting its own path: the old derivation hard-coded both the directory it sat in and its own filename, so filing it here made it answer with its OWN path — and nothing type-checks a string. `test/service-process.test.ts` asserts the resolved path exists on disk | `decision 13`, `decision 20`, `decision 47` |
-| `autopilot/routes.ts` | `decisions.md` — the readiness composer, and the accounting endpoint whose SHAPE lives in `core/accounting.ts` | `decision 12`, `decision 47` |
+| `autopilot/routes.ts` | `decisions.md` — the readiness composer, and the accounting endpoint whose SHAPE lives in `core/accounting.ts` | `decision 12`, `decision 47`, `decision 99` |
 | `boards/snapshot.ts` | `decisions.md` | `decision 46` |
 | `boards/cards-routes.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65`, `decision 92` |
 | `boards/move.ts` | `decisions.md` — every move of a card to a column, and the resolve-on-close rule | — |

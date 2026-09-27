@@ -1,6 +1,6 @@
 {
   "name": "vibeboard",
-  "version": "0.1.0",
+  "version": "0.1.0-beta",
   "private": true,
   "description": "A local-first cockpit for a markdown project board, editable by the AI CLI agents it orchestrates.",
   "type": "module",

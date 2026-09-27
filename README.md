@@ -112,3 +112,9 @@ The full documentation is moving to the [wiki](https://github.com/EderBorella/vi
 card format, skills, the auto-pilot modes, configuration and the security model. It is being
 written. Until it lands, the containment model is in
 [`docs/security/containment.md`](docs/security/containment.md).
+
+## Contact and support
+
+Found a bug or have an idea? Open an [issue](https://github.com/EderBorella/vibeboard/issues). I keep
+an eye on them. For anything else, message me on [GitHub](https://github.com/EderBorella) or
+[LinkedIn](https://www.linkedin.com/in/eder-borella/).

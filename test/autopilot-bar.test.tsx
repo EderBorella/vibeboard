@@ -986,25 +986,23 @@ describe('the feature auto-pilot is focused on', () => {
     expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
   });
 
-  // THE LANE IS HELD IN BOTH MODES, which is what stops the row moving when the mode is toggled. The picker
-  // sits in the pushed middle group, and a group that loses a control loses its width — every pixel of which
-  // comes out of the position of the control you just clicked, measured at 148.81px before this.
-  //
-  // So in standard a spacer of the same width stands in its place. This asserts the STRUCTURE, which jsdom
-  // can see; the pixels are measured on the running product, and the browser harness holds the consequence
-  // — the bar may take two lines and no more (visual/checks/board.spec.ts, check 7).
-  it('holds the lane with a spacer in standard, inside the same group as the picker', () => {
+  // NO LANE IS HELD OUTSIDE EXPRESS. A 256px spacer used to stand in for the picker so toggling the mode moved
+  // nothing; with Mini the default it was an empty box on most bars and the width that overran check 18, so
+  // the owner dropped it and accepted the shift. The picker still lives in the pushed middle group.
+  it('sits in the middle group in express, and leaves nothing behind in the other modes', () => {
     show({ autopilotConfig: EXPRESS });
-    const group = screen.getByTestId('ap-agent');
-    expect(group.contains(picker())).toBe(true);
-    expect(screen.queryByTestId('ap-focus-spacer')).toBeNull();
+    expect(screen.getByTestId('ap-agent').contains(picker())).toBe(true);
 
-    cleanup();
-    show();
-    const spacer = screen.getByTestId('ap-focus-spacer');
-    expect(screen.getByTestId('ap-agent').contains(spacer)).toBe(true);
-    // Hidden, not absent: an absent element takes the lane with it.
-    expect(spacer.getAttribute('aria-hidden')).toBe('true');
+    for (const mode of ['standard', 'mini'] as const) {
+      cleanup();
+      show({ autopilotConfig: { ...EXPRESS, mode } });
+      const group = screen.getByTestId('ap-agent');
+      expect(
+        group.querySelector(':scope > [aria-hidden]'),
+        `a placeholder is holding the lane in ${mode}`,
+      ).toBeNull();
+      expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
+    }
   });
 
   // THE CONTROL MUST SHOW THE STATE THAT EXISTS, and this was found by opening the page rather than by any

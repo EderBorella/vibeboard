@@ -81,7 +81,6 @@ export function ReviewFeatures({ reason, config, features, onFocus, onConfirm, d
           features={features}
           disabled={disabled || busy !== null}
           onChange={onFocus}
-          spacer={false}
         />
         <Button
           variant="primary"

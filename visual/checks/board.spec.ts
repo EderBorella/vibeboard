@@ -1446,7 +1446,7 @@ test('15. express mode renders its focus picker without breaking the row', async
 
     expect(seen, 'express mode rendered no picker on the bar').not.toBeNull();
     if (!seen) return;
-    // ENABLED AND NAMED: in standard the lane is held by a hidden spacer, so a check that only asked
+    // ENABLED AND NAMED: the bar carries other controls in the same group, so a check that only asked
     // "is there a select" would pass on the wrong element the moment the modes were confused.
     expect(seen.disabled, 'the focus picker is disabled in express mode').toBe(false);
     expect(seen.named).toMatch(/feature auto-pilot works on/i);

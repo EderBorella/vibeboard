@@ -35,6 +35,8 @@ const skillNamed = (slug: string): Skill => ({
   // The seeded break-down says "one acceptance criterion per card" in its own words. Express contradicts
   // that on purpose, which is why the ordering assertion below is not cosmetic.
   prompt: 'One acceptance criterion per card.',
+  autopilotOnly: false,
+  moveOnSuccess: true,
 });
 
 const card = (board: BoardName): Card =>

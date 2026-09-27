@@ -31,6 +31,8 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   boards: [],
   columns: [],
   prompt: 'Implement the card below.',
+  autopilotOnly: false,
+  moveOnSuccess: true,
   ...over,
 });
 
@@ -67,7 +69,22 @@ describe('SkillEditor', () => {
       boards: [],
       columns: [],
       prompt: 'Implement the card below.',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
+  });
+
+  it('saves both running flags, and stops offering the move while the skill is auto-pilot only', () => {
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);
+    const move = screen.getByLabelText(
+      'Move the card to the next column when the run succeeds',
+    ) as HTMLInputElement;
+    fireEvent.click(move);
+    fireEvent.click(screen.getByLabelText(/^For auto-pilot only/));
+    expect(move.disabled).toBe(true);
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ autopilotOnly: true, moveOnSuccess: false });
   });
 
   it('offers every column when no board is ticked', () => {

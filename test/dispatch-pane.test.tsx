@@ -34,6 +34,8 @@ const skill: Skill = {
   boards: [],
   columns: [],
   prompt: 'p',
+  autopilotOnly: false,
+  moveOnSuccess: true,
 };
 
 const props = {

@@ -22,7 +22,7 @@ beforeAll(() => {
   process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
 });
 
-const dispatch = { board: 'engineering', card: 'E-001', skill: 'implement' };
+const dispatch = { board: 'engineering', card: 'E-001', skill: 'execute' };
 
 describe('while a project is halted', () => {
   it('refuses a dispatch, naming the restart', async () => {

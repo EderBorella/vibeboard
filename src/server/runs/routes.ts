@@ -4,7 +4,7 @@ import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { boardAroundFor } from '../../core/board-around.js';
 import { findCard } from '../../core/find.js';
-import { phase, phaseForRun } from '../../core/phases.js';
+import { actingPhase, phase } from '../../core/phases.js';
 import { asVerification, isInFlight, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, isBoard } from '../../core/types.js';
 import { readBoard } from '../../store/cards/board.js';
@@ -149,7 +149,7 @@ async function resolveDispatch(
 
   const previous = await resolvePrevious(root, body, card.id);
   if (previous && 'error' in previous) return previous;
-  const around = boardAroundFor(phaseForRun(skill.slug, card.board)?.name, card, everyCard);
+  const around = boardAroundFor(actingPhase(skill.slug, card.board)?.name, card, everyCard);
 
   return {
     input: {
@@ -281,8 +281,9 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     if (stopped) return reply.code(stopped.code).send({ error: stopped.error });
     const resolved = await resolveDispatch(ctx, body);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
+    const byHand = req.credential?.scope === 'admin' ? { dispatchedBy: 'person' as const } : {};
     try {
-      return { run: await ctx.runner.dispatch(resolved.input) };
+      return { run: await ctx.runner.dispatch({ ...resolved.input, ...byHand }) };
     } catch (err) {
       // The cap, today. Phase 5 replaces it with a queue, at which point this stops being a refusal.
       return reply.code(409).send({ error: errorText(err) });

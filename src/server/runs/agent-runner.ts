@@ -85,6 +85,7 @@ export interface DispatchInput {
   model: string;
   effort: string;
   mode: string;
+  dispatchedBy?: 'person';
 }
 
 export interface RunnerOptions {
@@ -123,6 +124,8 @@ export interface RunnerOptions {
   apiBase?: () => string;
   // Called whenever a record changes on disk, so the WS layer can push it without polling.
   onUpdate?: (record: RunRecord) => void;
+  // Called once a run has ended and its record is written, before the next queued run starts.
+  onSettled?: (final: RunRecord, input: DispatchInput, root: string) => Promise<void>;
   // How files-changed is measured (S11). Injected so a test about something else neither needs git nor
   // pays for it: without one the field is simply absent, which is exactly what it means when there is
   // no repository to ask.
@@ -290,6 +293,7 @@ export class AgentRunner {
       model: input.model,
       effort: input.effort,
       mode: input.mode,
+      ...(input.dispatchedBy ? { dispatchedBy: input.dispatchedBy } : {}),
       ...(input.previous ? { previous: input.previous.run } : {}),
       ...(input.userPrompt?.trim() ? { prompt: input.userPrompt.trim() } : {}),
       ...(input.attachments.length > 0 ? { attached: input.attachments } : {}),
@@ -453,7 +457,7 @@ export class AgentRunner {
 
     // Not awaited: the caller was answered when the record was written, and the ending arrives
     // through onUpdate. Errors are folded into the record rather than thrown into nowhere.
-    void this.#settle(root, run, record, turn, minted?.token);
+    void this.#settle(root, run, record, turn, input, minted?.token);
   }
 
   // A slot freed. Take the oldest waiting run and spawn it.
@@ -551,6 +555,7 @@ export class AgentRunner {
     run: string,
     record: RunRecord,
     turn: RunningTurn,
+    input: DispatchInput,
     secret?: string,
   ): Promise<void> {
     let final: RunRecord;
@@ -606,6 +611,9 @@ export class AgentRunner {
       this.#opts.credentials?.expireRun(run);
     }
     this.#opts.onUpdate?.(final);
+    await this.#opts.onSettled?.(final, input, root).catch((err) => {
+      this.#opts.log?.warn({ err, run }, 'the step after this run ended failed');
+    });
     // A slot just freed, so whatever was waiting starts now. After the update, so the dashboard sees
     // this run end before the next one begins.
     this.#drain();

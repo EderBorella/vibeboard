@@ -119,7 +119,7 @@ const COUNT_OPTIONALS = [
 // The three `*_OPTIONALS` lists below are self-describing; these two are not, because they are read by
 // hand — the enum-guarded fields each need their own type predicate, and the required block in
 // `parseRun` reads its keys inline. Both are listed here so the union can be closed.
-const GUARDED_KEYS = ['outcome', 'fault', 'verdict', 'usage', 'verification'] as const;
+const GUARDED_KEYS = ['outcome', 'fault', 'verdict', 'usage', 'verification', 'dispatchedBy'] as const;
 const REQUIRED_KEYS = [
   'run',
   'card',
@@ -148,15 +148,22 @@ type Unread = Exclude<keyof RunRecord, ParsedKey>;
 const _everyFieldIsRead: Unread extends never ? true : Unread = true;
 void _everyFieldIsRead;
 
-function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
+// The fields whose value must be one of a fixed set: anything else is dropped rather than trusted.
+function enumFields(d: Record<string, unknown>): Partial<RunRecord> {
   const out: Partial<RunRecord> = {};
+  if (isOutcome(d.outcome)) out.outcome = d.outcome;
+  if (isFault(d.fault)) out.fault = d.fault;
+  if (isVerdict(d.verdict)) out.verdict = d.verdict;
+  if (d.dispatchedBy === 'person') out.dispatchedBy = 'person';
+  return out;
+}
+
+function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
+  const out: Partial<RunRecord> = enumFields(d);
   for (const { key, min } of COUNT_OPTIONALS) {
     const n = d[key];
     if (typeof n === 'number' && Number.isInteger(n) && n >= min) out[key] = n;
   }
-  if (isOutcome(d.outcome)) out.outcome = d.outcome;
-  if (isFault(d.fault)) out.fault = d.fault;
-  if (isVerdict(d.verdict)) out.verdict = d.verdict;
   const usage = asUsage(d.usage);
   if (usage !== undefined) out.usage = usage;
   const verification = asVerification(d.verification);

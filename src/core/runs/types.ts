@@ -104,6 +104,9 @@ export interface RunRecord {
   // way to un-block a card was to move its result files out of the folder by hand, which destroys the
   // history that explains why it was blocked in the first place.
   forgiven?: string;
+  // A person started it from a card. Absent is the loop's, and the loop neither counts nor reads a hand
+  // run (decision 93) — set by the server from the credential, never from what a caller sends.
+  dispatchedBy?: 'person';
   finished?: string;
   // When the user dealt with it. `status` says how the run ended, which is a fact about the agent
   // and never changes; this says the decision has been taken, which is a fact about the user. A

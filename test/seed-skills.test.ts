@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
+import { skillsForCard } from '../src/core/skills.js';
 import { defaultConfig } from '../src/store/project/config.js';
 import { SEED_SKILLS, seedSkills } from '../src/store/project/seed-skills.js';
 import { readSkills } from '../src/store/project/skill-catalogue.js';
@@ -104,10 +105,10 @@ describe('the phase skills the phase table names', () => {
     const { skills } = await readSkills(root, config);
     const boardsOf = (slug: string): string[] => skills.find((s) => s.slug === slug)?.boards ?? ['MISSING'];
     expect(boardsOf('derive-features')).toEqual(['features']);
-    // THE STORY'S, since the work moved up to it (decision 83). `implement` is still seeded — implementing
-    // one task by hand is a thing a person does — but no phase names it, so it is scoped like `execute`.
+    // THE STORY'S, since the work moved up to it (decision 83). Implementing one task by hand is `execute`'s.
     expect(boardsOf('implement-story')).toEqual(['product']);
-    expect(boardsOf('implement')).toEqual(['engineering']);
+    expect(boardsOf('execute')).toEqual(['engineering']);
+    expect(boardsOf('implement')).toEqual(['MISSING']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
     // The lifecycle's own, each scoped to the boards its phases sit on. `fix` is ONE phase since decision 83
     // retired the task's — `phaseForRun('fix', 'engineering')` is undefined, pinned in test/phases.test.ts —
@@ -198,8 +199,8 @@ describe('the phase skills the phase table names', () => {
     );
   });
 
-  it('tells implement to file what it finds rather than widen the card', () => {
-    const content = SEED_SKILLS.find((s) => s.slug === 'implement')?.content ?? '';
+  it('tells execute to file what it finds rather than widen the card', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'execute')?.content ?? '';
     expect(content).toContain('POST /api/suggestions');
     expect(content).toContain('CODE-QUALITY.md');
   });
@@ -222,7 +223,7 @@ describe('the phase skills the phase table names', () => {
     expect(SEED_SKILLS.find((s) => s.slug === 'break-down')?.content).toContain(
       "**If a card you create declares the project's `smoke:` command**, say on the card\nthat the way to declare it is `POST /api/foundation/smoke` with `{ command }`.",
     );
-    expect(SEED_SKILLS.find((s) => s.slug === 'implement')?.content).toContain(
+    expect(SEED_SKILLS.find((s) => s.slug === 'execute')?.content).toContain(
       "**If this card asks you to declare the project's `smoke:` command**, declare it\nwith `POST /api/foundation/smoke` and a body of `{ command }`.",
     );
     // RULING 67, and the reason this pin is worth its exactness. Both sentences used to send the agent to
@@ -230,13 +231,13 @@ describe('the phase skills the phase table names', () => {
     // read-only — so the instruction named a file no run could write, and the mandatory harness feature
     // deadlocked on it for three reviews before the bound stopped auto-pilot. If either sentence drifts back
     // to naming the file as the thing to edit, this fails.
-    for (const slug of ['break-down', 'implement']) {
+    for (const slug of ['break-down', 'execute']) {
       const content = SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
       expect(content, slug).toContain('POST /api/foundation/smoke');
       expect(content, slug).toContain('read-only');
     }
     // And the reason, which both carry: a reader told only "not that one" has no way to choose the next one.
-    for (const slug of ['break-down', 'implement']) {
+    for (const slug of ['break-down', 'execute']) {
       expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).toContain(
         'are one check, not two: gates are written',
       );
@@ -509,23 +510,9 @@ describe("the wizard's project-run skills", () => {
   });
 });
 
-// THE THREE HAND-DISPATCH SKILLS the lifecycle never uses. Frozen as exact bytes, because "untouched" is a
-// claim about this task and an assertion about a substring would not have held it.
+// THE TWO READING SKILLS the lifecycle never uses. Frozen as exact bytes, because "untouched" is a claim an
+// assertion about a substring would not have held.
 const FROZEN: Record<string, string> = {
-  execute: `---
-name: Execute
-description: Implement what the card describes
-boards: [engineering]
----
-Implement the card below.
-
-Read any linked product card first: it carries the intent, while an engineering
-card often carries only the mechanics. Work in small steps, and run the
-project's own test and lint commands before you finish.
-
-Do not change a card's id, and do not move a card between columns unless the
-card itself asks you to.
-`,
   research: `---
 name: Research
 description: Gather context and options without changing anything
@@ -554,9 +541,28 @@ Change nothing on disk except the report you are asked to write.
 };
 
 describe('the skills the lifecycle does not use', () => {
-  it('leaves the three hand-dispatch skills untouched', () => {
-    for (const slug of ['execute', 'research', 'summarise']) {
+  it('leaves the two reading skills untouched', () => {
+    for (const slug of ['research', 'summarise']) {
       expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).toBe(FROZEN[slug]);
     }
+  });
+
+  // A person's skills say nothing about auto-pilot, and the hand break-down carries none of the loop's
+  // break-down machinery (decision 96).
+  it('keeps the hand skills free of the loop', async () => {
+    for (const slug of ['execute', 'research', 'summarise', 'split']) {
+      expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).not.toMatch(/auto-?pilot/i);
+    }
+    const split = SEED_SKILLS.find((s) => s.slug === 'split')?.content ?? '';
+    expect(split).not.toContain('satisfiedBy');
+    expect(split).not.toContain('smoke');
+    const root = await tempDir();
+    await seedSkills(root);
+    const { skills } = await readSkills(root, config);
+    const offered = (board: 'features' | 'product' | 'engineering') =>
+      skillsForCard(skills, board, 'backlog').map((s) => s.slug);
+    expect(offered('features')).toEqual(['research', 'split', 'summarise']);
+    expect(offered('product')).toEqual(['research', 'split', 'summarise']);
+    expect(offered('engineering')).toEqual(['execute', 'research', 'summarise']);
   });
 });

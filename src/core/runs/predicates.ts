@@ -30,6 +30,10 @@ export function isProjectRun(record: RunRecord): boolean {
   return record.card === undefined && record.board === undefined;
 }
 
+export function isHandRun(record: Pick<RunRecord, 'dispatchedBy'>): boolean {
+  return record.dispatchedBy === 'person';
+}
+
 // In-flight statuses cannot survive a restart: the child process is gone with the server that
 // spawned it, so a record still claiming to run is stale rather than live.
 export function isInFlight(status: RunStatus): boolean {

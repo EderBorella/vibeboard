@@ -146,7 +146,7 @@ is checkable by looking at it.
 Confirm `GET /api/state` shows it within a second or two: that is the filesystem watcher, and it is the
 premise the whole product rests on.
 
-Then dispatch `POST /api/runs` with `{board, card, skill: "implement"}`.
+Then dispatch `POST /api/runs` with `{board, card, skill: "execute"}`.
 
 **While it runs**, `docker ps --filter label=io.vibeboard.box=1` must show one container for the project.
 And check the per-project OpenCode state directory: if it held a legacy `auth.json` **file**, it must now
@@ -154,8 +154,9 @@ be a **symlink** into `~/.cache/vibeboard/creds/opencode/`. Count `*.superseded`
 where a legacy copy was neither adopted nor identical to the host, which is worth knowing about but is
 not a failure.
 
-**When it settles, the record must say** `status: success`, `outcome: success`, **no `fault`**, a non-zero
-`filesChanged`, and the file the card asked for must be on disk with exactly the contents it asked for.
+**When it settles, the record must say** `status: success`, `outcome: success`, **no `fault`**,
+`dispatchedBy: person`, a non-zero `filesChanged`, and the file the card asked for must be on disk with exactly
+the contents it asked for. The card must have moved to the next column, with a `run` line in the diary saying so.
 
 An `unreadable-report` fault means the report identity check rejected what the agent wrote. A `failed`
 with *"could not start the agent box"* is the incident at the top of this page.
@@ -289,6 +290,8 @@ categories: **instructions, foundation, skills, docs, resources**.
 - **Create and rename** (`POST /api/control/create`, `/rename`) and **delete** (`DELETE`).
 - **Resources** round-trip (`GET`/`PUT /api/control/resources`) — the external links agents are handed.
 - **Skills** edit (`PUT /api/skills/:slug`) and the catalogue lists (`GET /api/skills`).
+  Untick **For auto-pilot only** on `fix`: it appears on a product card's rail, and the file gains
+  `autopilotOnly: false`; tick it again and the key is gone.
 - **The smoke declaration** (`POST /api/foundation/smoke`) — the command a project declares as proof it
   runs, which is deliberately not allowed to be one of the gates.
 

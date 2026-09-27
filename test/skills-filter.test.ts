@@ -11,12 +11,19 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   boards: [],
   columns: [],
   prompt: 'p',
+  autopilotOnly: false,
+  moveOnSuccess: true,
   ...over,
 });
 
 describe('skillsForCard (web)', () => {
   it('offers an unrestricted skill on any card', () => {
     expect(skillsForCard([skill()], 'product', 'backlog')).toHaveLength(1);
+  });
+
+  it('never offers a skill that is for auto-pilot only', () => {
+    const s = [skill({ slug: 'machine', autopilotOnly: true }), skill({ slug: 'mine' })];
+    expect(skillsForCard(s, 'product', 'backlog').map((x) => x.slug)).toEqual(['mine']);
   });
 
   it('restricts by board', () => {

@@ -5,8 +5,7 @@ import { entryColumn } from '../../core/entry-column.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem, parentBoardOf, parentOf } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
-import { phaseForRun } from '../../core/phases.js';
-import { slugify } from '../../core/slug.js';
+import { actingPhase, phaseForRun } from '../../core/phases.js';
 import {
   BOARDS,
   type BoardName,
@@ -20,29 +19,18 @@ import { createLinkedCard, setCardLinks } from '../../store/cards/links.js';
 import {
   archiveCard,
   type CreateCardInput,
-  placeCard,
   restoreCard,
   restoreTarget,
   updateCard,
 } from '../../store/cards/mutations.js';
-import { resolveCardRuns } from '../../store/run-store.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
-
-// A card in its board's last column is closed, so nothing on it is still waiting for a decision.
-// Which column that is comes from the config rather than a name: "done" is a convention, and a
-// project may call it anything.
-function isClosingColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
-  const last = config.boards[board].columns.at(-1);
-  return last !== undefined && slugify(last) === columnSlug;
-}
+import { moveCard } from './move.js';
 
 interface CardRef {
   board: BoardName;
   id: string;
 }
 
-// Shared by /place and /move, so the resolve-on-close rule has one home. Two copies would drift
-// the moment one of them gained a condition.
 async function place(
   ctx: AppCtx,
   { board, id }: CardRef,
@@ -53,14 +41,8 @@ async function place(
   const { root, config } = ctx.session as { root: string; config: ProjectConfig };
   const card = await findCard(root, board, id, config);
   if (!card) return reply.code(404).send({ error: 'Card not found' });
-  const placed = await placeCard(root, config, card, toColumnSlug, beforeId);
+  const placed = await moveCard(root, config, card, toColumnSlug, beforeId);
   if (placed === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
-  // Closing a card resolves its runs. Done on the move rather than in the watcher: writing run
-  // records in response to filesystem events, inside the folder the watcher watches, is a loop —
-  // so a card moved by an agent editing files directly still needs Dismiss.
-  if (isClosingColumn(config, board, placed.columnSlug)) {
-    await resolveCardRuns(root, board, placed.id, nowIso());
-  }
   return placed;
 }
 
@@ -85,7 +67,7 @@ function wrongBoardForRun(
   input: CreateCardInput,
 ): string | undefined {
   if (!cred.skill) return undefined;
-  const creates = phaseForRun(cred.skill, cred.board)?.creates;
+  const creates = actingPhase(cred.skill, cred.board)?.creates;
   // A phase with no `creates`, and a skill no phase names, may create nothing. The work it found is real; it
   // is just not a card this run gets to make, so the refusal names the surface that exists for it.
   if (creates === undefined) {

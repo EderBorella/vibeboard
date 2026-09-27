@@ -1,6 +1,6 @@
 import { relative } from 'node:path';
 import type { BoardAround } from '../../../core/board-around.js';
-import { phaseForRun } from '../../../core/phases.js';
+import { actingPhase } from '../../../core/phases.js';
 import type { Skill } from '../../../core/skills.js';
 import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
@@ -201,7 +201,7 @@ function surroundings(input: PromptInputs): string[] {
 }
 
 export function buildRunPrompt(input: PromptInputs): string {
-  const phaseName = phaseForRun(input.skill.slug, input.card?.board)?.name;
+  const phaseName = actingPhase(input.skill.slug, input.card?.board)?.name;
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
   const parts: string[] = [

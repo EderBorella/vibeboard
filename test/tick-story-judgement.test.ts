@@ -364,3 +364,21 @@ describe('a story that arrives with nothing under it', () => {
     expect(tasks.map((t) => [t.links, t.columnSlug])).toEqual([[['P-001'], 'done']]);
   });
 });
+
+// DECISION 93: a person's run is theirs. A fix somebody ran by hand after the loop's implement is not what the
+// story's review judges, so the review is still handed the loop's own run.
+describe("a person's run on the story", () => {
+  it('is not taken for the loop’s own work', () => {
+    const story = card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']);
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      story,
+      task('E-001', 'review', 10),
+      task('E-002', 'review', 20),
+    ];
+    const implemented = dispatched(1, story, 'implement-story');
+    const byHand = { ...dispatched(2, story, 'fix'), dispatchedBy: 'person' as const };
+    const action = decideTick(input({ cards, runs: [...brokeDown(), implemented, byHand] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-review', previous: implemented.run });
+  });
+});

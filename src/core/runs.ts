@@ -14,6 +14,7 @@ export {
   parseRun,
 } from './runs/parse.js';
 export {
+  isHandRun,
   isInFlight,
   isProjectRun,
   isRunId,

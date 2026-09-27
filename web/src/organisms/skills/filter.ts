@@ -7,6 +7,7 @@ import type { BoardName } from '../../lib/shared';
 export function skillsForCard(skills: Skill[], board: BoardName, columnSlug: string): Skill[] {
   return skills.filter(
     (s) =>
+      !s.autopilotOnly &&
       (s.boards.length === 0 || s.boards.includes(board)) &&
       (s.columns.length === 0 || s.columns.includes(columnSlug)),
   );

@@ -31,6 +31,8 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   boards: [],
   columns: [],
   prompt: 'p',
+  autopilotOnly: false,
+  moveOnSuccess: true,
   ...over,
 });
 

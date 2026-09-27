@@ -1,7 +1,7 @@
 import { relative } from 'node:path';
 import type { BoardAround } from '../../../core/board-around.js';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
-import { type PhaseName, phase, phaseForRun } from '../../../core/phases.js';
+import { actingPhase, type PhaseName, phase } from '../../../core/phases.js';
 import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
 import { BOX_BROWSERS_PATH, BOX_PLAYWRIGHT_VERSION } from '../../boxes/image-tools.js';
@@ -302,7 +302,7 @@ const EXPRESS: Partial<Record<PhaseName, string[]>> = {
 // `undefined` for a phase express says nothing about, and for every run on a standard project — the rule
 // this file already follows, that a heading over nothing is worse than no heading.
 export function expressSection(skill: string, board: BoardName | undefined): string | undefined {
-  const name = phaseForRun(skill, board)?.name;
+  const name = actingPhase(skill, board)?.name;
   const lines = name ? EXPRESS[name] : undefined;
   if (!lines) return undefined;
   return [

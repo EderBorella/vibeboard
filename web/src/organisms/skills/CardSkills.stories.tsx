@@ -29,6 +29,8 @@ const skill = (slug: string, name: string, columns: string[]): Skill => ({
   boards: ['features'],
   columns,
   prompt: '',
+  autopilotOnly: false,
+  moveOnSuccess: true,
 });
 
 const invalid: InvalidSkill[] = [

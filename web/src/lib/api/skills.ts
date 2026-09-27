@@ -13,7 +13,11 @@ export interface Skill {
   boards: BoardName[];
   columns: string[];
   prompt: string;
+  autopilotOnly: boolean;
+  moveOnSuccess: boolean;
 }
+
+export type SkillFields = Omit<Skill, 'slug' | 'path'>;
 
 // A skill file that failed validation: absent from the rail, reported with its reason so it is
 // distinguishable from a skill nobody wrote.
@@ -34,15 +38,6 @@ export async function listSkills(): Promise<SkillCatalogue> {
 
 // Write a skill from its fields; the server serialises the YAML and answers with the catalogue as it
 // now reads it — including a validation failure the fields alone could not predict.
-export function putSkill(
-  slug: string,
-  fields: {
-    name: string;
-    description: string;
-    boards: BoardName[];
-    columns: string[];
-    prompt: string;
-  },
-): Promise<SkillCatalogue> {
+export function putSkill(slug: string, fields: SkillFields): Promise<SkillCatalogue> {
   return put<SkillCatalogue>(`/api/skills/${encodeURIComponent(slug)}`, fields);
 }

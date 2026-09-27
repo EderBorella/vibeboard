@@ -18,6 +18,7 @@ const IDENTITY_KEYS = [
   'status',
   'fault',
   'forgiven',
+  'dispatchedBy',
   'outcome',
   'resolved',
 ] as const;

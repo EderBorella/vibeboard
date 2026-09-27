@@ -174,6 +174,8 @@ describe('web/shared mirrors src/core', () => {
       boards: [],
       columns: [],
       prompt: 'p',
+      autopilotOnly: false,
+      moveOnSuccess: true,
       ...over,
     });
     const all = [
@@ -182,6 +184,7 @@ describe('web/shared mirrors src/core', () => {
       s({ slug: 'todo', columns: ['todo'] }),
       s({ slug: 'both', boards: ['engineering'], columns: ['todo'] }),
       s({ slug: 'multi', boards: ['product', 'features'], columns: ['backlog', 'todo'] }),
+      s({ slug: 'machine', autopilotOnly: true }),
     ];
     for (const board of core.BOARDS) {
       for (const column of ['todo', 'backlog', 'in-progress', 'review', 'done', 'nonsense']) {

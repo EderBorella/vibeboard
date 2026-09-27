@@ -40,7 +40,7 @@ import { childrenOf, liveCards } from '../hierarchy.js';
 import { ARCHIVE_SLUG } from '../layout.js';
 import { type PhaseName, phase } from '../phases.js';
 import { derivePosition, type Position } from '../position.js';
-import { isProjectRun, type RunRecord } from '../runs.js';
+import { isHandRun, isProjectRun, type RunRecord } from '../runs.js';
 import { criterionCommand } from '../satisfied.js';
 import type { BoardName, Card } from '../types.js';
 import {
@@ -971,7 +971,10 @@ function phaseAction(input: TickInput, position: Position): TickAction | undefin
   return allSettled(input.ap, stories) ? checkupPhase(input, feature) : undefined;
 }
 
-export function decideTick(input: TickInput): TickAction {
+export function decideTick(given: TickInput): TickAction {
+  // A person's runs are not the loop's to count or read (decision 93). They still hold it while in flight and
+  // still spend the project's money, which `inFlight` and `spend` carry separately.
+  const input = { ...given, runs: given.runs.filter((r) => !isHandRun(r)) };
   const { ap, state, cards, runs, spend, inFlight, problems, commands } = input;
   if (state.state !== 'running') return notRunning(state);
 

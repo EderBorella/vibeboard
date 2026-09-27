@@ -1,6 +1,6 @@
 import type { AutopilotConfig } from './autopilot.js';
 import { formatUsd } from './money.js';
-import { isProjectRun, type RunRecord, type RunStatus } from './runs.js';
+import { isHandRun, isProjectRun, type RunRecord, type RunStatus } from './runs.js';
 import type { BoardName } from './types.js';
 
 // What a project has spent, and how many attempts a card has used. Both are QUERIES over the run
@@ -111,8 +111,12 @@ const BURNS: Record<RunStatus, boolean> = {
 //
 // Order matters below. A forgiven run is not counted whatever else is true of it — that is a person
 // overruling the machine, and it must not be second-guessed by a status test.
-export function burnsAttempt(run: Pick<RunRecord, 'status' | 'fault' | 'forgiven'>): boolean {
+export function burnsAttempt(
+  run: Pick<RunRecord, 'status' | 'fault' | 'forgiven' | 'dispatchedBy'>,
+): boolean {
   if (run.forgiven) return false;
+  // A person's run spends the project's money, not the loop's attempts (decision 93).
+  if (isHandRun(run)) return false;
   // The machine's failure, not the work's. ANY classified fault, not `infrastructure` by name: the field
   // exists to say the failure was not the card's, and every member of `RUN_FAULTS` means exactly that.
   // Testing for one value made the second one — `unreadable-report`, added 2026-09-01 — silently burn on

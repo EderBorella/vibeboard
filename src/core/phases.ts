@@ -203,3 +203,12 @@ export const LIFECYCLE_SKILLS: readonly string[] = [
 export function phaseForRun(skill: string, board?: BoardName): Phase | undefined {
   return PHASES.find((p) => p.skill === skill && p.board === board);
 }
+
+// THE HAND BREAK-DOWN (decision 96). No phase dispatches it, so it is neither in the table nor in
+// LIFECYCLE_SKILLS and the loop never reads its runs. Outside the loop it acts as its board's break-down: that
+// row decides which board it may create on and how its prompt is sized.
+export const HAND_BREAKDOWN = 'split';
+
+export function actingPhase(skill: string, board?: BoardName): Phase | undefined {
+  return phaseForRun(skill === HAND_BREAKDOWN ? 'break-down' : skill, board);
+}

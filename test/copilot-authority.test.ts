@@ -557,7 +557,7 @@ describe('a dispatch while the gates are unreviewed', () => {
       method: 'POST',
       url: '/api/runs',
       headers: admin,
-      payload: { board: 'engineering', card: 'E-001', skill: 'implement' },
+      payload: { board: 'engineering', card: 'E-001', skill: 'execute' },
     });
 
     expect(res.statusCode).toBe(412);

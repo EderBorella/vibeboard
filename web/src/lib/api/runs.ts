@@ -127,6 +127,8 @@ export const RUN_RECORD_NOT_MIRRORED = [
   // one left behind; nothing on screen shows either, and a pid in the UI would invite acting on it.
   'pgid',
   'pgstart',
+  // Read only by the loop and the server, to keep a person's runs out of the loop's reckoning.
+  'dispatchedBy',
 ] as const;
 
 // A field on the interface above that `RUN_RECORD_KEYS` does not name. `never` when every one is there;

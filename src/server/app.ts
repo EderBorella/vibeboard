@@ -43,6 +43,7 @@ import { registerExplorerRoutes } from './explorer/routes.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import type { AppCtx } from './route-context.js';
 import { AgentRunner } from './runs/agent-runner.js';
+import { moveAfterHandRun } from './runs/hand-run.js';
 import { groupsOf, reapGroups } from './runs/reaper.js';
 import { registerRunRoutes } from './runs/routes.js';
 import { debugLogging } from './settings/app-state.js';
@@ -173,6 +174,11 @@ export function buildApp(
     // Assigned below, because the runtime is built after the runner and this closes over it.
     halted: () => autopilot.isHalted(),
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
+    onSettled: moveAfterHandRun({
+      session,
+      autopilotRunning: async () => (await autopilot.current()).state === 'running',
+      broadcast,
+    }),
     log: log.child({ component: 'runner' }),
   });
   // Everything an emergency stop takes down. Decision 13's blast radius: every agent this server

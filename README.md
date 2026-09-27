@@ -238,13 +238,18 @@ a network you trust, and never expose it to the public internet.
   validation is reported with the reason rather than silently ignored. Author one
   as **fields** in Project Control — name, description, and boards and columns
   ticked from the live config, so an invalid scope cannot be typed — with `Raw`
-  always one click away, because the file is still the truth
+  always one click away, because the file is still the truth. A skill ticked
+  **for auto-pilot only** is left off the rail: the lifecycle's and setup's are,
+  until you untick one to run it by hand
 - **Run a skill as an agent**: pick connector, model, effort and mode (all
   pre-filled from your defaults), add a prompt and attach project files, and the
   agent works the card. It reports back through a file contract, so a run either
   **succeeds** — report on the card, with links to any cards it created — or
   **needs you**, with options to choose from. Choosing one dispatches again
-  carrying the previous report, so the work iterates until you close the card
+  carrying the previous report, so the work iterates until you close the card.
+  A run that succeeds **moves its card to the next column** unless its skill says
+  otherwise, so the board shows the work happened. A run you start by hand is
+  yours: auto-pilot neither counts it against a card's attempts nor reads it
 - **Execution dashboard**: every run in the project across In progress, Requires
   attention and Done, with a badge when something is waiting on you. Stop a run
   from there, or open the card it belongs to. Runs past

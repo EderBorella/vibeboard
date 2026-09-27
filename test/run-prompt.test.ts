@@ -42,6 +42,8 @@ const skill: Skill = {
   boards: ['engineering'],
   columns: [],
   prompt: 'Implement the card below.\nRun the tests before you finish.',
+  autopilotOnly: false,
+  moveOnSuccess: true,
 };
 
 const card = (over: Partial<Card> = {}): Card =>

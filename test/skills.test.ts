@@ -28,6 +28,8 @@ describe('parseSkill', () => {
       boards: [],
       columns: [],
       prompt: 'Do the thing.',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
   });
 
@@ -105,14 +107,50 @@ describe('parseSkill', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(Object.keys(r.skill).sort()).toEqual([
+      'autopilotOnly',
       'boards',
       'columns',
       'description',
+      'moveOnSuccess',
       'name',
       'path',
       'prompt',
       'slug',
     ]);
+  });
+});
+
+describe('the two running flags', () => {
+  const flags = (slug: string, fm = '') => {
+    const r = parseSkill(slug, file(`name: N\ndescription: D${fm}`), config);
+    return r.ok
+      ? { autopilotOnly: r.skill.autopilotOnly, moveOnSuccess: r.skill.moveOnSuccess }
+      : r.invalid.reason;
+  };
+
+  // An older project's files carry neither key, so what they mean comes from the slug.
+  it.each([
+    ['fix', { autopilotOnly: true, moveOnSuccess: true }],
+    ['scan-project', { autopilotOnly: true, moveOnSuccess: true }],
+    ['checkup-story', { autopilotOnly: true, moveOnSuccess: true }],
+    ['execute', { autopilotOnly: false, moveOnSuccess: true }],
+    ['split', { autopilotOnly: false, moveOnSuccess: true }],
+    ['research', { autopilotOnly: false, moveOnSuccess: false }],
+  ])('gives %s its slug default when the file says nothing', (slug, expected) => {
+    expect(flags(slug)).toEqual(expected);
+  });
+
+  it('lets the file overrule the default either way', () => {
+    expect(flags('fix', '\nautopilotOnly: false\nmoveOnSuccess: false')).toEqual({
+      autopilotOnly: false,
+      moveOnSuccess: false,
+    });
+    expect(flags('execute', '\nautopilotOnly: true')).toEqual({ autopilotOnly: true, moveOnSuccess: true });
+  });
+
+  it('refuses a flag that is not true or false', () => {
+    expect(flags('execute', '\nautopilotOnly: sometimes')).toBe('autopilotOnly must be true or false');
+    expect(flags('execute', '\nmoveOnSuccess: 1')).toBe('moveOnSuccess must be true or false');
   });
 });
 
@@ -124,6 +162,8 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   boards: [],
   columns: [],
   prompt: 'p',
+  autopilotOnly: false,
+  moveOnSuccess: true,
   ...over,
 });
 const ok = (s: Skill): SkillParse => ({ ok: true, skill: s });
@@ -210,12 +250,14 @@ describe('serializeSkill', () => {
   // against that board's config, so a scope naming a column engineering does not have would come
   // back invalid and test the rejection path instead of the round trip.
   it('round-trips through parseSkill', () => {
-    const text = serializeSkill({
+    const text = serializeSkill('execute', {
       name: 'Execute',
       description: 'Implement the card',
       boards: ['engineering'],
       columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
     const parsed = parseSkill('execute', text, config);
     expect(parsed.ok).toBe(true);
@@ -228,30 +270,55 @@ describe('serializeSkill', () => {
       boards: ['engineering'],
       columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
   });
 
   it('omits an empty scope rather than writing an empty list', () => {
     // "Every board" is the absence of a restriction; `boards: []` reads like a mistake, and a reader
     // of the file should not have to know they mean the same thing.
-    const text = serializeSkill({
+    const text = serializeSkill('x', {
       name: 'N',
       description: 'D',
       boards: [],
       columns: [],
       prompt: 'P',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
     expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
   });
 
   it('trims what it is given', () => {
-    const text = serializeSkill({
+    const text = serializeSkill('x', {
       name: '  N  ',
       description: '  D  ',
       boards: [],
       columns: [],
       prompt: '\n  P  \n',
+      autopilotOnly: false,
+      moveOnSuccess: true,
     });
     expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
+  });
+
+  // Written only where it differs from the slug's default, so an untouched skill saves byte for byte.
+  it.each([
+    ['fix', true, true, ''],
+    ['fix', false, true, 'autopilotOnly: false\n'],
+    ['execute', true, false, 'autopilotOnly: true\nmoveOnSuccess: false\n'],
+    ['research', false, true, 'moveOnSuccess: true\n'],
+  ])('writes %s with autopilotOnly %s and moveOnSuccess %s', (slug, autopilotOnly, moveOnSuccess, keys) => {
+    const text = serializeSkill(slug, {
+      name: 'N',
+      description: 'D',
+      boards: [],
+      columns: [],
+      prompt: 'P',
+      autopilotOnly,
+      moveOnSuccess,
+    });
+    expect(text).toBe(`---\nname: N\ndescription: D\n${keys}---\nP\n`);
   });
 });

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { RESUMABLE_DOCUMENTS } from '../../core/layout.js';
+import { WIZARD_SKILLS } from '../../core/skills.js';
 import {
   clearWizardState,
   isScaffoldMode,
@@ -13,8 +14,6 @@ import type { Scope } from '../auth/credentials.js';
 import { errorText } from '../errors.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { agentDispatchRefusal, resolveProjectDispatch } from '../runs/dispatch.js';
-
-const WIZARD_SKILLS = ['scan-project', 'suggest-stack'];
 
 // Why setup cannot start this run right now, or nothing. Its own function for `dispatchRefusal`'s
 // reason: the handler is then dispatch-and-report, while the rules — a machine that cannot confine an

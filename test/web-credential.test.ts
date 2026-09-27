@@ -17,7 +17,19 @@ describe('the browser sends no credential of its own', () => {
 
   it.each([
     ['post', () => createControlFile('docs')],
-    ['put', () => putSkill('execute', { name: 'x', description: 'd', boards: [], columns: [], prompt: 'p' })],
+    [
+      'put',
+      () =>
+        putSkill('execute', {
+          name: 'x',
+          description: 'd',
+          boards: [],
+          columns: [],
+          prompt: 'p',
+          autopilotOnly: false,
+          moveOnSuccess: true,
+        }),
+    ],
     ['patch', () => patchConfig({ name: 'renamed' })],
     ['a bare read', () => getState()],
   ])('sends the cookie and no Authorization header through %s', async (_shape, call) => {

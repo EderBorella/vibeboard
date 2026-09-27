@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { SKILLS_DIR } from '../../core/layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
-// any other, and nothing here is special-cased later.
+// any other. The machine's are hidden from a card's skills by their slug's default (core/skills.ts),
+// which is why none of them carries a flag.
 //
 // No `columns:` on purpose — a column slug has to exist in that project's config, and a project
 // may have renamed its columns. Boards are fixed by BOARDS, so board scoping is always valid.
@@ -15,17 +16,36 @@ export const SEED_SKILLS: { slug: string; content: string }[] = [
     slug: 'execute',
     content: `---
 name: Execute
-description: Implement what the card describes
+description: Build what the card describes, and make the gates pass
 boards: [engineering]
 ---
 Implement the card below.
 
 Read any linked product card first: it carries the intent, while an engineering
-card often carries only the mechanics. Work in small steps, and run the
-project's own test and lint commands before you finish.
+card often carries only the mechanics. Work in small steps.
 
-Do not change a card's id, and do not move a card between columns unless the
-card itself asks you to.
+The gates in the project's foundation/CODE-QUALITY.md are the bar, and they are
+quoted here in full. Run them yourself before you finish: a run that leaves them
+failing has not delivered.
+
+**If this card asks you to declare the project's \`smoke:\` command**, declare it
+with \`POST /api/foundation/smoke\` and a body of \`{ command }\`. Do NOT try to edit
+foundation/TESTING.md: the foundation documents are read-only to every run, that
+endpoint is the only way to declare this, and it writes that one key and nothing
+else. If the card tells you to edit the file, this is what it means.
+
+The command must not be one of the gate commands foundation/CODE-QUALITY.md
+declares — the endpoint refuses that outright. A gate and a smoke command that are
+the same command are one check, not two: gates are written alongside the code they
+judge, so they pass over a product with no way to run it. Make the smoke command
+start the product the way the README describes starting it, and use it the way the
+README describes using it.
+
+Do the one thing the card asks. Anything else you find — an unrelated bug, a
+missing dependency, work the card implies but does not say — goes to
+\`POST /api/suggestions\`. Do the part you can, file the rest, and stop.
+
+Do not change a card's id, and do not move a card.
 `,
   },
   {
@@ -144,45 +164,30 @@ List every card you created in your report, by id.
 `,
   },
   {
-    // NO LONGER A PHASE'S SKILL since the work moved up to the story (decision 83) — `implement-story` below
-    // is what the lifecycle dispatches, and `phaseSkillProblems` no longer asks a project for this one. It
-    // stays seeded because implementing ONE task by hand is a thing a person does, exactly as `execute` is:
-    // a skill no phase names blocks nothing and is offered on the card it is scoped to.
-    slug: 'implement',
+    // A PERSON'S BREAK-DOWN (decision 96): its own slug, so running or editing it touches nothing the loop's
+    // `break-down` does, and it carries none of that skill's machinery.
+    slug: 'split',
     content: `---
-name: Implement
-description: Build what the card describes, and make the gates pass
-boards: [engineering]
+name: Split into cards
+description: Break the card into smaller cards on the board below it
+boards: [features, product]
 ---
-Implement the card below.
+Break the card below into smaller cards on the board one level down: a feature
+into user stories on the product board, a user story into tasks on engineering.
 
-Read the linked product card first: it carries the intent, while an engineering
-card often carries only the mechanics. It is quoted in full in this prompt.
+Read the board first — the part of it around this card is in this prompt — and
+say in your report what already exists under this card.
 
-The gates in the project's foundation/CODE-QUALITY.md are the bar, and they are
-quoted here in full. Run them yourself before you finish: auto-pilot runs them
-again the moment you are done, and a run that leaves them failing has not
-delivered.
+The card and the project's README are the bound: split what they ask for and
+nothing else. Anything else you notice goes to \`POST /api/suggestions\`.
 
-**If this card asks you to declare the project's \`smoke:\` command**, declare it
-with \`POST /api/foundation/smoke\` and a body of \`{ command }\`. Do NOT try to edit
-foundation/TESTING.md: the foundation documents are read-only to every run, that
-endpoint is the only way to declare this, and it writes that one key and nothing
-else. If the card tells you to edit the file, this is what it means.
+Give each card one acceptance criterion, so that one test can say whether it is
+done.
 
-The command must not be one of the gate commands foundation/CODE-QUALITY.md
-declares — the endpoint refuses that outright. A gate and a smoke command that are
-the same command are one check, not two: gates are written alongside the code they
-judge, so they pass over a product with no way to run it. Make the smoke command
-start the product the way the README describes starting it, and use it the way the
-README describes using it.
+Create each card with \`POST /api/cards\`, one card per call. The endpoint decides
+its board, column, group and parent.
 
-Do the one thing the card asks. Anything else you find — an unrelated bug, a
-missing dependency, work the card implies but does not say — goes to
-\`POST /api/suggestions\`. Do the part you can, file the rest, and stop.
-
-You do not move your own card, and cannot: auto-pilot moves it when this run
-finishes, and your credential grants nothing that could.
+List every card you created in your report, by id.
 `,
   },
   {

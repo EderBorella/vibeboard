@@ -3,7 +3,7 @@ import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
-import type { Skill } from '../../lib/api';
+import type { Skill, SkillFields } from '../../lib/api';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../../lib/shared';
 import { slugify } from '../../lib/viewmodel';
 import { Field } from '../../molecules/Field';
@@ -12,13 +12,7 @@ interface Props {
   skill: Skill;
   config: ProjectConfig;
   busy: boolean;
-  onSave: (fields: {
-    name: string;
-    description: string;
-    boards: BoardName[];
-    columns: string[];
-    prompt: string;
-  }) => Promise<void>;
+  onSave: (fields: SkillFields) => Promise<void>;
 }
 
 // A skill as fields rather than YAML.
@@ -32,6 +26,8 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
   const [boards, setBoards] = useState<BoardName[]>(skill.boards);
   const [columns, setColumns] = useState<string[]>(skill.columns);
   const [prompt, setPrompt] = useState(skill.prompt);
+  const [autopilotOnly, setAutopilotOnly] = useState(skill.autopilotOnly);
+  const [moveOnSuccess, setMoveOnSuccess] = useState(skill.moveOnSuccess);
   const [dirty, setDirty] = useState(false);
 
   // Which columns can be ticked: those on the boards this skill claims, or on every board when it
@@ -107,6 +103,35 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         ))}
       </fieldset>
 
+      <fieldset className="skill-scope">
+        <legend>
+          <Text caps>Running</Text>
+        </legend>
+        <Field
+          layout="check"
+          label="For auto-pilot only"
+          hint="Hidden from a card's skills. Untick it to run this skill by hand."
+        >
+          <Control
+            type="checkbox"
+            checked={autopilotOnly}
+            onChange={() => touch(setAutopilotOnly)(!autopilotOnly)}
+          />
+        </Field>
+        <Field
+          layout="check"
+          label="Move the card to the next column when the run succeeds"
+          hint={autopilotOnly ? 'Auto-pilot moves the cards it works on itself.' : undefined}
+        >
+          <Control
+            type="checkbox"
+            checked={moveOnSuccess}
+            disabled={autopilotOnly}
+            onChange={() => touch(setMoveOnSuccess)(!moveOnSuccess)}
+          />
+        </Field>
+      </fieldset>
+
       {/* `caps` and no rail: the same face as the two rows above, over a control too tall to sit beside
           its label. It was `vb-label-caps vb-label-rail` on a full-width label, so the 6rem the rail
           declares was doing nothing here — the face is what it wanted. */}
@@ -126,7 +151,9 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
           size="md"
           disabled={busy || !dirty || name.trim() === '' || description.trim() === '' || prompt.trim() === ''}
           onClick={() => {
-            void onSave({ name, description, boards, columns, prompt }).then(() => setDirty(false));
+            void onSave({ name, description, boards, columns, prompt, autopilotOnly, moveOnSuccess }).then(
+              () => setDirty(false),
+            );
           }}
         >
           Save skill

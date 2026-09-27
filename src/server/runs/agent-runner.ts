@@ -325,7 +325,7 @@ export class AgentRunner {
     try {
       await this.#start(root, record, input);
     } catch (err) {
-      await this.#failToStart(root, record, err);
+      await this.#failToStart(root, record, input, err);
       throw err;
     }
     return record;
@@ -343,7 +343,8 @@ export class AgentRunner {
     this.#starting.add(run);
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
-    // its own into done and declare itself finished.
+    // its own into done and declare itself finished — except a run a person started, who judges it
+    // (decision 97).
     // The board and skill go on the credential so the card endpoint can refuse a run creating work for
     // itself — see `wrongColumnForRun` in boards/cards-routes.ts.
     //
@@ -493,7 +494,7 @@ export class AgentRunner {
       // become an unhandled one. A queued run whose box cannot be created has to be reported as a
       // failed run, or it simply disappears: taken off the queue, never spawned, never settled.
       void this.#start(next.root, { ...next.record, status: 'running' }, next.input, true).catch((err) =>
-        this.#failToStart(next.root, next.record, err),
+        this.#failToStart(next.root, next.record, next.input, err),
       );
     }
   }
@@ -513,7 +514,7 @@ export class AgentRunner {
   // It gets a real, settled record rather than disappearing. A queued run is taken off the queue the
   // moment it is picked, so a throw with no handler here loses it silently: the board shows nothing
   // running, nothing queued, and no failure — the worst of the three possible wrong answers.
-  async #failToStart(root: string, record: RunRecord, err: unknown): Promise<void> {
+  async #failToStart(root: string, record: RunRecord, input: DispatchInput, err: unknown): Promise<void> {
     const reason = errorText(err);
     this.#opts.log?.error({ err, run: record.run }, 'a run could not be started');
     const failed = withoutReport(
@@ -531,6 +532,7 @@ export class AgentRunner {
         'could not record a run that failed to start',
       );
     }
+    await this.#settled(failed, input, root);
   }
 
   // How many suggestions this run filed, from the STORE. The agent's report is not asked: a run

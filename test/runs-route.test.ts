@@ -132,6 +132,7 @@ describe("a person's run", () => {
   it('is recorded as theirs, works its card in progress, and leaves it waiting in blocked (decisions 93 and 95)', async () => {
     const project = await projectWithCard();
     expect(await columnOf(project, project.card)).toBe('backlog');
+    const argsLog = await recordingShimArgs();
     const res = await project.app.inject({
       method: 'POST',
       url: '/api/runs',
@@ -140,6 +141,9 @@ describe("a person's run", () => {
     expect(await columnOf(project, project.card)).toBe('in-progress');
     const { run } = res.json() as { run: RunRecord };
     const final = await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+    // Moved before the prompt was built, so the run is told the card's file where it now is.
+    expect(await promptFrom(argsLog)).toContain(`engineering/in-progress/${project.card}.md`);
     expect(final).toMatchObject({ status: 'success', dispatchedBy: 'person' });
     expect(await columnOnceSettled(project, project.card, 'in-progress')).toBe('blocked');
     expect(await readFile(join(project.root, '.vibeboard', 'PROJECT-LOG.md'), 'utf8')).toContain(

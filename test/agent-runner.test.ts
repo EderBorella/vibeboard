@@ -922,7 +922,7 @@ describe('the run credential', () => {
       card?: string,
       // `board` optional inside it, exactly as the store declares it: a project run has a skill and no board,
       // and a spy typed more narrowly than the thing it wraps is a spy that stops forwarding one day.
-      dispatched?: { board?: BoardName; skill: string },
+      dispatched?: { board?: BoardName; skill: string; byHand?: true },
     ): Credential {
       const cred = super.mintRun(scope, run, project, card, dispatched);
       this.minted.push(cred);
@@ -951,6 +951,29 @@ describe('the run credential', () => {
     const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(text).toContain(store.minted[0].token);
     expect(text).toContain('http://127.0.0.1:4610');
+  });
+
+  // DECISION 97: only a run a person started gets the grant, and only its prompt lists the move it allows.
+  it("marks only a person's run's credential as theirs, and tells only that run it may move its card", async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root, { credentials: store, apiBase: () => 'http://127.0.0.1:4610' });
+    const { run: mine } = await instance.dispatch({ ...input(root), dispatchedBy: 'person' });
+    await settled(root, mine);
+    const { run: loops } = await instance.dispatch(input(root));
+    await settled(root, loops);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    expect(store.minted.map((c) => c.byHand)).toEqual([true, undefined]);
+    const { readFile } = await import('node:fs/promises');
+    const prompts = (await readFile(argsLog, 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line).prompt as string);
+    expect(prompts[0]).toContain('POST /api/cards/:board/:id/move');
+    expect(prompts[1]).not.toContain('POST /api/cards/:board/:id/move');
   });
 
   // A PROJECT run — the bootstrap. It has no card, so the credential must carry the SKILL without a board:

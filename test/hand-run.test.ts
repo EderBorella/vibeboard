@@ -60,14 +60,15 @@ const finish = (over: { record?: RunRecord; skill?: Skill; card?: Card; running?
   });
 
 describe("where a person's run puts its card when it starts", () => {
-  it('into in progress, from wherever it stands', () => {
+  it('into in progress, from wherever it stands short of done', () => {
     expect(startColumn(config, card('backlog'), skill())).toBe('in-progress');
-    expect(startColumn(config, card('done'), skill())).toBe('in-progress');
+    expect(startColumn(config, card('blocked'), skill())).toBe('in-progress');
     expect(startColumn(config, card('backlog', 'features'), skill())).toBe('in-progress');
   });
 
   it('nowhere when it is already there, or the skill does not move cards', () => {
     expect(startColumn(config, card('in-progress'), skill())).toBeUndefined();
+    expect(startColumn(config, card('done'), skill())).toBeUndefined();
     expect(startColumn(config, card('backlog'), skill({ movesCard: false }))).toBeUndefined();
     expect(startColumn(config, card('backlog'), skill({ autopilotOnly: true }))).toBeUndefined();
   });

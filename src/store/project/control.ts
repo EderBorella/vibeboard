@@ -76,8 +76,8 @@ export async function ensureControlFiles(projectRoot: string): Promise<void> {
   for (const filename of POINTER_FILES) {
     await ensurePointerFile(projectRoot, filename, '', false);
   }
-  // Skills for a project that predates them. Guarded inside: an existing skills folder is left
-  // alone, so a skill the user deleted never comes back.
+  // Each seeded skill once, including those added after this project was made; a skill the user deleted
+  // never comes back (decision 98).
   await seedSkills(projectRoot);
   // And the documents an agent gets pointed at. Same reasoning, guarded per file rather than per
   // folder — the docs folder holds the user's own writing too.

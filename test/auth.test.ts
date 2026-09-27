@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { allows, bearerToken } from '../src/server/auth/auth.js';
+import { allows, bearerToken, endpointsFor } from '../src/server/auth/auth.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { tempDir } from './helpers.js';
@@ -235,6 +235,26 @@ describe('the scope table', () => {
     }
     // Admin reaches everything, on every row.
     expect(allows(cred('admin'), method, route, PROJECT, 'E-001'), 'admin').toBe(true);
+  });
+
+  // DECISION 97: a person's run may move its own card and gains nothing else — every other row answers it
+  // exactly as it answers the loop's run on the same card. Every row grants some scope, so the union of the
+  // catalogues is the whole table.
+  it("grants a person's run the move of its own card and nothing else", () => {
+    const scopes: Scope[] = ['work', 'checkup', 'service', 'assist', 'repair'];
+    const rows = new Set(
+      scopes.flatMap((s) => endpointsFor(s, 'E-001').map((line) => /`([A-Z]+ [^`]+)`/.exec(line)?.[1] ?? '')),
+    );
+    const move = 'POST /api/cards/:board/:id/move';
+    expect(rows.has(move)).toBe(true);
+    const hand: Credential = { ...cred('work', 'E-001'), byHand: true };
+    for (const row of rows) {
+      const [method, route] = row.split(' ') as [string, string];
+      const loops = allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001');
+      expect(allows(hand, method, route, PROJECT, 'E-001'), row).toBe(row === move ? true : loops);
+    }
+    expect(allows(hand, 'POST', '/api/cards/:board/:id/move', PROJECT, 'E-002')).toBe(false);
+    expect(allows(cred('work', 'E-001'), 'POST', '/api/cards/:board/:id/move', PROJECT, 'E-001')).toBe(false);
   });
 
   it('denies a route it has never heard of', () => {

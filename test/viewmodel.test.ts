@@ -4,6 +4,7 @@ import {
   canPlace,
   cardPlace,
   cardsByColumn,
+  columnChoices,
   columnLabel,
   columnSlugs,
   csv,
@@ -371,5 +372,30 @@ describe('csv and parseCsv', () => {
 
   it('renders an empty list as an empty line', () => {
     expect(csv([])).toBe('');
+  });
+});
+
+// DECISION 95: the blocked column says what it is for on screen, and only there — the slug, which is the
+// folder and what the API takes, is untouched.
+describe('the blocked column on screen', () => {
+  const withBlocked: ProjectConfig = {
+    ...config,
+    boards: {
+      ...config.boards,
+      product: { columns: ['Backlog', 'Blocked', 'Done'] },
+      features: { columns: ['Blocked'] },
+    },
+  };
+  it('is named for waiting on the person, and still sends its slug', () => {
+    expect(columnChoices(withBlocked, 'product')).toEqual([
+      { slug: 'backlog', name: 'Backlog' },
+      { slug: 'blocked', name: 'Blocked / Waiting approval' },
+      { slug: 'done', name: 'Done' },
+    ]);
+    expect(columnLabel(withBlocked, 'product', 'blocked')).toBe('Blocked / Waiting approval');
+  });
+
+  it('is left alone on a board that has no blocked column of the loop’s', () => {
+    expect(columnChoices(withBlocked, 'features')).toEqual([{ slug: 'blocked', name: 'Blocked' }]);
   });
 });

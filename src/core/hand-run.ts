@@ -1,4 +1,4 @@
-import { BLOCKED_BOARDS, DEFAULT_AUTOPILOT } from './autopilot.js';
+import { BLOCKED_BOARDS, DEFAULT_AUTOPILOT, isTerminalColumn } from './autopilot.js';
 import { boardColumnSlugs } from './board/columns.js';
 import { isHandRun, type RunRecord } from './runs.js';
 import type { Skill } from './skills.js';
@@ -11,8 +11,10 @@ export const WORKING_COLUMN = 'in-progress';
 
 const moves = (skill: Skill): boolean => skill.movesCard && !skill.autopilotOnly;
 
+// Not out of a terminal column: a finished card someone reads or checks stays finished.
 export function startColumn(config: ProjectConfig, card: Card, skill: Skill): string | undefined {
   if (!moves(skill) || card.columnSlug === WORKING_COLUMN) return undefined;
+  if (isTerminalColumn(config.autopilot ?? DEFAULT_AUTOPILOT, card.board, card.columnSlug)) return undefined;
   return boardColumnSlugs(config, card.board).includes(WORKING_COLUMN) ? WORKING_COLUMN : undefined;
 }
 

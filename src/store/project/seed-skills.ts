@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { SEEDED_SKILLS_FILE, SKILLS_DIR } from '../../core/layout.js';
 
@@ -359,9 +359,8 @@ End your report by naming each task by id with its acceptance criterion and how
 this run meets it. That list is what the story's review is checked against, and a
 task you could not finish belongs in it too, said plainly.
 
-You do not move any card, and cannot: auto-pilot moves these tasks to review
-together when this run finishes, and only the story's review moves them to done.
-Your credential grants nothing that could.
+You do not move any card: auto-pilot moves these tasks to review together when
+this run finishes, and only the story's review moves them to done.
 `,
   },
   {
@@ -617,7 +616,10 @@ export async function seedSkills(root: string): Promise<boolean> {
   const listPath = join(root, SEEDED_SKILLS_FILE);
   const present = await slugsIn(dir, (p) => readdir(p));
   const listed = await slugsIn(listPath, async (p) =>
-    (await readFile(p, 'utf8')).split('\n').filter(Boolean),
+    (await readFile(p, 'utf8'))
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
   );
   const ours = present === undefined || present.some((slug) => SEEDED_BEFORE_THE_LIST.includes(slug));
   if (listed === undefined && !ours) return false;
@@ -628,6 +630,10 @@ export async function seedSkills(root: string): Promise<boolean> {
     await writeFile(join(dir, seed.slug, 'SKILL.md'), seed.content, 'utf8');
   }
   const all = [...new Set([...given, ...SEED_SKILLS.map((seed) => seed.slug)])].sort();
-  if (listed?.length !== all.length) await writeFile(listPath, `${all.join('\n')}\n`, 'utf8');
+  if (listed?.length !== all.length) {
+    // Renamed into place: a torn write would leave a short list, and every slug missing from it comes back.
+    await writeFile(`${listPath}.tmp`, `${all.join('\n')}\n`, 'utf8');
+    await rename(`${listPath}.tmp`, listPath);
+  }
   return arriving.length > 0;
 }

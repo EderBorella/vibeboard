@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -54,6 +54,21 @@ describe('TopBar', () => {
     expect(screen.queryByText('Boards')).toBeNull();
     expect(screen.queryByText('Switch project')).toBeNull();
     expect(screen.getByTitle('Theme')).toBeTruthy();
+  });
+
+  // The mark is a background on `.brand::before`, so it is read against the stylesheet: jsdom draws no
+  // pseudo-element. EMPTY CONTENT is the accessibility half — the old glyph was text, and a screen reader
+  // announced it as part of the app's name. `middle` is the half that keeps the bar its height.
+  it('draws the logo mark before the name, adding nothing to what is read aloud', () => {
+    const dir = join(process.cwd(), 'web', 'src', 'organisms', 'topbar');
+    const rule = /^\.brand::before\s*\{([^}]*)\}/m.exec(readFileSync(join(dir, 'topbar.css'), 'utf8'));
+    expect(rule, '.brand::before rule not found in web/src/organisms/topbar/topbar.css').toBeTruthy();
+    const body = rule?.[1] ?? '';
+    expect(body).toMatch(/content:\s*"";/);
+    expect(body).toMatch(/vertical-align:\s*middle;/);
+    const file = /url\("\.\/([^"]+)"\)/.exec(body)?.[1];
+    expect(file, 'the mark is not a file beside the stylesheet').toBeTruthy();
+    expect(existsSync(join(dir, file ?? '')), `${file} does not exist`).toBe(true);
   });
 
   // ON THE CONTROL AND ON `aria-current`, NOT ON THE TEXT NODE AND NOT ON A CLASS. `getByText` returned

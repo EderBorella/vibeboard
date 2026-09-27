@@ -35,7 +35,18 @@
   text-transform: uppercase;
   letter-spacing: 0.22em;
 }
-.brand::before { content: "▚ "; color: var(--accent); }
+/* THE LOGO'S RING, at `--mark-h`: the old glyph's footprint. At `--ctl-h` the brand grew 12.6px and a
+   17-character project name wrapped the bar at 1280px. `middle` and not the baseline: an empty
+   inline-block stands ON the baseline and grows the row. The file is three times the height, for HiDPI. */
+.brand::before {
+  content: "";
+  display: inline-block;
+  width: var(--mark-h);
+  height: var(--mark-h);
+  vertical-align: middle;
+  margin-inline-end: var(--s-3);
+  background: url("./brand-mark.png") center / contain no-repeat;
+}
 /* Truncates rather than forcing the row to wrap. A long project name is the most likely thing to make
    the bar overflow, and it is the least important thing on it.
    `max-width` is what makes that true, and the first version omitted it: measured with a 240-character

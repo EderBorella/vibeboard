@@ -100,7 +100,7 @@ const TRACKING_ON_PURPOSE = new Map([
   [
     '0.22em',
     '`.brand` in web/src/organisms/topbar/topbar.css — A LOGOTYPE IS NOT A UI LABEL. 0.22em on ' +
-      '`▚ VIBEBOARD` in condensed display caps is what makes it read as a wordmark rather than as a ' +
+      '`VIBEBOARD` in condensed display caps is what makes it read as a wordmark rather than as a ' +
       'heading, and it is the only element in the app whose job is to be the app.',
   ],
   [

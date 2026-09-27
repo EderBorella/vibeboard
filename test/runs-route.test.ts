@@ -11,7 +11,14 @@ import { ProjectSession } from '../src/server/boards/session.js';
 import { forgiveRefusal } from '../src/server/runs/routes.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { readProjectRun, readRun, writeRun } from '../src/store/run-store.js';
-import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
+import {
+  openTestProject,
+  pinLifecycle,
+  shimArgsLog,
+  type TestProject,
+  testApp,
+  wsClient,
+} from './helpers.js';
 
 // The executable bit a sandbox copy does not carry is restored for every stub at once in
 // test/global-teardown.ts — it used to be restored for this one file here, which is why the other six
@@ -131,6 +138,8 @@ async function columnOf(project: TestProject, card: string): Promise<string> {
 describe("a person's run", () => {
   it('is recorded as theirs, works its card in progress, and leaves it waiting in blocked (decisions 93 and 95)', async () => {
     const project = await projectWithCard();
+    // Decision 99's refusal is the other modes'; a Mini project picks up what it left waiting.
+    await pinLifecycle(project.app, 'standard');
     expect(await columnOf(project, project.card)).toBe('backlog');
     const argsLog = await recordingShimArgs();
     const res = await project.app.inject({

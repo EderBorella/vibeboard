@@ -129,6 +129,9 @@ export interface RunnerOptions {
   onUpdate?: (record: RunRecord) => void;
   // Called once a run has ended and its record is written, before the next queued run starts.
   onSettled?: (final: RunRecord, input: DispatchInput, root: string) => Promise<void>;
+  // A number that changes while a run's box is working — its network traffic. What keeps a Mini run alive while
+  // its agent reports nothing (decision 101); undefined where there is no box or it cannot be read.
+  activity?: (box: string | undefined) => Promise<number | undefined>;
   // How files-changed is measured (S11). Injected so a test about something else neither needs git nor
   // pays for it: without one the field is simply absent, which is exactly what it means when there is
   // no repository to ask.
@@ -226,12 +229,19 @@ function limitsFor(
   return { timeoutMs: NO_WALL_CLOCK_MS, idle: { idle: idleWatch(idleMs, stop), idleMs } };
 }
 
-type IdleWatch = { poke: () => void; stop: () => void; fired: boolean };
+type IdleWatch = {
+  poke: () => void;
+  stop: () => void;
+  fired: boolean;
+  // Also counts a change in `probe` as activity, polled every `every` milliseconds.
+  watch: (probe: () => Promise<number | undefined>, every: number) => void;
+};
 
 // Fires once the run has been silent for `ms`; every event it produces starts the count again.
 function idleWatch(ms: number, fire: () => void): IdleWatch {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const watch = {
+  let polling: ReturnType<typeof setInterval> | undefined;
+  const watch: IdleWatch = {
     fired: false,
     poke: () => {
       clearTimeout(timer);
@@ -240,7 +250,19 @@ function idleWatch(ms: number, fire: () => void): IdleWatch {
         fire();
       }, ms);
     },
-    stop: () => clearTimeout(timer),
+    stop: () => {
+      clearTimeout(timer);
+      clearInterval(polling);
+    },
+    watch: (probe, every) => {
+      let last: number | undefined;
+      polling = setInterval(() => {
+        void probe().then((now) => {
+          if (now !== undefined && last !== undefined && now !== last) watch.poke();
+          if (now !== undefined) last = now;
+        });
+      }, every);
+    },
   };
   return watch;
 }
@@ -306,6 +328,22 @@ export class AgentRunner {
     this.#queue = this.#queue.filter((q) => q.record.run !== run);
     void this.#endQueued(waiting);
     return true;
+  }
+
+  // Every run held to a silence rather than the clock — the Mini ones — whether running or waiting.
+  cancelUnbounded(): number {
+    const ids = [
+      ...[...this.#active].filter(([, a]) => a.idle !== undefined).map(([id]) => id),
+      ...this.#queue.filter((q) => q.input.idleMs !== undefined).map((q) => q.record.run),
+    ];
+    for (const id of ids) this.cancel(id);
+    return ids.length;
+  }
+
+  #watchIdle(idle: { idle: IdleWatch; idleMs: number }, box: string | undefined): void {
+    idle.idle.poke();
+    const activity = this.#opts.activity;
+    if (activity) idle.idle.watch(() => activity(box), Math.min(30_000, Math.max(100, idle.idleMs / 3)));
   }
 
   #stopIdle(run: string): void {
@@ -391,8 +429,8 @@ export class AgentRunner {
     this.#starting.add(run);
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
-    // its own into done and declare itself finished — except a run a person started, who judges it
-    // (decision 97).
+    // its own into done and declare itself finished — except a run a person started, who judges it, and a Mini
+    // build, which places every card it makes (decisions 97 and 102).
     // The board and skill go on the credential so the card endpoint can refuse a run creating work for
     // itself — see `wrongColumnForRun` in boards/cards-routes.ts.
     //
@@ -488,7 +526,7 @@ export class AgentRunner {
     });
     const gitAt = this.#opts.git?.point(root) ?? Promise.resolve(undefined);
     this.#active.set(run, { turn, cancelled: false, timeoutMs, gitAt, ...idle });
-    idle?.idle.poke();
+    if (idle) this.#watchIdle(idle, box);
 
     // ONE write, carrying the group and — for a run off the queue — the `running` transition with it.
     // The pgid exists only once the process does, which is why this cannot be part of the dispatch

@@ -99,7 +99,6 @@ describe('a project written before decision 85', () => {
       commands: { gates: ['npm test'], smoke: 'node dist/cli.js --help' },
       unrecordedSendBacks: [],
       unwrittenTasks: [],
-      miniChecks: undefined,
       satisfied: [],
     };
     // The open story has a task, so the work goes ahead: row P3, with that task in the group.

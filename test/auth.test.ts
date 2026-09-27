@@ -121,6 +121,7 @@ const GRID: Row[] = [
   // verification would advance itself on self-assessment, and one that could stop auto-pilot could stop the
   // thing supervising it.
   ['/api/runs/:board/:card/:run/verification', 'POST', false, false, true, false, false],
+  ['/api/runs/project/:run/verification', 'POST', false, false, true, false, false],
   // THE THREE WAYS TO CLEAR SPENT ATTEMPTS, refused to every autonomous scope and to `assist` (decision 86) and
   // held by `repair` alone (decision 88). The attempt cap is the only thing that stops a card being retried for
   // ever, so an agent that could clear its own card's attempts would have unlimited retries; the reset is worse

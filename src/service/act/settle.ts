@@ -10,7 +10,8 @@ import type { ActDeps } from './index.js';
 const SETTLE_TIMEOUT_MS = 3_600_000; // an hour: a run's own timeout is half that by default
 const SETTLE_POLL_MS = 2_000;
 
-// Ceilings, so no configured or injected number can turn the wait into an unbounded one. A day is longer than
+// Ceilings, so no configured or injected number can turn the wait into an unbounded one. A Mini run's wait
+// (`untilEnded`) is the one without them, and it ends on a refusal that cannot recover instead. A day is longer than
 // any run this design contemplates, and 100,000 polls is well past what a sane interval needs — both exist to
 // make the loop terminate on absurd input rather than to express a preference.
 const MAX_SETTLE_TIMEOUT_MS = 86_400_000;
@@ -60,6 +61,10 @@ export async function settle(
       // `queued` and `running` are the two that have not ended. Everything else is an ending, including the
       // ones nobody is answerable for.
       if (found && found.status !== 'queued' && found.status !== 'running') return found;
+    } else if (opts.untilEnded && answer.fatal) {
+      // The loop's authority is gone — a server that died without its shutdown path took the token with it — and
+      // an uncapped wait would ask for ever.
+      return undefined;
     }
     await sleep(poll);
   }

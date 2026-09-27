@@ -15,7 +15,7 @@ import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.j
 import { countLive } from '../../core/created.js';
 import { isStopReason, STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import { waitingOnPerson } from '../../core/hand-run.js';
-import { PHASES, phase } from '../../core/phases.js';
+import { MINI_PHASES, PHASES, phase } from '../../core/phases.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
 import { BOARDS } from '../../core/types.js';
@@ -71,7 +71,7 @@ function lifecycleProblemsFor(config: ProjectConfig, skillSlugs: string[]): stri
   // `autopilot:\n  maxIterations: 10` has a dozen things wrong with it, and appending a list about missing
   // skills to a list about a block that will not parse buries the one the reader has to fix first.
   if (!ap || shapeProblems(ap).length > 0) return problems;
-  return [...problems, ...phaseSkillProblems(skillSlugs)];
+  return [...problems, ...phaseSkillProblems(skillSlugs, ap.mode)];
 }
 
 interface Read {
@@ -163,7 +163,12 @@ function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Rea
     unreviewedGates: read.unreviewedGates,
     // `phases`, not `routes`: the count is how many phases DISPATCH, which is a fact about the machine, so a
     // malformed config block no longer makes it zero — the number was never about the config.
-    phases: { problems: lifecycleProblems, count: PHASES.filter((p) => p.skill !== undefined).length },
+    phases: {
+      problems: lifecycleProblems,
+      count: PHASES.filter(
+        (p) => p.skill !== undefined && MINI_PHASES.includes(p.name) === (config.autopilot?.mode === 'mini'),
+      ).length,
+    },
   };
 }
 
@@ -181,7 +186,7 @@ async function readCards(root: string, config: ProjectConfig): Promise<Record<Bo
 
 function waitingSentence(ids: string[]): string {
   const [what, them] = ids.length === 1 ? [`${ids[0]} is`, 'it'] : [`${ids.join(', ')} are`, 'them'];
-  return `${what} waiting for your approval in Blocked / Waiting approval: a run you started left ${them} there. Move ${them} on — to Done, or back into the work — before starting auto-pilot, which reads a blocked card as one it gave up on.`;
+  return `${what} waiting for your approval in Blocked / Waiting approval: a run you started, or a Mini build, left ${them} there. Move ${them} on — to Done, or back into the work — before starting auto-pilot in this mode, which reads a blocked card as one it gave up on.`;
 }
 
 async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {
@@ -195,7 +200,11 @@ async function readReadiness(root: string, config: ProjectConfig): Promise<Readi
     readCards(root, config),
     listRuns(root),
   ]);
-  const waiting = waitingOnPerson(config, Object.values(boards).flat(), runs).map((c) => c.id);
+  // Mini picks up from whatever it left waiting; the other two would read those cards as given up on.
+  const waiting =
+    config.autopilot?.mode === 'mini'
+      ? []
+      : waitingOnPerson(config, Object.values(boards).flat(), runs).map((c) => c.id);
   return composeReadiness(
     config,
     catalogue.skills.map((s) => s.slug),
@@ -252,6 +261,9 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const { detail } = (req.body ?? {}) as { detail?: string };
     const result = await ctx.autopilot.softStop(detail);
     if (!result.ok) return reply.code(409).send({ error: result.error });
+    // A Mini run has no limit of its own (decision 101), so letting it finish would leave it running with no bound
+    // — Stop ends it. The standard phases' runs are bounded, and still finish.
+    ctx.runner.cancelUnbounded();
     return { state: forClient(result.state) };
   });
 

@@ -15,6 +15,7 @@ import {
   listCardRuns,
   listProjectRuns,
   listRuns,
+  readProjectRun,
   readRun,
   resetCardRuns,
   resolveProjectRun,
@@ -326,6 +327,25 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
         .send({ error: 'That is not a verification: it needs a mode, a passed and an at.' });
     }
     const record = await readRun(ctx.session.root, board, card, run);
+    if (!record) return reply.code(404).send({ error: 'No such run' });
+    const judged = withVerification(record, verification);
+    await writeRun(ctx.session.root, judged);
+    return { run: judged };
+  });
+
+  // The same, for a run about the project: what the loop measured after a Mini review (decision 100), kept on the
+  // record it judged so the next round is told it and the tick reads it off disk.
+  api.post('/runs/project/:run/verification', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { run } = req.params as { run: string };
+    if (!isRunId(run)) return reply.code(400).send({ error: NOT_A_RUN_ID });
+    const verification = asVerification((req.body ?? {}) as Record<string, unknown>);
+    if (!verification) {
+      return reply
+        .code(400)
+        .send({ error: 'That is not a verification: it needs a mode, a passed and an at.' });
+    }
+    const record = await readProjectRun(ctx.session.root, run);
     if (!record) return reply.code(404).send({ error: 'No such run' });
     const judged = withVerification(record, verification);
     await writeRun(ctx.session.root, judged);

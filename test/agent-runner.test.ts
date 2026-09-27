@@ -575,6 +575,36 @@ describe('AgentRunner.dispatch', () => {
     expect(final.note).toBe('The agent had produced nothing for 0 minutes, so it was stopped.');
   });
 
+  // …and a box still moving on the network is not silent: OpenCode reports nothing until its turn is over.
+  it('keeps a Mini run alive while its box is working, and stops it once the box goes quiet', async () => {
+    const shim = behaving('hang');
+    const root = await tempDir();
+    let bytes = 0;
+    const started = Date.now();
+    const { instance } = runner(root, {
+      activity: async () => (Date.now() - started < 1_500 ? ++bytes : bytes),
+    });
+    const { run } = await instance.dispatch({ ...input(root, shim), idleMs: 400 });
+    const final = await settled(root, run);
+
+    expect(final.note).toBe('The agent had produced nothing for 0 minutes, so it was stopped.');
+    expect(Date.now() - started).toBeGreaterThan(1_500);
+  });
+
+  // DECISION 101: Stop ends a Mini run, which has no limit of its own; a bounded run still finishes.
+  it('cancels the runs held to a silence, and leaves the others', async () => {
+    const shim = behaving('hang');
+    const root = await tempDir();
+    let n = 0;
+    const { instance } = runner(root, { maxConcurrent: () => 2, suffix: () => `c${++n}` });
+    const { run: mini } = await instance.dispatch({ ...input(root, shim), idleMs: 60_000 });
+    const { run: bounded } = await instance.dispatch(input(root, shim));
+    expect(instance.cancelUnbounded()).toBe(1);
+    expect((await settled(root, mini)).status).toBe('cancelled');
+    instance.cancel(bounded);
+    await settled(root, bounded);
+  });
+
   // Decision 8: the enforceable per-run bound is wall-clock, and it has to be the number the user can
   // see. Two properties, and they pull in opposite directions: it is read PER DISPATCH so a change in
   // Settings needs no restart, and it is CARRIED for the life of that run so the sentence a timed-out
@@ -986,6 +1016,29 @@ describe('the run credential', () => {
       .map((line) => JSON.parse(line).prompt as string);
     expect(prompts[0]).toContain('POST /api/cards/:board/:id/move');
     expect(prompts[1]).not.toContain('POST /api/cards/:board/:id/move');
+  });
+
+  // DECISION 102: the any-card move is a Mini PROJECT run's alone — not the bootstrap's, not setup's.
+  it('gives the move of any card to a Mini project run and to no other run about the project', async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    let n = 0;
+    const { instance } = runner(root, {
+      credentials: store,
+      maxConcurrent: () => 3,
+      suffix: () => `m${++n}`,
+    });
+    const project = (slug: string) => ({
+      ...input(root),
+      card: undefined,
+      cardFile: undefined,
+      skill: { ...skill, slug },
+    });
+    // Minted when a run starts, which `dispatch` awaits.
+    for (const slug of ['build-project', 'derive-features', 'scan-project'])
+      await instance.dispatch(project(slug));
+    expect(store.minted.map((c) => c.moves)).toEqual(['any', undefined, undefined]);
+    instance.cancelAll();
   });
 
   // A PROJECT run — the bootstrap. It has no card, so the credential must carry the SKILL without a board:

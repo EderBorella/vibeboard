@@ -253,6 +253,10 @@ export class BoardClient {
     return this.#call('POST', `/runs/${board}/${card}/${run}/verification`, verification);
   }
 
+  projectVerdict(run: string, verification: Verification): Promise<Answer<unknown>> {
+    return this.#call('POST', `/runs/project/${run}/verification`, verification);
+  }
+
   // A diary entry, prose AND the fields the checkup reads. `DiaryEntry` carries `iteration`, `card`, `board`,
   // `skill` and `outcome` so its one reader does not have to regex a sentence — and this signature used to
   // accept only `(kind, text)`, so none of them was ever written by anything.

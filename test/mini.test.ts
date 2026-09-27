@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import { type MiniChecks, miniAction } from '../src/core/lifecycle/mini.js';
+import { miniAction } from '../src/core/lifecycle/mini.js';
 import { decideTick } from '../src/core/lifecycle/tick.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { input } from './tick-fixtures.js';
@@ -29,13 +29,32 @@ const run = (
     ...over,
   };
 };
-const pass: MiniChecks = { passed: true, detail: 'The gates and the smoke command pass.' };
-const fail: MiniChecks = { passed: false, detail: '`npm test` failed:\n2 failing' };
-const decide = (runs: RunRecord[], miniChecks?: MiniChecks) => miniAction({ runs, state, miniChecks });
+
+import type { Verification } from '../src/core/verify.js';
+
+const pass: Verification = { mode: 'smoke', passed: true, at: 'T' };
+const fail: Verification = {
+  mode: 'gates',
+  passed: false,
+  at: 'T',
+  command: 'npm test',
+  output: '2 failing',
+};
+const commands = { gates: ['npm test'], smoke: 'node greet.js Ada' };
+const decide = (runs: RunRecord[]) => miniAction({ runs, state, commands });
 
 describe('the Mini lifecycle', () => {
   it('builds first', () => {
     expect(decide([])).toEqual({ kind: 'dispatch', phase: 'mini-build', skill: 'build-project' });
+  });
+
+  it('names what the server noted when a stopped run gave no reason', () => {
+    const build = run('build-project', 'failed', {
+      note: 'The agent had produced nothing for 10 minutes, so it was stopped.',
+    });
+    expect(decide([build])).toMatchObject({
+      detail: 'The build ended failed: The agent had produced nothing for 10 minutes, so it was stopped.',
+    });
   });
 
   it('stops on a build that did not finish, with the reason it gave', () => {
@@ -58,16 +77,22 @@ describe('the Mini lifecycle', () => {
   });
 
   it('finishes when the review says so and the loop’s own checks pass', () => {
-    const action = decide([run('build-project'), run('review-project')], pass);
+    const action = decide([run('build-project'), run('review-project', 'success', { verification: pass })]);
     expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
+  });
+
+  it('does not finish over a smoke command that is one of the gates (decision 66)', () => {
+    const runs = [run('build-project'), run('review-project', 'success', { verification: pass })];
+    const action = miniAction({ runs, state, commands: { gates: ['npm test'], smoke: 'npm test' } });
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
   });
 
   it.each([
     ['the review asked for another round', 'attention', pass],
     ['the loop’s checks failed', 'success', fail],
   ] as const)('gives the review a second round when %s', (_why, status, checks) => {
-    const review = run('review-project', status);
-    expect(decide([run('build-project'), review], checks)).toEqual({
+    const review = run('review-project', status, { verification: checks });
+    expect(decide([run('build-project'), review])).toEqual({
       kind: 'dispatch',
       phase: 'mini-review',
       skill: 'review-project',
@@ -77,8 +102,13 @@ describe('the Mini lifecycle', () => {
 
   it('stops after two rounds, naming what fails and what the review said', () => {
     const runs = [run('build-project'), run('review-project', 'attention')];
-    runs.push(run('review-project', 'attention', { summary: 'The smoke command needs a display.' }));
-    const action = decide(runs, fail);
+    runs.push(
+      run('review-project', 'attention', {
+        summary: 'The smoke command needs a display.',
+        verification: fail,
+      }),
+    );
+    const action = decide(runs);
     expect(action).toEqual({
       kind: 'stop',
       reason: 'stalled',

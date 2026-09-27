@@ -280,6 +280,21 @@ export function putFoundation(app: FastifyInstance, name: string, content: strin
 //
 // `cards: false` leaves the board EMPTY, which is a ready project too: it is the state the bootstrap derives
 // the feature list from.
+// A new project runs Mini (decision 100). A test about another lifecycle says which.
+export async function pinLifecycle(
+  app: FastifyInstance,
+  mode: 'standard' | 'express' | 'mini',
+): Promise<void> {
+  const { config } = (await app.inject({ method: 'GET', url: '/api/state' })).json().snapshot;
+  const res = await app.inject({
+    method: 'PATCH',
+    url: '/api/config',
+    payload: { autopilot: { ...config.autopilot, mode } },
+  });
+  if (res.statusCode !== 200)
+    throw new Error(`pinLifecycle could not set ${mode}: ${res.statusCode} ${res.body}`);
+}
+
 export async function makeReady(
   app: FastifyInstance,
   root: string,

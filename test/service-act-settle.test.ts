@@ -79,3 +79,23 @@ describe('waiting for a run to settle', () => {
     expect(result.dispatches).toBe(1);
   });
 });
+
+// DECISION 101: a Mini run's wait has no cap, so it must end on the one answer that will never change — a refusal
+// that cannot recover, such as a token that died with a server killed without its shutdown path.
+describe('waiting for a Mini run', () => {
+  it('gives up once its authority is gone, rather than asking for ever', async () => {
+    const { settle } = await import('../src/service/act/settle.js');
+    let polls = 0;
+    const found = await settle(
+      deps({} as ActDeps['client'], { settlePollMs: 1, sleep: async () => undefined }),
+      'r1',
+      async () => {
+        polls += 1;
+        return { ok: false, reason: 'Unauthorized', fatal: polls > 3 };
+      },
+      { untilEnded: true },
+    );
+    expect(found).toBeUndefined();
+    expect(polls).toBe(4);
+  });
+});

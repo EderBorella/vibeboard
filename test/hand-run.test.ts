@@ -135,4 +135,27 @@ describe('the cards waiting on the person', () => {
     ];
     expect(waitingOnPerson(config, cards, runs).map((c) => c.id)).toEqual(['E-001']);
   });
+
+  // DECISION 102: a Mini build parks its cards in blocked with no run of their own, and they wait on the person too.
+  it('include what a Mini build parked there', () => {
+    const parked = { ...at('E-005', 'blocked'), createdBy: 'build-1' };
+    const loopBlocked = { ...at('E-006', 'blocked'), createdBy: 'break-down-1' };
+    const runs = [
+      record({
+        run: 'build-1',
+        card: undefined,
+        board: undefined,
+        skill: 'build-project',
+        dispatchedBy: undefined,
+      }),
+      record({
+        run: 'break-down-1',
+        card: 'P-001',
+        board: 'product',
+        skill: 'break-down',
+        dispatchedBy: undefined,
+      }),
+    ];
+    expect(waitingOnPerson(config, [parked, loopBlocked], runs).map((c) => c.id)).toEqual(['E-005']);
+  });
 });

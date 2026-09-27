@@ -1,6 +1,5 @@
-import type { MiniChecks } from '../../core/lifecycle/mini.js';
+import { checksSentence } from '../../core/lifecycle/mini.js';
 import type { RunRecord } from '../../core/runs.js';
-import { tail, type Verification } from '../../core/verify.js';
 import { verifyGates, verifySmoke } from '../../exec/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { refuseWhileGateDocumentUnread } from './checkup.js';
@@ -27,18 +26,12 @@ export async function afterMiniRun(
   const at = deps.now().toISOString();
   const gates = await (deps.verify?.gates ?? verifyGates)(deps.root, at);
   const checked = gates.passed ? await (deps.verify?.smoke ?? verifySmoke)(deps.root, at) : gates;
-  const miniChecks: MiniChecks = { passed: checked.passed, detail: describe(checked) };
-  await deps.client.log('run', miniChecks.detail, {
+  // On the review's own record, so the next round is told it and the tick reads it off disk.
+  const wrote = await deps.client.projectVerdict(settled.run, checked);
+  if (!wrote.ok) deps.log?.(`could not record what the checks did on ${settled.run}: ${wrote.reason}`);
+  await deps.client.log('run', checksSentence(checked), {
     iteration: context.iteration + 1,
     outcome: checked.mode,
   });
-  return { dispatches: 1, miniChecks };
-}
-
-// Which command failed and what it printed, because that is where a person starts.
-function describe(v: Verification): string {
-  if (v.passed) return 'The gates and the smoke command pass.';
-  const what = v.command ? `\`${v.command}\` failed` : `The ${v.mode} could not run`;
-  if (v.output?.trim()) return `${what}:\n${tail(v.output.trim(), 1500)}`;
-  return v.reason ? `${what}: ${v.reason}` : `${what}.`;
+  return { dispatches: 1 };
 }

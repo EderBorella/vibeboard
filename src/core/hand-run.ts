@@ -1,5 +1,6 @@
 import { BLOCKED_BOARDS, DEFAULT_AUTOPILOT, isTerminalColumn } from './autopilot.js';
 import { boardColumnSlugs } from './board/columns.js';
+import { MINI_BUILD } from './phases.js';
 import { isHandRun, type RunRecord } from './runs.js';
 import type { Skill } from './skills.js';
 import type { Card, ProjectConfig } from './types.js';
@@ -47,13 +48,15 @@ const lastRunOn = (runs: RunRecord[], card: string): RunRecord | undefined =>
       undefined,
     );
 
-// WAITING ON THE PERSON (decision 99): a card in the blocked column whose last run was one they started. To
-// auto-pilot a blocked card is one it gave up on, so it would skip these and could close a feature over them.
+// WAITING ON THE PERSON (decision 99): a card in the blocked column whose last run was one they started, or — with
+// no run of its own — one a Mini build made and parked there (decision 102). To the standard lifecycle a blocked
+// card is one it gave up on, so it would skip these and could close a feature over them.
 export function waitingOnPerson(config: ProjectConfig, cards: Card[], runs: RunRecord[]): Card[] {
   const blocked = (config.autopilot ?? DEFAULT_AUTOPILOT).blockedColumn;
   return cards.filter((c) => {
     if (!BLOCKED_BOARDS.includes(c.board) || c.columnSlug !== blocked) return false;
     const last = lastRunOn(runs, c.id);
-    return last !== undefined && isHandRun(last);
+    if (last !== undefined) return isHandRun(last);
+    return runs.some((r) => r.run === c.createdBy && r.skill === MINI_BUILD);
   });
 }

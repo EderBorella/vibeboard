@@ -211,7 +211,7 @@ export function buildRunPrompt(input: PromptInputs): string {
           `The card: ${input.card.id}`,
           `File: ${relative(input.projectRoot, input.card.filePath)}\n\n\`\`\`markdown\n${(input.cardFile ?? '').trim()}\n\`\`\``,
         )
-      : section('This run is about the project, not a card', projectSubject()),
+      : section('This run is about the project, not a card', projectSubject(phaseName)),
   ];
 
   // IMMEDIATELY AFTER THE SKILL AND BEFORE THE CARD, and the order is the behaviour. The seeded
@@ -242,7 +242,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   // After the linked cards and before the contract: this IS the checkup's subject.
   parts.push(...checkupSections(input.checkup));
   const judging = input.review !== undefined;
-  if (input.previous) parts.push(previousSection(input.previous, judging));
+  if (input.previous) parts.push(previousSection(input.previous, judging, input.card !== undefined));
   // Last of the context: the user's words are the most specific instruction in the prompt and must not be
   // buried above the card.
   if (input.userPrompt?.trim()) {

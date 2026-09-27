@@ -209,6 +209,11 @@ export function recorder(
       verdicts.push({ ...verification, run });
       return opts.verdict ?? { ok: true as const, value: {} };
     },
+    projectVerdict: async (run: string, verification: Verification) => {
+      calls.push(`verdict:${run}`);
+      verdicts.push({ ...verification, run });
+      return opts.verdict ?? { ok: true as const, value: {} };
+    },
     log: async (kind: string, text: string) => {
       calls.push(`log:${kind}`);
       diary.push({ kind, text });

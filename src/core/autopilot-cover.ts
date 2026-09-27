@@ -4,9 +4,10 @@ import {
   isLifecycleMode,
   isTerminalColumn,
   LIFECYCLE_MODES,
+  type LifecycleMode,
 } from './autopilot.js';
 import { boardColumnSlugs } from './board/columns.js';
-import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
+import { LIFECYCLE_SKILLS, MINI_PHASES, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 
 // "Can this project's lifecycle run?" — asked before auto-pilot starts, and again on every config
@@ -73,6 +74,10 @@ function checkNumbers(ap: AutopilotConfig, out: string[]): void {
   positive('runTimeoutMs', ap.runTimeoutMs, out);
   positive('attemptCap', ap.attemptCap, out);
   positive('idleMinutes', ap.idleMinutes, out);
+  // A timer overflows past about 24 days and fires at once, which would stop every Mini run as it started.
+  if (typeof ap.idleMinutes === 'number' && ap.idleMinutes > 1440) {
+    out.push(`idleMinutes must be at most 1440, a day; it is ${ap.idleMinutes}.`);
+  }
   // budgetUsd alone may be zero: for a subscription-backed or local model the figure is zero or not
   // what you are billed, and then maxIterations is the cap actually bounding the project.
   if (typeof ap.budgetUsd !== 'number' || !Number.isFinite(ap.budgetUsd) || ap.budgetUsd < 0) {
@@ -162,17 +167,21 @@ export function coverageProblems(config: ProjectConfig): string[] {
 //
 // A phase whose skill does not exist is the unreachable-column failure one level in: the phase is chosen,
 // the dispatch 404s, and nothing can ever advance the card.
-export function phaseSkillProblems(skillSlugs: string[]): string[] {
+// Asked of the phases THIS project's mode walks (decision 100): Mini's two, or everything else.
+export function phaseSkillProblems(skillSlugs: string[], mode: LifecycleMode = 'standard'): string[] {
   const have = new Set(skillSlugs);
-  return LIFECYCLE_SKILLS.filter((skill) => !have.has(skill)).map((skill) => {
-    // Every phase that wanted it, in ONE sentence: `break-down` is two phases, and two sentences about one
-    // absent file would report one problem twice.
-    const phases = PHASES.filter((p) => p.skill === skill).map((p) => p.name);
-    const which =
-      phases.length === 1 ? `The ${phases[0]} phase needs` : `The ${phases.join(' and ')} phases need`;
-    // The remedy is part of the refusal. `seedSkills` writes only into a project whose skills folder is
-    // ABSENT — which is what makes deleting a skill permanent — so a project that lost one cannot get it
-    // back by reopening, and a sentence that names only the gap is a dead end.
-    return `${which} a skill called "${skill}", and this project has none. Add one in the Skills tab.`;
-  });
+  const walked = PHASES.filter((p) => MINI_PHASES.includes(p.name) === (mode === 'mini'));
+  const needed = LIFECYCLE_SKILLS.filter((skill) => walked.some((p) => p.skill === skill));
+  return needed
+    .filter((skill) => !have.has(skill))
+    .map((skill) => {
+      // Every phase that wanted it, in ONE sentence: `break-down` is two phases, and two sentences about one
+      // absent file would report one problem twice.
+      const phases = walked.filter((p) => p.skill === skill).map((p) => p.name);
+      const which =
+        phases.length === 1 ? `The ${phases[0]} phase needs` : `The ${phases.join(' and ')} phases need`;
+      // The remedy is part of the refusal. `seedSkills` never gives back a skill a project deleted (decision 98),
+      // so reopening cannot restore one, and a sentence that names only the gap is a dead end.
+      return `${which} a skill called "${skill}", and this project has none. Add one in the Skills tab.`;
+    });
 }

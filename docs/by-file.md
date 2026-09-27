@@ -152,6 +152,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `boards/move.ts` | `decisions.md` — every move of a card to a column, and the resolve-on-close rule | — |
 | `boards/project-routes.ts` | `decisions.md` | `S7` |
 | `boxes/api-socket.ts` | `security/containment.md` — the socket **directory** is what is mounted, read-only | — |
+| `boxes/box-activity.ts` | `decisions.md` — the box traffic that keeps a Mini run alive | `decision 101` |
 | `boxes/box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
 | `boxes/box-service.ts` | `security/containment.md`, `decisions.md` | `S2` |
 | `boxes/containers.ts` | `security/containment.md` — the mount set, the protected paths, the writable hole, the flags | `S1` |

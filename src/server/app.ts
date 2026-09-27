@@ -19,6 +19,7 @@ import { registerConfigRoutes } from './boards/config-routes.js';
 import { registerProjectRoutes } from './boards/project-routes.js';
 import type { ProjectSession } from './boards/session.js';
 import { registerWizardRoutes } from './boards/wizard-routes.js';
+import { boxNetworkBytes } from './boxes/box-activity.js';
 import { registerBoxRoutes } from './boxes/box-routes.js';
 import type { BoxService } from './boxes/box-service.js';
 import {
@@ -174,6 +175,7 @@ export function buildApp(
     // Assigned below, because the runtime is built after the runner and this closes over it.
     halted: () => autopilot.isHalted(),
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
+    activity: async (box) => (box && opts.boxes ? boxNetworkBytes(opts.boxes, box) : undefined),
     onSettled: moveAfterHandRun({
       session,
       autopilotRunning: async () => (await autopilot.current()).state === 'running',

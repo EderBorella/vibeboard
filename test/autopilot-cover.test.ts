@@ -125,6 +125,15 @@ describe('the skill every phase needs', () => {
     expect(phaseSkillProblems([...LIFECYCLE_SKILLS])).toEqual([]);
   });
 
+  // DECISION 100: a project is asked only for the skills its own mode walks.
+  it('asks a Mini project for Mini’s two, and a standard one for everything else', () => {
+    const standard = LIFECYCLE_SKILLS.filter((s) => s !== 'build-project' && s !== 'review-project');
+    expect(phaseSkillProblems(standard, 'standard')).toEqual([]);
+    expect(phaseSkillProblems(['build-project', 'review-project'], 'mini')).toEqual([]);
+    expect(phaseSkillProblems(['build-project'], 'mini').join(' ')).toContain('review-project');
+    expect(phaseSkillProblems(standard, 'mini').join(' ')).toContain('build-project');
+  });
+
   it('says nothing about a skill no phase names', () => {
     // `execute` is a seeded skill the machine never dispatches. Its absence blocks nothing, or every
     // project that deleted a skill it does not use would be refused.

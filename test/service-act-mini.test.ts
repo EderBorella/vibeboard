@@ -74,7 +74,9 @@ describe('a Mini run, carried out', () => {
       context,
     );
     expect(ran).toEqual(['gates', 'smoke']);
-    expect(result.miniChecks).toEqual({ passed: true, detail: 'The gates and the smoke command pass.' });
+    // On the review's own record: the next round is told it, and the tick reads it off disk.
+    expect(r.verdicts).toEqual([{ mode: 'smoke', passed: true, at: 'T', run: expect.any(String) }]);
+    expect(result).toEqual({ dispatches: 1 });
   });
 
   it('names the failing command and what it printed, and runs no smoke command over failing gates', async () => {
@@ -88,7 +90,11 @@ describe('a Mini run, carried out', () => {
       context,
     );
     expect(ran).toEqual(['gates']);
-    expect(result.miniChecks).toEqual({ passed: false, detail: '`npm test` failed:\n2 failing' });
+    expect(r.verdicts).toMatchObject([
+      { mode: 'gates', passed: false, command: 'npm test', output: '2 failing' },
+    ]);
+    expect(r.diary.map((d) => d.text)).toContain('`npm test` failed:\n2 failing');
+    expect(result).toEqual({ dispatches: 1 });
   });
 
   it('runs no command while a gate document is unread', async () => {

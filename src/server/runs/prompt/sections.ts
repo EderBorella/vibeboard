@@ -27,7 +27,17 @@ export function section(heading: string, body: string): string {
 // not find or invents one to reason about. So the reading is fixed here, once, rather than by rewording every
 // skill: the project is the subject, and any instruction phrased about "this card" is about the board as a
 // whole.
-export function projectSubject(): string {
+export function projectSubject(phaseName?: PhaseName): string {
+  // A Mini run works the whole board rather than starting it (decision 100): the bootstrap's words would tell a
+  // build to ignore the plan it is to pick up from, and a review that making cards is its job.
+  if (phaseName === 'mini-build' || phaseName === 'mini-review') {
+    return [
+      'This run is about the whole project rather than one card. The board is yours to read, and your skill says',
+      'what to do with it.',
+      '',
+      'The **README at the project root is the brief**, and the foundation documents below decide how it is built.',
+    ].join('\n');
+  }
   return [
     'There is no card. The board is empty, and creating its first cards is what this run is for — so nothing',
     'on the board is your subject and there is none to read, move or edit.',
@@ -508,7 +518,11 @@ function usableSection(): string {
 // A run that produced no report is the case this exists for. What it left behind — how it ended, what
 // VibeBoard noted about it, how many files it changed — IS the evidence when there is no report, and a
 // judge shown nothing simply looked elsewhere.
-export function previousSection(previous: NonNullable<PromptInputs['previous']>, judging: boolean): string {
+export function previousSection(
+  previous: NonNullable<PromptInputs['previous']>,
+  judging: boolean,
+  onCard = true,
+): string {
   const facts = [
     `Run **${previous.run}**, skill \`${previous.skill}\`, which VibeBoard recorded as \`${previous.status}\`.`,
     ...(previous.filesChanged === undefined
@@ -521,7 +535,7 @@ export function previousSection(previous: NonNullable<PromptInputs['previous']>,
     : 'It wrote no report.';
   const verdict = previous.verification ? `\n\n${verdictEvidence(previous.verification)}` : '';
   return section(
-    judging ? 'The run you are judging' : 'The previous run on this card',
+    judging ? 'The run you are judging' : onCard ? 'The previous run on this card' : 'The previous run',
     `${judging ? '' : 'This continues earlier work.\n\n'}${facts.join('\n')}\n\n${report}${verdict}`,
   );
 }

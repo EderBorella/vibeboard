@@ -71,7 +71,6 @@ export const input = (over: Partial<TickInput> = {}): TickInput => ({
   // not absent, because the field is required for exactly that reason.
   unrecordedSendBacks: [],
   unwrittenTasks: [],
-  miniChecks: undefined,
   // NO STORY'S CRITERION ALREADY PASSES, which is every board that has never carried a `satisfiedBy` — so
   // every test below this line decides what it decided before decision 85. Empty and not absent, for the
   // reason above: the field is required, and test/tick-satisfied.test.ts is where that is pinned.

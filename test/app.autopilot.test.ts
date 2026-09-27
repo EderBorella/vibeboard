@@ -9,7 +9,7 @@ import { CredentialStore } from '../src/server/auth/credentials.js';
 import type { Readiness } from '../src/server/autopilot/routes.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { configPath } from '../src/store/project/config.js';
-import { makeReady, openTestProject, putFoundation, tempDir } from './helpers.js';
+import { makeReady, openTestProject, pinLifecycle, putFoundation, tempDir } from './helpers.js';
 
 const README = `# Timeline\n\n${'A tool that turns a folder of notes into a searchable timeline. '.repeat(4)}\n`;
 
@@ -112,6 +112,7 @@ describe('GET /api/autopilot/readiness', () => {
   it('names a phase whose skill has been deleted', async () => {
     const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     await makeReady(app, root);
+    await pinLifecycle(app, 'standard');
     expect((await readiness(app)).ok).toBe(true);
 
     const deleted = await app.inject({

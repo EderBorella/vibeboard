@@ -211,7 +211,7 @@ export const LIFECYCLE_SKILLS: readonly string[] = [
 // Which phase a RUN belongs to, for the endpoint (ruling 56). Matched on `skill` AND `board`, because
 // `break-down` is TWO phases with different `creates`: a story's break-down matched on skill alone
 // would carry the authority to create features. A project run has no board and resolves to the
-// bootstrap, the only card-less phase.
+// bootstrap or to one of Mini's two, the card-less phases.
 export function phaseForRun(skill: string, board?: BoardName): Phase | undefined {
   return PHASES.find((p) => p.skill === skill && p.board === board);
 }

@@ -223,6 +223,10 @@ const RULES: Record<string, Rule> = {
     scopes: ['service'],
     describe: "write a run's verdict.",
   },
+  'POST /api/runs/project/:run/verification': {
+    scopes: ['service'],
+    describe: "write a project run's verdict.",
+  },
 
   // CLEARING SPENT ATTEMPTS, and `repair` is the only scope that may (decisions 86 and 88). Every autonomous
   // scope is refused for the reason the routes give: an agent able to clear its own card's attempts has

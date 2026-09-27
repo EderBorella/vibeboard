@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  Status: <strong>Beta</strong> · <a href="LICENSE">MIT License</a>
+  Status: <strong>Beta</strong> · <a href="LICENSE">PolyForm Noncommercial 1.0.0</a>
 </p>
 
 > VibeBoard was inspired by **Adam Awan**. Thanks for the spark that set it in motion.

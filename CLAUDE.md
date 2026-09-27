@@ -1,7 +1,7 @@
 # VibeBoard — working instructions
 
 This file is the project's own brief. It replaces the shared launch-root setup: sessions now start
-**inside** `/data/projects/vibeboard`, so what used to be "go and read the project's docs" is here.
+**inside** the repository, so what used to be "go and read the project's docs" is here.
 
 @.claude/CODE-QUALITY.md
 
@@ -17,8 +17,9 @@ and a card you drag are the same event.
 One Node process: Fastify 5 + `@fastify/websocket` + chokidar + gray-matter, React 19 / Vite front
 end, served at `localhost:4610`. Agents run in a Docker box per `(project, backend)`.
 
-The full product description is [`README.md`](README.md). Read it before changing anything
-user-facing; it is the only place the security model is stated end to end.
+The product is introduced in [`README.md`](README.md), kept short on purpose. The security model is
+stated end to end in [`docs/security/model.md`](docs/security/model.md); read it before changing
+anything user-facing.
 
 ## Resources
 

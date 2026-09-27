@@ -110,8 +110,7 @@ through the API with a per-card credential, and cannot reach your local network.
 
 The full documentation is moving to the [wiki](https://github.com/EderBorella/vibeboard/wiki): the
 card format, skills, the auto-pilot modes, configuration and the security model. It is being
-written. Until it lands, the containment model is in
-[`docs/security/containment.md`](docs/security/containment.md).
+written. Until it lands, the security model is in [`docs/security/model.md`](docs/security/model.md).
 
 ## Contact and support
 

@@ -111,50 +111,57 @@ async function settled(project: TestProject, card: string, run: string): Promise
   throw new Error('run never settled');
 }
 
-// Where a card stands now, polled: the move lands just after the run's record, which `settled` waits for.
+// Where a card stands now, polled until it leaves `from`: the finishing move lands just after the run's record.
 async function columnOnceSettled(project: TestProject, card: string, from: string): Promise<string> {
   let column = from;
   for (let i = 0; i < 20 && column === from; i++) {
     await new Promise((r) => setTimeout(r, 50));
-    const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
-      snapshot: { boards: { engineering: { id: string; columnSlug: string }[] } };
-    };
-    column = state.snapshot.boards.engineering.find((c) => c.id === card)?.columnSlug ?? 'gone';
+    column = await columnOf(project, card);
   }
   return column;
 }
 
+async function columnOf(project: TestProject, card: string): Promise<string> {
+  const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
+    snapshot: { boards: { engineering: { id: string; columnSlug: string }[] } };
+  };
+  return state.snapshot.boards.engineering.find((c) => c.id === card)?.columnSlug ?? 'gone';
+}
+
 describe("a person's run", () => {
-  it('is recorded as theirs, and moves its card on when it succeeds (decisions 93 and 95)', async () => {
+  it('is recorded as theirs, works its card in progress, and leaves it waiting in blocked (decisions 93 and 95)', async () => {
     const project = await projectWithCard();
-    const from = (await project.app.inject({ method: 'GET', url: '/api/state' })).json().snapshot.boards
-      .engineering[0].columnSlug as string;
+    expect(await columnOf(project, project.card)).toBe('backlog');
     const res = await project.app.inject({
       method: 'POST',
       url: '/api/runs',
       payload: { board: 'engineering', card: project.card, skill: 'execute', dispatchedBy: 'ignored' },
     });
+    expect(await columnOf(project, project.card)).toBe('in-progress');
     const { run } = res.json() as { run: RunRecord };
     const final = await settled(project, project.card, run.run);
     expect(final).toMatchObject({ status: 'success', dispatchedBy: 'person' });
-    const to = await columnOnceSettled(project, project.card, from);
-    expect(to).not.toBe(from);
+    expect(await columnOnceSettled(project, project.card, 'in-progress')).toBe('blocked');
     expect(await readFile(join(project.root, '.vibeboard', 'PROJECT-LOG.md'), 'utf8')).toContain(
-      `moved to ${to}: started by hand`,
+      'moved to blocked to wait for you',
     );
   });
 
-  it('leaves its card where it was when the skill only reads', async () => {
+  it('leaves its card where it was when the skill does not move cards', async () => {
     const project = await projectWithCard();
-    const from = (await project.app.inject({ method: 'GET', url: '/api/state' })).json().snapshot.boards
-      .engineering[0].columnSlug as string;
+    const quiet = join(project.root, '.vibeboard', 'skills', 'quiet');
+    await mkdir(quiet, { recursive: true });
+    await writeFile(
+      join(quiet, 'SKILL.md'),
+      '---\nname: Quiet\ndescription: d\nmovesCard: false\n---\nLook.\n',
+    );
     const res = await project.app.inject({
       method: 'POST',
       url: '/api/runs',
-      payload: { board: 'engineering', card: project.card, skill: 'research' },
+      payload: { board: 'engineering', card: project.card, skill: 'quiet' },
     });
     await settled(project, project.card, (res.json() as { run: RunRecord }).run.run);
-    expect(await columnOnceSettled(project, project.card, from)).toBe(from);
+    expect(await columnOnceSettled(project, project.card, 'backlog')).toBe('backlog');
   });
 });
 

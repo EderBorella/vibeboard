@@ -22,7 +22,7 @@ export interface Skill {
   columns: string[]; // empty = every column; slugs
   prompt: string; // the body: what the agent is asked to do
   autopilotOnly: boolean; // hidden from a card's skills
-  moveOnSuccess: boolean; // a person's run that succeeds moves its card on
+  movesCard: boolean; // a person's run moves its card while it runs (decision 95)
 }
 
 // The skills setup starts, as project runs with no card.
@@ -30,17 +30,11 @@ export const WIZARD_SKILLS: readonly string[] = ['scan-project', 'suggest-stack'
 
 // Retired seeds an older project still holds: nothing dispatches them and nothing rewrites a skills folder.
 const RETIRED_SKILLS = ['implement', 'review', 'checkup-story'];
-// Skills that do not do their card's work: a reading task, and a split, after which the card still needs it.
-const STAYING_SKILLS = ['research', 'summarise', 'split'];
 
-// Defaults by slug rather than keys in every file (decision 94), so a project seeded before the flags existed
+// A default by slug rather than a key in every file (decision 94), so a project seeded before the flag existed
 // hides the machine's skills with no file rewritten, and a file only carries a flag a person changed.
 export function autopilotOnlyByDefault(slug: string): boolean {
   return LIFECYCLE_SKILLS.includes(slug) || WIZARD_SKILLS.includes(slug) || RETIRED_SKILLS.includes(slug);
-}
-
-export function moveOnSuccessByDefault(slug: string): boolean {
-  return !STAYING_SKILLS.includes(slug);
 }
 
 // An invalid file is not a failure to report loudly — it is a skill that does not appear in the
@@ -103,12 +97,12 @@ export function parseSkill(slug: string, content: string, config: ProjectConfig)
 
   const autopilotOnly = asFlag(data.autopilotOnly, autopilotOnlyByDefault(slug));
   if (autopilotOnly === undefined) return bad('autopilotOnly must be true or false');
-  const moveOnSuccess = asFlag(data.moveOnSuccess, moveOnSuccessByDefault(slug));
-  if (moveOnSuccess === undefined) return bad('moveOnSuccess must be true or false');
+  const movesCard = asFlag(data.movesCard, true);
+  if (movesCard === undefined) return bad('movesCard must be true or false');
 
   return {
     ok: true,
-    skill: { slug, path, name, description, boards, columns, prompt, autopilotOnly, moveOnSuccess },
+    skill: { slug, path, name, description, boards, columns, prompt, autopilotOnly, movesCard },
   };
 }
 
@@ -155,19 +149,18 @@ export interface SkillFields {
   columns: string[];
   prompt: string;
   autopilotOnly: boolean;
-  moveOnSuccess: boolean;
+  movesCard: boolean;
 }
 
 // Write a skill file from its fields. Empty scoping lists are omitted rather than written as `[]`:
 // "every board" is the absence of a restriction, and an empty list reads like a mistake. A flag is written
-// only where it differs from its slug's default, so saving an untouched skill leaves its file as it was.
+// only where it differs from its default, so saving an untouched skill leaves its file as it was.
 export function serializeSkill(slug: string, fields: SkillFields): string {
   const lines = [`name: ${fields.name.trim()}`, `description: ${fields.description.trim()}`];
   if (fields.boards.length > 0) lines.push(`boards: [${fields.boards.join(', ')}]`);
   if (fields.columns.length > 0) lines.push(`columns: [${fields.columns.join(', ')}]`);
   if (fields.autopilotOnly !== autopilotOnlyByDefault(slug))
     lines.push(`autopilotOnly: ${fields.autopilotOnly}`);
-  if (fields.moveOnSuccess !== moveOnSuccessByDefault(slug))
-    lines.push(`moveOnSuccess: ${fields.moveOnSuccess}`);
+  if (!fields.movesCard) lines.push('movesCard: false');
   return `---\n${lines.join('\n')}\n---\n${fields.prompt.trim()}\n`;
 }

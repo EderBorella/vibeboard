@@ -29,7 +29,7 @@ describe('parseSkill', () => {
       columns: [],
       prompt: 'Do the thing.',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
   });
 
@@ -111,7 +111,7 @@ describe('parseSkill', () => {
       'boards',
       'columns',
       'description',
-      'moveOnSuccess',
+      'movesCard',
       'name',
       'path',
       'prompt',
@@ -123,34 +123,31 @@ describe('parseSkill', () => {
 describe('the two running flags', () => {
   const flags = (slug: string, fm = '') => {
     const r = parseSkill(slug, file(`name: N\ndescription: D${fm}`), config);
-    return r.ok
-      ? { autopilotOnly: r.skill.autopilotOnly, moveOnSuccess: r.skill.moveOnSuccess }
-      : r.invalid.reason;
+    return r.ok ? { autopilotOnly: r.skill.autopilotOnly, movesCard: r.skill.movesCard } : r.invalid.reason;
   };
 
   // An older project's files carry neither key, so what they mean comes from the slug.
   it.each([
-    ['fix', { autopilotOnly: true, moveOnSuccess: true }],
-    ['scan-project', { autopilotOnly: true, moveOnSuccess: true }],
-    ['checkup-story', { autopilotOnly: true, moveOnSuccess: true }],
-    ['execute', { autopilotOnly: false, moveOnSuccess: true }],
-    ['split', { autopilotOnly: false, moveOnSuccess: false }],
-    ['research', { autopilotOnly: false, moveOnSuccess: false }],
+    ['fix', { autopilotOnly: true, movesCard: true }],
+    ['scan-project', { autopilotOnly: true, movesCard: true }],
+    ['checkup-story', { autopilotOnly: true, movesCard: true }],
+    ['execute', { autopilotOnly: false, movesCard: true }],
+    ['research', { autopilotOnly: false, movesCard: true }],
   ])('gives %s its slug default when the file says nothing', (slug, expected) => {
     expect(flags(slug)).toEqual(expected);
   });
 
   it('lets the file overrule the default either way', () => {
-    expect(flags('fix', '\nautopilotOnly: false\nmoveOnSuccess: false')).toEqual({
+    expect(flags('fix', '\nautopilotOnly: false\nmovesCard: false')).toEqual({
       autopilotOnly: false,
-      moveOnSuccess: false,
+      movesCard: false,
     });
-    expect(flags('execute', '\nautopilotOnly: true')).toEqual({ autopilotOnly: true, moveOnSuccess: true });
+    expect(flags('execute', '\nautopilotOnly: true')).toEqual({ autopilotOnly: true, movesCard: true });
   });
 
   it('refuses a flag that is not true or false', () => {
     expect(flags('execute', '\nautopilotOnly: sometimes')).toBe('autopilotOnly must be true or false');
-    expect(flags('execute', '\nmoveOnSuccess: 1')).toBe('moveOnSuccess must be true or false');
+    expect(flags('execute', '\nmovesCard: 1')).toBe('movesCard must be true or false');
   });
 });
 
@@ -163,7 +160,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   columns: [],
   prompt: 'p',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
   ...over,
 });
 const ok = (s: Skill): SkillParse => ({ ok: true, skill: s });
@@ -257,7 +254,7 @@ describe('serializeSkill', () => {
       columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
     const parsed = parseSkill('execute', text, config);
     expect(parsed.ok).toBe(true);
@@ -271,7 +268,7 @@ describe('serializeSkill', () => {
       columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
   });
 
@@ -285,7 +282,7 @@ describe('serializeSkill', () => {
       columns: [],
       prompt: 'P',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
     expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
   });
@@ -298,7 +295,7 @@ describe('serializeSkill', () => {
       columns: [],
       prompt: '\n  P  \n',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
     expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
   });
@@ -307,9 +304,8 @@ describe('serializeSkill', () => {
   it.each([
     ['fix', true, true, ''],
     ['fix', false, true, 'autopilotOnly: false\n'],
-    ['execute', true, false, 'autopilotOnly: true\nmoveOnSuccess: false\n'],
-    ['research', false, true, 'moveOnSuccess: true\n'],
-  ])('writes %s with autopilotOnly %s and moveOnSuccess %s', (slug, autopilotOnly, moveOnSuccess, keys) => {
+    ['execute', true, false, 'autopilotOnly: true\nmovesCard: false\n'],
+  ])('writes %s with autopilotOnly %s and movesCard %s', (slug, autopilotOnly, movesCard, keys) => {
     const text = serializeSkill(slug, {
       name: 'N',
       description: 'D',
@@ -317,7 +313,7 @@ describe('serializeSkill', () => {
       columns: [],
       prompt: 'P',
       autopilotOnly,
-      moveOnSuccess,
+      movesCard,
     });
     expect(text).toBe(`---\nname: N\ndescription: D\n${keys}---\nP\n`);
   });

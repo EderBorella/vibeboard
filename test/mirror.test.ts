@@ -175,7 +175,7 @@ describe('web/shared mirrors src/core', () => {
       columns: [],
       prompt: 'p',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
       ...over,
     });
     const all = [

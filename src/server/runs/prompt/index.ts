@@ -160,7 +160,7 @@ export interface PromptInputs {
   // `scope` is carried because the endpoint list is GENERATED from it. Without it the section would
   // have to assume `work`, and a run dispatched under any other scope would be handed a list that is
   // wrong in both directions — naming rows it cannot call, omitting rows it can.
-  credential?: { token: string; apiBase: string; scope: Scope };
+  credential?: { token: string; apiBase: string; scope: Scope; byHand?: true };
 }
 
 // ONE CONTRACT, never two. A run handed both would be told to report an outcome and to judge, and whichever
@@ -262,6 +262,7 @@ export function buildRunPrompt(input: PromptInputs): string {
               input.credential.token,
               input.credential.scope,
               input.card?.id,
+              input.credential.byHand === true,
             ),
           ),
     );

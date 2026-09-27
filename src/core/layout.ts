@@ -41,6 +41,9 @@ export const WIZARD_FILE = `${CONFIG_DIR}/wizard.yaml`;
 export const BOARDS_DIR = `${CONFIG_DIR}/boards`;
 
 export const SKILLS_DIR = `${CONFIG_DIR}/skills`;
+// Every seeded skill a project has been given, one slug a line, so a later seed arrives once and a deleted
+// one stays deleted. Beside the folder rather than in it, where Project Control would list it as a skill.
+export const SEEDED_SKILLS_FILE = `${CONFIG_DIR}/seeded-skills.txt`;
 export const DOCS_DIR = `${CONFIG_DIR}/docs`;
 export const RESOURCES_DIR = `${CONFIG_DIR}/resources`;
 export const RESOURCES_YAML = `${CONFIG_DIR}/resources.yaml`;

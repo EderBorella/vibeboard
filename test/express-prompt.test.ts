@@ -36,7 +36,7 @@ const skillNamed = (slug: string): Skill => ({
   // that on purpose, which is why the ordering assertion below is not cosmetic.
   prompt: 'One acceptance criterion per card.',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
 });
 
 const card = (board: BoardName): Card =>

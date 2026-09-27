@@ -27,7 +27,7 @@ describe('the browser sends no credential of its own', () => {
           columns: [],
           prompt: 'p',
           autopilotOnly: false,
-          moveOnSuccess: true,
+          movesCard: true,
         }),
     ],
     ['patch', () => patchConfig({ name: 'renamed' })],

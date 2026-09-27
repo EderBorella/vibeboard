@@ -1,4 +1,4 @@
-import type { BoardName, Card, ProjectConfig } from './shared';
+import { BLOCKED_BOARDS, type BoardName, type Card, type ProjectConfig } from './shared';
 
 // Mirrors src/core/slug.ts — column folders on disk are slugified display names.
 export function slugify(name: string): string {
@@ -55,6 +55,17 @@ export function columnSlugs(config: ProjectConfig, board: BoardName): string[] {
   return config.boards[board].columns.map(slugify);
 }
 
+// The blocked column is where a person's runs leave their cards for them (decision 95), so the board says so.
+// On screen only: a column's folder is its label slugged, and renaming it would move every card in it.
+export function columnChoices(config: ProjectConfig, board: BoardName): { slug: string; name: string }[] {
+  const blocked = config.autopilot?.blockedColumn ?? 'blocked';
+  return config.boards[board].columns.map((label) => {
+    const slug = slugify(label);
+    const waiting = BLOCKED_BOARDS.includes(board) && slug === blocked;
+    return { slug, name: waiting ? 'Blocked / Waiting approval' : label };
+  });
+}
+
 // Group cards under each column slug (empty columns preserved), sorted by manual order.
 export function cardsByColumn(cards: Card[], slugs: string[]): Record<string, Card[]> {
   const grouped: Record<string, Card[]> = {};
@@ -70,7 +81,7 @@ export function cardsByColumn(cards: Card[], slugs: string[]): Record<string, Ca
 // to the slug itself when the column has been renamed out from under the card, which is a real
 // state: the file keeps sitting in the old folder until something moves it.
 export function columnLabel(config: ProjectConfig, board: BoardName, slug: string): string {
-  return config.boards[board].columns.find((name) => slugify(name) === slug) ?? slug;
+  return columnChoices(config, board).find((c) => c.slug === slug)?.name ?? slug;
 }
 
 // Where a card sits, for the read-only view. An archived card's own column IS the archive folder,

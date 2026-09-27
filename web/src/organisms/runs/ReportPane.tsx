@@ -10,7 +10,7 @@ import { Text } from '../../atoms/Text';
 import type { RunRecord } from '../../lib/api';
 import { renderMarkdown } from '../../lib/markdown';
 import type { Card, ProjectConfig } from '../../lib/shared';
-import { slugify } from '../../lib/viewmodel';
+import { columnChoices } from '../../lib/viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
 import { needsAttention } from './viewmodel';
@@ -49,12 +49,12 @@ export function ReportPane({
   onContinue,
   canContinue,
 }: Props) {
-  const columns = config.boards[card.board].columns;
+  const columns = columnChoices(config, card.board);
   // Defaults to a column named Review where the board has one — it does not exist on every board,
   // and guessing another would move a card somewhere nobody asked for.
-  const review = columns.find((name) => slugify(name) === 'review');
+  const review = columns.find((c) => c.slug === 'review');
   // The SLUG, not the display name: that is what the options carry and what the API takes.
-  const [column, setColumn] = useState(review ? slugify(review) : '');
+  const [column, setColumn] = useState(review ? review.slug : '');
 
   return (
     // `<article aria-label>` IS A `Stack` NOW — the tag and the accessible name are what kept the flex
@@ -193,7 +193,7 @@ export function ReportPane({
         <ReportOptions
           options={record.options ?? []}
           cardId={card.id}
-          columns={columns.map((name) => ({ slug: slugify(name), name }))}
+          columns={columns}
           currentColumn={card.columnSlug}
           onContinue={onContinue}
           onClose={onClose}
@@ -211,9 +211,9 @@ export function ReportPane({
             onChange={(e) => setColumn(e.target.value)}
           >
             <option value="">Choose a column…</option>
-            {columns.map((name) => (
-              <option key={name} value={slugify(name)}>
-                {name}
+            {columns.map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.name}
               </option>
             ))}
           </Control>

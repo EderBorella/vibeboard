@@ -27,7 +27,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
   const [columns, setColumns] = useState<string[]>(skill.columns);
   const [prompt, setPrompt] = useState(skill.prompt);
   const [autopilotOnly, setAutopilotOnly] = useState(skill.autopilotOnly);
-  const [moveOnSuccess, setMoveOnSuccess] = useState(skill.moveOnSuccess);
+  const [movesCard, setMovesCard] = useState(skill.movesCard);
   const [dirty, setDirty] = useState(false);
 
   // Which columns can be ticked: those on the boards this skill claims, or on every board when it
@@ -120,14 +120,14 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         </Field>
         <Field
           layout="check"
-          label="Move the card to the next column when the run succeeds"
+          label="Move the card to In Progress when a run starts, and to Blocked / Waiting approval when it ends"
           hint={autopilotOnly ? 'Auto-pilot moves the cards it works on itself.' : undefined}
         >
           <Control
             type="checkbox"
-            checked={moveOnSuccess}
+            checked={movesCard}
             disabled={autopilotOnly}
-            onChange={() => touch(setMoveOnSuccess)(!moveOnSuccess)}
+            onChange={() => touch(setMovesCard)(!movesCard)}
           />
         </Field>
       </fieldset>
@@ -151,8 +151,8 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
           size="md"
           disabled={busy || !dirty || name.trim() === '' || description.trim() === '' || prompt.trim() === ''}
           onClick={() => {
-            void onSave({ name, description, boards, columns, prompt, autopilotOnly, moveOnSuccess }).then(
-              () => setDirty(false),
+            void onSave({ name, description, boards, columns, prompt, autopilotOnly, movesCard }).then(() =>
+              setDirty(false),
             );
           }}
         >

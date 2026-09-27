@@ -247,8 +247,11 @@ a network you trust, and never expose it to the public internet.
   **succeeds** — report on the card, with links to any cards it created — or
   **needs you**, with options to choose from. Choosing one dispatches again
   carrying the previous report, so the work iterates until you close the card.
-  A run that succeeds **moves its card to the next column** unless its skill says
-  otherwise, so the board shows the work happened. A run you start by hand is
+  A run you start **moves its card to In Progress**, and when it ends **to Blocked /
+  Waiting approval**, so what waits on you is where you look. Every board has the
+  skills to take a card from backlog to done — break a feature into stories or a
+  story into tasks, build a story, execute a task — and a **check** for each,
+  which moves its card to done when the work passes. A run you start by hand is
   yours: auto-pilot neither counts it against a card's attempts nor reads it
 - **Execution dashboard**: every run in the project across In progress, Requires
   attention and Done, with a badge when something is waiting on you. Stop a run

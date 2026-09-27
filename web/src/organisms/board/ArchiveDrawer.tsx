@@ -9,7 +9,7 @@ import { Text } from '../../atoms/Text';
 import { listArchive, restoreCard } from '../../lib/api';
 import { errorText } from '../../lib/errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../../lib/shared';
-import { columnSlugs } from '../../lib/viewmodel';
+import { columnChoices, columnLabel } from '../../lib/viewmodel';
 import { Row } from '../shared/Row';
 
 interface Props {
@@ -33,9 +33,7 @@ function when(iso?: string): string {
 export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
   const [cards, setCards] = useState<ArchivedCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const slugs = columnSlugs(config, board);
-  const labels = config.boards[board].columns;
-  const labelOf = (slug: string): string => labels[slugs.indexOf(slug)] ?? slug;
+  const labelOf = (slug: string): string => columnLabel(config, board, slug);
 
   // Refetch on mount and whenever the count moves. Restoring changes the count too, so the
   // list reconciles itself without an optimistic local update.
@@ -124,9 +122,9 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
               }}
             >
               <option value="">Elsewhere…</option>
-              {slugs.map((slug, i) => (
-                <option key={slug} value={slug}>
-                  {labels[i]}
+              {columnChoices(config, board).map((col) => (
+                <option key={col.slug} value={col.slug}>
+                  {col.name}
                 </option>
               ))}
             </Control>

@@ -31,6 +31,7 @@ import {
   dispatchFrame,
   resolveProjectDispatch,
 } from './dispatch.js';
+import { moveOnHandStart } from './hand-run.js';
 
 // Dispatching and reading runs.
 //
@@ -113,6 +114,21 @@ async function resolvePrevious(
     code: 409,
     error: `There is no run ${body.previous} on ${card}, so there is nothing for this run to continue or to judge.`,
   };
+}
+
+// A PERSON'S DISPATCH (decisions 93 and 95): marked as theirs, and its card moved into the working column
+// first — then resolved again, so the prompt names the card's file where it now is.
+async function resolveByHand(
+  ctx: AppCtx,
+  body: DispatchBody,
+): Promise<{ input: DispatchInput } | { code: number; error: string }> {
+  const first = await resolveDispatch(ctx, body);
+  if ('error' in first) return first;
+  const { card, skill } = first.input;
+  const { root, config } = ctx.session;
+  const moved = card && root && config ? await moveOnHandStart(root, config, card, skill) : false;
+  const resolved = moved ? await resolveDispatch(ctx, body) : first;
+  return 'error' in resolved ? resolved : { input: { ...resolved.input, dispatchedBy: 'person' } };
 }
 
 async function resolveDispatch(
@@ -279,11 +295,11 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const body = req.body as DispatchBody;
     const stopped = await dispatchRefusal(ctx, body, req.credential?.scope);
     if (stopped) return reply.code(stopped.code).send({ error: stopped.error });
-    const resolved = await resolveDispatch(ctx, body);
+    const resolved =
+      req.credential?.scope === 'admin' ? await resolveByHand(ctx, body) : await resolveDispatch(ctx, body);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
-    const byHand = req.credential?.scope === 'admin' ? { dispatchedBy: 'person' as const } : {};
     try {
-      return { run: await ctx.runner.dispatch({ ...resolved.input, ...byHand }) };
+      return { run: await ctx.runner.dispatch(resolved.input) };
     } catch (err) {
       // The cap, today. Phase 5 replaces it with a queue, at which point this stops being a refusal.
       return reply.code(409).send({ error: errorText(err) });

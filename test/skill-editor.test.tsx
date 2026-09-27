@@ -32,7 +32,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   columns: [],
   prompt: 'Implement the card below.',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
   ...over,
 });
 
@@ -70,29 +70,25 @@ describe('SkillEditor', () => {
       columns: [],
       prompt: 'Implement the card below.',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     });
   });
 
   it('shows the flags the skill has, not the defaults', () => {
-    render(<SkillEditor {...props} skill={skill({ autopilotOnly: true, moveOnSuccess: false })} />);
+    render(<SkillEditor {...props} skill={skill({ autopilotOnly: true, movesCard: false })} />);
     expect((screen.getByLabelText(/^For auto-pilot only/) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText(/^Move the card to the next column/) as HTMLInputElement).checked).toBe(
-      false,
-    );
+    expect((screen.getByLabelText(/^Move the card to In Progress/) as HTMLInputElement).checked).toBe(false);
   });
 
   it('saves both running flags, and stops offering the move while the skill is auto-pilot only', () => {
     const onSave = saver();
     render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);
-    const move = screen.getByLabelText(
-      'Move the card to the next column when the run succeeds',
-    ) as HTMLInputElement;
+    const move = screen.getByLabelText(/^Move the card to In Progress/) as HTMLInputElement;
     fireEvent.click(move);
     fireEvent.click(screen.getByLabelText(/^For auto-pilot only/));
     expect(move.disabled).toBe(true);
     fireEvent.click(screen.getByText('Save skill'));
-    expect(onSave.mock.calls[0][0]).toMatchObject({ autopilotOnly: true, moveOnSuccess: false });
+    expect(onSave.mock.calls[0][0]).toMatchObject({ autopilotOnly: true, movesCard: false });
   });
 
   it('offers every column when no board is ticked', () => {

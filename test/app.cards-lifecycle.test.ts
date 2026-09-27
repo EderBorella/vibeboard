@@ -93,20 +93,48 @@ describe('which board a run may create a card on', () => {
     expect(res.json().error).toContain('engineering/backlog');
   });
 
-  // DECISION 96: a person's `split` creates one level down, as its board's break-down would, and no further.
+  // DECISION 96: a person's break-down creates one level down, as its board's break-down would, and no further.
   it.each([
-    ['features', 'F-001', 'product', 200],
-    ['features', 'F-001', 'features', 409],
-    ['product', 'P-001', 'engineering', 200],
-    ['product', 'P-001', 'product', 409],
-    ['engineering', 'E-001', 'engineering', 409],
-  ] as const)('lets a split on %s %s create on %s: %i', async (board, card, onto, code) => {
+    ['break-down-feature', 'features', 'F-001', 'product', 200],
+    ['break-down-feature', 'features', 'F-001', 'features', 409],
+    ['break-down-story', 'product', 'P-001', 'engineering', 200],
+    ['break-down-story', 'product', 'P-001', 'product', 409],
+    ['break-down-feature', 'product', 'P-001', 'engineering', 409],
+    ['break-down-story', 'engineering', 'E-001', 'engineering', 409],
+  ] as const)('lets %s on %s %s create on %s: %i', async (skill, board, card, onto, code) => {
     const { app, store, root } = await open();
-    const run = store.mintRun('work', `run-split-${board}-${onto}`, root, card, { board, skill: 'split' });
+    const run = store.mintRun('work', `run-${skill}-${board}-${onto}`, root, card, { board, skill });
     const res = await create(app, bearer(run.token), {
       board: onto,
       columnSlug: 'backlog',
       title: 'A split card',
+    });
+    expect(res.statusCode).toBe(code);
+  });
+
+  // DECISION 97: a person's run may move its own card, which is how a check of theirs passes; no other run
+  // may move one, and no run may move another card.
+  it.each([
+    ['a hand run, its own card', { byHand: true as const }, 'E-001', 200],
+    ['a hand run, another card', { byHand: true as const }, 'E-002', 403],
+    ["the loop's run, its own card", {}, 'E-001', 403],
+  ])('moves a card for %s', async (_who, grant, target, code) => {
+    const { app, store, root } = await open();
+    await create(
+      app,
+      { authorization: `Bearer ${ADMIN}` },
+      { board: 'engineering', columnSlug: 'backlog', title: 'Another' },
+    );
+    const run = store.mintRun('work', 'run-move', root, 'E-001', {
+      board: 'engineering',
+      skill: 'check-task',
+      ...grant,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/cards/engineering/${target}/move`,
+      headers: bearer(run.token),
+      payload: { toColumnSlug: 'done' },
     });
     expect(res.statusCode).toBe(code);
   });

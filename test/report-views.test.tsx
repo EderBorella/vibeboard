@@ -631,7 +631,7 @@ describe('ActiveReport', () => {
       columns: [],
       prompt: 'p',
       autopilotOnly: false,
-      moveOnSuccess: true,
+      movesCard: true,
     },
   ];
   const props = {

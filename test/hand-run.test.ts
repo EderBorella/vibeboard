@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { burnsAttempt } from '../src/core/accounting.js';
-import { handRunTarget, nextColumn } from '../src/core/hand-run.js';
+import { finishColumn, startColumn } from '../src/core/hand-run.js';
 import { parseRun, type RunRecord, serializeRun } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
@@ -33,7 +33,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   columns: [],
   prompt: 'p',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
   ...over,
 });
 
@@ -50,47 +50,48 @@ const card = (columnSlug: string, board: Card['board'] = 'engineering'): Card =>
   filePath: `/tmp/${columnSlug}/E-001.md`,
 });
 
-const target = (
-  over: { record?: RunRecord; skill?: Skill; card?: Card; from?: string; running?: boolean } = {},
-) =>
-  handRunTarget({
+const finish = (over: { record?: RunRecord; skill?: Skill; card?: Card; running?: boolean } = {}) =>
+  finishColumn({
     record: over.record ?? record(),
     skill: over.skill ?? skill(),
     card: 'card' in over ? over.card : card('in-progress'),
-    dispatchedFrom: over.from ?? 'in-progress',
     config,
     autopilotRunning: over.running ?? false,
   });
 
-describe('the column after this one', () => {
-  it('walks board order and passes over blocked, into done', () => {
-    expect(nextColumn(config, 'engineering', 'backlog')).toBe('in-progress');
-    expect(nextColumn(config, 'engineering', 'review')).toBe('done');
-    expect(nextColumn(config, 'product', 'in-progress')).toBe('done');
-    expect(nextColumn(config, 'features', 'in-progress')).toBe('done');
-    expect(nextColumn(config, 'engineering', 'done')).toBeUndefined();
-    expect(nextColumn(config, 'engineering', 'nowhere')).toBeUndefined();
+describe("where a person's run puts its card when it starts", () => {
+  it('into in progress, from wherever it stands', () => {
+    expect(startColumn(config, card('backlog'), skill())).toBe('in-progress');
+    expect(startColumn(config, card('done'), skill())).toBe('in-progress');
+    expect(startColumn(config, card('backlog', 'features'), skill())).toBe('in-progress');
+  });
+
+  it('nowhere when it is already there, or the skill does not move cards', () => {
+    expect(startColumn(config, card('in-progress'), skill())).toBeUndefined();
+    expect(startColumn(config, card('backlog'), skill({ movesCard: false }))).toBeUndefined();
+    expect(startColumn(config, card('backlog'), skill({ autopilotOnly: true }))).toBeUndefined();
   });
 });
 
-describe("where a person's run moves its card", () => {
-  it('moves it on when the run succeeded', () => {
-    expect(target()).toBe('review');
-  });
+describe("where a person's run puts its card when it ends", () => {
+  it.each(['success', 'attention', 'failed', 'cancelled'] as const)(
+    'into blocked when it ends %s',
+    (status) => {
+      expect(finish({ record: record({ status }) })).toBe('blocked');
+    },
+  );
 
   it.each([
     ['the loop dispatched it', { record: record({ dispatchedBy: undefined }) }],
-    ['it needs attention', { record: record({ status: 'attention' }) }],
-    ['it failed', { record: record({ status: 'failed' }) }],
-    ['the machine failed it', { record: record({ fault: 'infrastructure' }) }],
-    ['it sent the card back', { record: record({ verdict: 'sent-back' }) }],
+    ['the skill does not move cards', { skill: skill({ movesCard: false }) }],
     ['the skill is for auto-pilot only', { skill: skill({ autopilotOnly: true }) }],
-    ['the skill does not move', { skill: skill({ moveOnSuccess: false }) }],
-    ['somebody moved the card meanwhile', { card: card('review') }],
+    ['the run moved it to done itself', { card: card('done') }],
+    ['somebody moved it meanwhile', { card: card('review') }],
     ['the card is gone', { card: undefined }],
     ['auto-pilot is running', { running: true }],
+    ['its board has no blocked column', { card: card('in-progress', 'features') }],
   ] as const)('leaves it where it is when %s', (_why, over) => {
-    expect(target(over)).toBeUndefined();
+    expect(finish(over)).toBeUndefined();
   });
 });
 

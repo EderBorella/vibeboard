@@ -27,7 +27,7 @@ const skill: Skill = {
   columns: [],
   prompt: 'Implement the card below.',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
 };
 
 const card = (root: string): Card =>

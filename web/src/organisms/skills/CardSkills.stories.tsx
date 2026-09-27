@@ -30,7 +30,7 @@ const skill = (slug: string, name: string, columns: string[]): Skill => ({
   columns,
   prompt: '',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
 });
 
 const invalid: InvalidSkill[] = [

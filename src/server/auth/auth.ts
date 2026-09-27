@@ -26,6 +26,8 @@ interface Rule {
   scopes: readonly Scope[];
   // Scopes additionally confined to the credential's own card, matched against the `:id` param.
   ownCard?: readonly Scope[];
+  // A run a person started may do this to its own card, whatever its scope row says (decision 97).
+  handOwnCard?: true;
   // ONE LINE, AND IT IS REQUIRED. The endpoint catalogue an agent is given is generated from this
   // table (`endpointsFor` below), so a row without a description does not compile — which is the
   // whole mechanism. It used to be prose typed out three times, twice in the dispatch prompt
@@ -99,9 +101,11 @@ const RULES: Record<string, Rule> = {
   },
 
   // Moving is supervision, not work: a work agent must not be able to put its own card in done and
-  // declare itself finished.
+  // declare itself finished. A run a person started is the exception — the person judges it, and moving its
+  // own card is how a check of theirs says it passed.
   'POST /api/cards/:board/:id/move': {
     scopes: ['checkup', 'service', ...COPILOT_SCOPES],
+    handOwnCard: true,
     describe: '`{ toColumnSlug }` — move a card to another column on the same board, keeping its id.',
   },
   // THE DRAG-AND-DROP VERB, and every scope but `repair` is refused it: where in a column a card belongs is a
@@ -319,11 +323,12 @@ const RULES: Record<string, Rule> = {
 // credential minted without one — "a run minted without a card has no card to be confined to". The card-less
 // caller is real: a project run (the bootstrap) is `work` scope with no card at all, and listing PATCH beside
 // a promise about "your own card" would describe the one authority it is guaranteed not to have.
-export function endpointsFor(scope: Scope, card?: string): string[] {
+export function endpointsFor(scope: Scope, card?: string, byHand = false): string[] {
   const lines: string[] = [];
   for (const [key, rule] of Object.entries(RULES)) {
-    if (!rule.scopes.includes(scope)) continue;
-    const ownCard = rule.ownCard?.includes(scope) === true;
+    const handRow = byHand && rule.handOwnCard === true && !rule.scopes.includes(scope);
+    if (!rule.scopes.includes(scope) && !handRow) continue;
+    const ownCard = handRow || rule.ownCard?.includes(scope) === true;
     if (ownCard && card === undefined) continue;
     const confined = ownCard ? ` You may do this to **${card}** and no other card.` : '';
     lines.push(`- \`${key}\` — ${rule.describe}${confined}`);
@@ -379,6 +384,9 @@ export function allows(
   // editing project B's E-001 for the rest of the run.
   if (cred.project !== openProject) return false;
   const rule = RULES[`${verb} ${routeUrl}`];
+  if (cred.byHand === true && rule?.handOwnCard === true && !rule.scopes.includes(cred.scope)) {
+    return cardId !== undefined && cardId === cred.card;
+  }
   if (!rule?.scopes.includes(cred.scope)) return false;
   if (!rule.ownCard?.includes(cred.scope)) return true;
   // An own-card rule with no card on the credential denies rather than waves through: a run

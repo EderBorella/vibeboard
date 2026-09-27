@@ -156,7 +156,9 @@ not a failure.
 
 **When it settles, the record must say** `status: success`, `outcome: success`, **no `fault`**,
 `dispatchedBy: person`, a non-zero `filesChanged`, and the file the card asked for must be on disk with exactly
-the contents it asked for. The card must have moved to the next column, with a `run` line in the diary saying so.
+the contents it asked for. The card must have been in In Progress while it ran and be in Blocked (shown as "Blocked / Waiting approval")
+now, with a `run` line in the diary saying so. Then run **Check the task** on it: when it passes, the card is in
+Done, moved there by the run itself.
 
 An `unreadable-report` fault means the report identity check rejected what the agent wrote. A `failed`
 with *"could not start the agent box"* is the incident at the top of this page.

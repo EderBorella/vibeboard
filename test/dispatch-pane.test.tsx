@@ -35,7 +35,7 @@ const skill: Skill = {
   columns: [],
   prompt: 'p',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
 };
 
 const props = {

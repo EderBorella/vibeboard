@@ -14,7 +14,7 @@ export interface Skill {
   columns: string[];
   prompt: string;
   autopilotOnly: boolean;
-  moveOnSuccess: boolean;
+  movesCard: boolean;
 }
 
 export type SkillFields = Omit<Skill, 'slug' | 'path'>;

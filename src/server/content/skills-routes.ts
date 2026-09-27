@@ -1,11 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import {
-  autopilotOnlyByDefault,
-  moveOnSuccessByDefault,
-  type SkillFields,
-  serializeSkill,
-  skillPath,
-} from '../../core/skills.js';
+import { autopilotOnlyByDefault, type SkillFields, serializeSkill, skillPath } from '../../core/skills.js';
 import { type BoardName, isBoard } from '../../core/types.js';
 import { writeControlFile } from '../../store/project/control-files.js';
 import { readSkills } from '../../store/project/skill-catalogue.js';
@@ -28,12 +22,12 @@ function toFields(body: unknown, slug: string): SkillFields | string {
   if (unknown !== undefined) return `Unknown board "${unknown}"`;
   // Absent means the slug's default, which a file does not carry.
   const autopilotOnly = b.autopilotOnly ?? autopilotOnlyByDefault(slug);
-  const moveOnSuccess = b.moveOnSuccess ?? moveOnSuccessByDefault(slug);
-  if (typeof autopilotOnly !== 'boolean' || typeof moveOnSuccess !== 'boolean') {
-    return 'autopilotOnly and moveOnSuccess must be true or false';
+  const movesCard = b.movesCard ?? true;
+  if (typeof autopilotOnly !== 'boolean' || typeof movesCard !== 'boolean') {
+    return 'autopilotOnly and movesCard must be true or false';
   }
   const columns = asList(b.columns);
-  return { name, description, boards: boards as BoardName[], columns, prompt, autopilotOnly, moveOnSuccess };
+  return { name, description, boards: boards as BoardName[], columns, prompt, autopilotOnly, movesCard };
 }
 
 // The skill catalogue. Read from disk per request rather than cached: the user (or an agent) can

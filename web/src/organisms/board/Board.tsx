@@ -4,7 +4,7 @@ import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { BoardName, Card, ProjectConfig } from '../../lib/shared';
-import { cardsByColumn, columnSlugs } from '../../lib/viewmodel';
+import { cardsByColumn, columnChoices, columnSlugs } from '../../lib/viewmodel';
 import { Row } from '../shared/Row';
 import { ArchiveDrawer } from './ArchiveDrawer';
 import { Column } from './Column';
@@ -43,7 +43,7 @@ export function Board({
   const [showArchive, setShowArchive] = useState(false);
   const slugs = columnSlugs(config, board);
   const grouped = cardsByColumn(cards, slugs);
-  const displayNames = config.boards[board].columns;
+  const displayNames = columnChoices(config, board).map((c) => c.name);
 
   return (
     <Stack direction="column" gap={4} as="section" testId="board">

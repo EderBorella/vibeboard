@@ -1,6 +1,6 @@
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { SKILLS_DIR } from '../../core/layout.js';
+import { SEEDED_SKILLS_FILE, SKILLS_DIR } from '../../core/layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
 // any other. The machine's are hidden from a card's skills by their slug's default (core/skills.ts),
@@ -163,17 +163,17 @@ the product from OUTSIDE.
 List every card you created in your report, by id.
 `,
   },
+  // A PERSON'S SKILLS, one set per board, that take a card from backlog to done (decision 96). None of them
+  // is the loop's: the break-downs borrow their board's authority to create, and the checks move their own
+  // card to done when the work passes, which only a person's run may do (decision 97).
   {
-    // A PERSON'S BREAK-DOWN (decision 96): its own slug, so running or editing it touches nothing the loop's
-    // `break-down` does, and it carries none of that skill's machinery.
-    slug: 'split',
+    slug: 'break-down-feature',
     content: `---
-name: Split into cards
-description: Break the card into smaller cards on the board below it
-boards: [features, product]
+name: Break down into stories
+description: Write the user stories this feature needs
+boards: [features]
 ---
-Break the card below into smaller cards on the board one level down: a feature
-into user stories on the product board, a user story into tasks on engineering.
+Break the feature below into user stories on the product board.
 
 Read the board first — the part of it around this card is in this prompt — and
 say in your report what already exists under this card.
@@ -188,6 +188,116 @@ Create each card with \`POST /api/cards\`, one card per call. The endpoint decid
 its board, column, group and parent.
 
 List every card you created in your report, by id.
+`,
+  },
+  {
+    slug: 'check-feature',
+    content: `---
+name: Check the feature
+description: Try the product and judge whether this feature works
+boards: [features]
+---
+Check whether the feature below works — whether the stories under it add up to it.
+
+Read the feature and the stories under it. Then use the product the way the
+project's README describes: run the smoke command foundation/TESTING.md declares,
+if there is one, and exercise what this feature is for.
+
+Change nothing: not the code, and not any other card.
+
+If it passes, move this card to done — \`POST /api/cards/<board>/<id>/move\` with
+\`{ "toColumnSlug": "done" }\`, for this card and no other — and report success.
+If it does not, leave the card where it is and report that it needs attention,
+saying what is wrong specifically enough that someone could disagree with you.
+`,
+  },
+  {
+    slug: 'break-down-story',
+    content: `---
+name: Break down into tasks
+description: Write the engineering tasks this story needs
+boards: [product]
+---
+Break the story below into tasks on the engineering board.
+
+Read the board first — the part of it around this card is in this prompt — and
+say in your report what already exists under this card.
+
+The card and the project's README are the bound: split what they ask for and
+nothing else. Anything else you notice goes to \`POST /api/suggestions\`.
+
+Give each card one acceptance criterion, so that one test can say whether it is
+done.
+
+Create each card with \`POST /api/cards\`, one card per call. The endpoint decides
+its board, column, group and parent.
+
+List every card you created in your report, by id.
+`,
+  },
+  {
+    slug: 'build-story',
+    content: `---
+name: Build the story
+description: Implement the whole story, and make the gates pass
+boards: [product]
+---
+Implement the story below, end to end.
+
+If tasks are linked to it, they are listed in this prompt: do them as one piece of
+work, and deliver the acceptance criterion each one states. If it has none, the
+story's own acceptance criterion is the whole brief.
+
+The gates in the project's foundation/CODE-QUALITY.md are the bar, and they are
+quoted here in full. Run them yourself before you finish: a run that leaves them
+failing has not delivered.
+
+Do what the story asks and nothing more. Anything else you find goes to
+\`POST /api/suggestions\`.
+
+End your report with each acceptance criterion and how this run meets it.
+`,
+  },
+  {
+    slug: 'check-story',
+    content: `---
+name: Check the story
+description: Judge whether the work delivers this story
+boards: [product]
+---
+Check whether the work under the story below delivers what it asks for.
+
+Read the story, the tasks linked to it and the code they changed. Run the gates
+in the project's foundation/CODE-QUALITY.md, quoted here in full, and use the
+change the way the story describes using it.
+
+Change nothing: not the code, and not any other card.
+
+If it passes, move this card to done — \`POST /api/cards/<board>/<id>/move\` with
+\`{ "toColumnSlug": "done" }\`, for this card and no other — and report success.
+If it does not, leave the card where it is and report that it needs attention,
+saying what is wrong specifically enough that someone could disagree with you.
+`,
+  },
+  {
+    slug: 'check-task',
+    content: `---
+name: Check the task
+description: Judge whether the work delivers this task
+boards: [engineering]
+---
+Check whether the work on the task below delivers what it asks for.
+
+Read the task, the story it belongs to and the code it changed. Run the gates in
+the project's foundation/CODE-QUALITY.md, quoted here in full, and check the
+task's acceptance criterion directly.
+
+Change nothing: not the code, and not any other card.
+
+If it passes, move this card to done — \`POST /api/cards/<board>/<id>/move\` with
+\`{ "toColumnSlug": "done" }\`, for this card and no other — and report success.
+If it does not, leave the card where it is and report that it needs attention,
+saying what is wrong specifically enough that someone could disagree with you.
 `,
   },
   {
@@ -473,20 +583,51 @@ Then finish your report as the contract asks, with \`summary\` restating the pro
   },
 ];
 
-// Seed ONLY when the skills folder is absent. Deleting a skill removes its folder and leaves
-// the skills root behind, so this is what makes a deletion permanent — and it also means a
-// project that already keeps its own skills there is never written into.
+// What every version of this file seeded before `SEEDED_SKILLS_FILE` existed. A folder that predates the file
+// counts these as already given, so what it has lost stays lost and only what was added since arrives.
+const SEEDED_BEFORE_THE_LIST = [
+  'break-down',
+  'checkup-feature',
+  'checkup-story',
+  'derive-features',
+  'execute',
+  'fix',
+  'implement',
+  'implement-story',
+  'research',
+  'review',
+  'review-story',
+  'scan-project',
+  'suggest-stack',
+  'summarise',
+];
+
+async function slugsIn(path: string, read: (p: string) => Promise<string[]>): Promise<string[] | undefined> {
+  try {
+    return await read(path);
+  } catch {
+    return undefined;
+  }
+}
+
+// Give a project each seeded skill once (decision 98). A deleted skill stays deleted because its slug is on the list, and a
+// folder VibeBoard never seeded — a repository keeping its own skills there — is never written into.
 export async function seedSkills(root: string): Promise<boolean> {
   const dir = join(root, SKILLS_DIR);
-  try {
-    await readdir(dir);
-    return false; // exists, even if empty
-  } catch {
-    /* absent — seed it */
-  }
-  for (const seed of SEED_SKILLS) {
+  const listPath = join(root, SEEDED_SKILLS_FILE);
+  const present = await slugsIn(dir, (p) => readdir(p));
+  const listed = await slugsIn(listPath, async (p) =>
+    (await readFile(p, 'utf8')).split('\n').filter(Boolean),
+  );
+  const ours = present === undefined || present.some((slug) => SEEDED_BEFORE_THE_LIST.includes(slug));
+  if (listed === undefined && !ours) return false;
+  const given = new Set(listed ?? (present === undefined ? [] : [...SEEDED_BEFORE_THE_LIST, ...present]));
+  const arriving = SEED_SKILLS.filter((seed) => !given.has(seed.slug) && !present?.includes(seed.slug));
+  for (const seed of arriving) {
     await mkdir(join(dir, seed.slug), { recursive: true });
     await writeFile(join(dir, seed.slug, 'SKILL.md'), seed.content, 'utf8');
   }
-  return true;
+  const all = [...new Set([...given, ...SEED_SKILLS.map((seed) => seed.slug)])].sort();
+  if (listed?.length !== all.length) await writeFile(listPath, `${all.join('\n')}\n`, 'utf8');
+  return arriving.length > 0;
 }

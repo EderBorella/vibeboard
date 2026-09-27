@@ -22,8 +22,14 @@ import type { Scope } from '../../auth/credentials.js';
 // times. The seeded document no longer lists endpoints at all; it points at whatever the credential
 // section says, which is this. The confinement line is generated too: it is enforced server-side either way, but an agent
 // that does not know about it reads a 403 as a broken tool and falls back to editing files.
-export function credentialSection(apiBase: string, token: string, scope: Scope, cardId?: string): string {
-  const endpoints = endpointsFor(scope, cardId);
+export function credentialSection(
+  apiBase: string,
+  token: string,
+  scope: Scope,
+  cardId?: string,
+  byHand = false,
+): string {
+  const endpoints = endpointsFor(scope, cardId, byHand);
   return [
     `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
     'It stops working the moment this run ends, and it is yours alone — do not put it in a card, a',

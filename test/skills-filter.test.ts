@@ -12,7 +12,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   columns: [],
   prompt: 'p',
   autopilotOnly: false,
-  moveOnSuccess: true,
+  movesCard: true,
   ...over,
 });
 

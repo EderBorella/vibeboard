@@ -196,6 +196,11 @@ function narrowPrevious(previous: RunRecord): NonNullable<Parameters<typeof buil
   };
 }
 
+function promptCredential(minted: Credential, apiBase: string): NonNullable<PromptInputs['credential']> {
+  const { token, scope, byHand } = minted;
+  return { token, apiBase, scope, ...(byHand ? { byHand } : {}) };
+}
+
 export class AgentRunner {
   #opts: RunnerOptions;
   #active = new Map<string, Active>();
@@ -268,6 +273,13 @@ export class AgentRunner {
     );
     await writeRun(waiting.root, final);
     this.#opts.onUpdate?.(final);
+    await this.#settled(final, waiting.input, waiting.root);
+  }
+
+  async #settled(final: RunRecord, input: DispatchInput, root: string): Promise<void> {
+    await this.#opts.onSettled?.(final, input, root).catch((err) => {
+      this.#opts.log?.warn({ err, run: final.run }, 'the step after this run ended failed');
+    });
   }
 
   // Start a run, or queue it when every slot is taken. Returns the record as written at dispatch, so
@@ -343,6 +355,7 @@ export class AgentRunner {
     const minted = this.#opts.credentials?.mintRun('work', run, root, record.card, {
       ...(record.board ? { board: record.board } : {}),
       skill: record.skill,
+      ...(record.dispatchedBy ? { byHand: true as const } : {}),
     });
     // Everything from here to the handover to #settle is inside the try: once a credential exists,
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
@@ -365,9 +378,7 @@ export class AgentRunner {
     announce = false,
   ): Promise<void> {
     const run = record.run;
-    const credential = minted
-      ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '', scope: minted.scope }
-      : undefined;
+    const credential = minted && promptCredential(minted, this.#opts.apiBase?.() ?? '');
     const prompt = buildRunPrompt({
       skill: input.skill,
       // Both or neither, spread rather than passed: `exactOptionalPropertyTypes` refuses an explicit
@@ -611,9 +622,7 @@ export class AgentRunner {
       this.#opts.credentials?.expireRun(run);
     }
     this.#opts.onUpdate?.(final);
-    await this.#opts.onSettled?.(final, input, root).catch((err) => {
-      this.#opts.log?.warn({ err, run }, 'the step after this run ended failed');
-    });
+    await this.#settled(final, input, root);
     // A slot just freed, so whatever was waiting starts now. After the update, so the dashboard sees
     // this run end before the next one begins.
     this.#drain();

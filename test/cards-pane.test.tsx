@@ -275,7 +275,7 @@ describe('CardsPane', () => {
             columns: [],
             prompt: 'p',
             autopilotOnly: false,
-            moveOnSuccess: true,
+            movesCard: true,
           },
         ]}
         invalid={[{ slug: 'broken', path: skillRel('broken', 'SKILL.md'), reason: 'needs a name' }]}
@@ -327,7 +327,7 @@ describe('CardsPane', () => {
         columns: [],
         prompt: 'p',
         autopilotOnly: false,
-        moveOnSuccess: true,
+        movesCard: true,
       },
     ];
     const { container } = render(
@@ -354,7 +354,7 @@ describe('CardsPane', () => {
         columns: [],
         prompt: 'p',
         autopilotOnly: false,
-        moveOnSuccess: true,
+        movesCard: true,
       },
     ];
     const onRun = vi.fn(async () => {});
@@ -410,7 +410,7 @@ describe('CardsPane', () => {
         columns: [],
         prompt: 'p',
         autopilotOnly: false,
-        moveOnSuccess: true,
+        movesCard: true,
       },
     ];
     const frozen = card('E-009', { archived: '2026-07-26T10:00:00Z' });
@@ -532,7 +532,7 @@ describe('CardsPane', () => {
         columns: [],
         prompt: 'p',
         autopilotOnly: false,
-        moveOnSuccess: true,
+        movesCard: true,
       },
     ];
     api.listCardRuns.mockResolvedValueOnce(

@@ -63,6 +63,24 @@ describe('seedSkills', () => {
     expect(skills[0].prompt).toBe('Their prompt.');
   });
 
+  // A project seeded by an earlier version has no list: it is given what was added since, and nothing it lost.
+  it('gives an earlier project the skills added since, once, and none it deleted', async () => {
+    const root = await tempDir();
+    const old = SEED_SKILLS.filter((s) => ['execute', 'summarise', 'fix'].includes(s.slug));
+    for (const seed of old) {
+      await mkdir(join(root, skillRel(seed.slug)), { recursive: true });
+      await writeFile(join(root, skillRel(seed.slug, 'SKILL.md')), seed.content, 'utf8');
+    }
+    expect(await seedSkills(root)).toBe(true);
+    const slugs = async () => (await readSkills(root, config)).skills.map((s) => s.slug);
+    // `research` was seeded by the earlier version and deleted since, so it is not given back.
+    expect(await slugs()).not.toContain('research');
+    expect(await slugs()).toContain('check-story');
+    await rm(join(root, skillRel('check-story')), { recursive: true });
+    expect(await seedSkills(root)).toBe(false);
+    expect(await slugs()).not.toContain('check-story');
+  });
+
   it('does not edit a seed already on disk', async () => {
     const root = await tempDir();
     await seedSkills(root);
@@ -547,22 +565,46 @@ describe('the skills the lifecycle does not use', () => {
     }
   });
 
-  // A person's skills say nothing about auto-pilot, and the hand break-down carries none of the loop's
-  // break-down machinery (decision 96).
-  it('keeps the hand skills free of the loop', async () => {
-    for (const slug of ['execute', 'research', 'summarise', 'split']) {
+  // A person's skills say nothing about auto-pilot, and their break-downs carry none of the loop's break-down
+  // machinery (decision 96). Every board offers what takes a card from backlog to done.
+  it('keeps the hand skills free of the loop, and offers each board its set', async () => {
+    const hand = [
+      'execute',
+      'research',
+      'summarise',
+      'break-down-feature',
+      'check-feature',
+      'break-down-story',
+    ];
+    for (const slug of [...hand, 'build-story', 'check-story', 'check-task']) {
       expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).not.toMatch(/auto-?pilot/i);
     }
-    const split = SEED_SKILLS.find((s) => s.slug === 'split')?.content ?? '';
-    expect(split).not.toContain('satisfiedBy');
-    expect(split).not.toContain('smoke');
+    for (const slug of ['break-down-feature', 'break-down-story']) {
+      const text = SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
+      expect(text, slug).not.toContain('satisfiedBy');
+      expect(text, slug).not.toContain('smoke');
+    }
     const root = await tempDir();
     await seedSkills(root);
     const { skills } = await readSkills(root, config);
     const offered = (board: 'features' | 'product' | 'engineering') =>
       skillsForCard(skills, board, 'backlog').map((s) => s.slug);
-    expect(offered('features')).toEqual(['research', 'split', 'summarise']);
-    expect(offered('product')).toEqual(['research', 'split', 'summarise']);
-    expect(offered('engineering')).toEqual(['execute', 'research', 'summarise']);
+    expect(offered('features')).toEqual(['break-down-feature', 'check-feature', 'research', 'summarise']);
+    expect(offered('product')).toEqual([
+      'break-down-story',
+      'build-story',
+      'check-story',
+      'research',
+      'summarise',
+    ]);
+    expect(offered('engineering')).toEqual(['check-task', 'execute', 'research', 'summarise']);
+  });
+
+  it('tells each check to move only its own card to done, and only when it passes', () => {
+    for (const slug of ['check-feature', 'check-story', 'check-task']) {
+      const text = SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
+      expect(text, slug).toContain('`{ "toColumnSlug": "done" }`, for this card and no other');
+      expect(text, slug).toContain('If it does not, leave the card where it is');
+    }
   });
 });

@@ -12,6 +12,12 @@
 
 > VibeBoard was inspired by **Adam Awan**. Thanks for the spark that set it in motion.
 
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Auto-pilot building a project on the board, from an empty board to every card done">
+  <br>
+  <em>Auto-pilot in Mini mode building a small game: 44 cards in 36 minutes, shown in 24 seconds.</em>
+</p>
+
 ## What is VibeBoard
 
 VibeBoard is a self-hosted web app for running a software project with AI coding agents. You plan on

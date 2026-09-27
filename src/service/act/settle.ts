@@ -34,6 +34,9 @@ export async function settle(
   deps: ActDeps,
   run: string,
   look: () => Promise<Answer<{ runs: RunRecord[] }>>,
+  // A Mini run has no time limit (decision 101): the runner ends it — an error, the Stop button, a silence —
+  // and the wait follows it there rather than giving up first.
+  opts: { untilEnded?: boolean } = {},
 ): Promise<RunRecord | undefined> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const timeout = deps.settleTimeoutMs ?? SETTLE_TIMEOUT_MS;
@@ -47,7 +50,9 @@ export async function settle(
   // range before it can reach the arithmetic, and the attempt count has a hard ceiling of its own.
   const poll = usable(deps.settlePollMs, SETTLE_POLL_MS, 1, SETTLE_TIMEOUT_MS);
   const patience = usable(timeout, SETTLE_TIMEOUT_MS, 0, MAX_SETTLE_TIMEOUT_MS);
-  const attempts = Math.min(MAX_SETTLE_POLLS, Math.max(1, Math.floor(patience / poll) + 1));
+  const attempts = opts.untilEnded
+    ? Number.POSITIVE_INFINITY
+    : Math.min(MAX_SETTLE_POLLS, Math.max(1, Math.floor(patience / poll) + 1));
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const answer = await look();
     if (answer.ok) {

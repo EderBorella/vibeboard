@@ -20,16 +20,27 @@ interface Props {
 // The titles carry the TRADE rather than a description, because that is the whole of the decision. Express
 // was measured against standard on the same README and the same backend: 24 runs against 80, $14.06 against
 // $41.07, 12 cards against 39, with a product that passes its smoke test either way.
+const MODES: Record<(typeof LIFECYCLE_MODES)[number], { label: string; title: string }> = {
+  mini: {
+    label: 'Mini',
+    title:
+      'One run plans the whole project on the board and builds it; a second reviews, tests and fixes it, for at most two rounds. The build run has NO time limit and NO spending cap while it runs: it stops on an error, on Stop, or after the idle limit with no output.',
+  },
+  express: {
+    label: 'Express',
+    title:
+      'One feature card listing the plan, one story per bullet, one task per story. Measured at roughly a third of the runs, cost and time on a small project — what it trades away is granularity.',
+  },
+  standard: {
+    label: 'Standard',
+    title:
+      'One card per capability, one story per acceptance criterion. More cards, more verification steps, more cost.',
+  },
+};
+
 export function LifecyclePicker({ config, onChange, disabled = false }: Props) {
   if (!config) return null;
-  const items = LIFECYCLE_MODES.map((mode) => ({
-    value: mode,
-    label: mode === 'express' ? 'Express' : 'Standard',
-    title:
-      mode === 'express'
-        ? 'One feature card listing the plan, one story per bullet, one task per story. Measured at roughly a third of the runs, cost and time on a small project — what it trades away is granularity.'
-        : 'One card per capability, one story per acceptance criterion. More cards, more verification steps, more cost.',
-  }));
+  const items = LIFECYCLE_MODES.map((mode) => ({ value: mode, ...MODES[mode] }));
   return (
     <Tabs
       grouped

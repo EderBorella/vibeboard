@@ -93,7 +93,7 @@ describe('the columns warning', () => {
     // If a future default block names a column the scaffold does not create, the warning above becomes a
     // lie — every project would be refused on its first column edit for a hole it was scaffolded with.
     const config = defaultConfig('T');
-    expect(config.autopilot).toEqual(DEFAULT_AUTOPILOT);
+    expect(config.autopilot).toEqual({ ...DEFAULT_AUTOPILOT, mode: 'mini' });
   });
 });
 

@@ -79,6 +79,7 @@ const AP_CONFIG: AutopilotConfig = {
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
   mode: 'standard',
+  idleMinutes: 10,
 };
 
 // TWO features and one already DONE, because a fixture too thin to distinguish two outcomes tests neither:

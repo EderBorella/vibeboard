@@ -245,7 +245,7 @@ export const VERIFY_MODES = ['gates', 'smoke', 'review'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 // Mirrors LIFECYCLE_MODES in src/core/autopilot.ts. A runtime array for the same reason VERIFY_MODES is
 // one: test/mirror.test.ts compares the two lists, and a hand-written union drifts in silence.
-export const LIFECYCLE_MODES = ['standard', 'express'] as const;
+export const LIFECYCLE_MODES = ['standard', 'express', 'mini'] as const;
 export type LifecycleMode = (typeof LIFECYCLE_MODES)[number];
 
 export interface AutopilotConfig {
@@ -256,6 +256,7 @@ export interface AutopilotConfig {
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
   mode: LifecycleMode;
+  idleMinutes: number;
   // One feature the loop confines itself to, by id, or absent for the whole board. Optional on both sides:
   // it is deliberately not in `DEFAULT_AUTOPILOT`, so it is never written into a project that does not use
   // it — see src/core/autopilot.ts.
@@ -297,6 +298,7 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'terminal',
   'blockedColumn',
   'mode',
+  'idleMinutes',
 ] as const;
 
 export interface ProjectConfig {

@@ -1,5 +1,6 @@
 import type { BoardAround } from '../../core/board-around.js';
 import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
+import { MINI_SKILLS } from '../../core/phases.js';
 import {
   parseAgentReport,
   type RunRecord,
@@ -86,6 +87,8 @@ export interface DispatchInput {
   effort: string;
   mode: string;
   dispatchedBy?: 'person';
+  // A Mini run (decision 101): no wall-clock limit, and stopped once it has produced nothing for this long.
+  idleMs?: number;
 }
 
 export interface RunnerOptions {
@@ -149,6 +152,9 @@ interface Active {
   // "still running after Ns" quote a limit this run was never held to, because Settings may have
   // changed while it ran.
   timeoutMs: number;
+  // A Mini run's silence limit, and whether it is what stopped the run.
+  idleMs?: number;
+  idle?: IdleWatch;
   // The working tree as it was when this run started. A PROMISE rather than a value: the point is
   // taken when the turn is spawned, which is a synchronous path, and a run can finish before git has
   // answered. Awaited at settle, so there is no race to lose.
@@ -197,8 +203,46 @@ function narrowPrevious(previous: RunRecord): NonNullable<Parameters<typeof buil
 }
 
 function promptCredential(minted: Credential, apiBase: string): NonNullable<PromptInputs['credential']> {
-  const { token, scope, byHand } = minted;
-  return { token, apiBase, scope, ...(byHand ? { byHand } : {}) };
+  const { token, scope, moves } = minted;
+  return { token, apiBase, scope, ...(moves ? { moves } : {}) };
+}
+
+// The longest delay a timer accepts. A Mini run is ended by its silence limit instead (decision 101).
+const NO_WALL_CLOCK_MS = 2_147_483_647;
+
+// A person's run may move its own card, and a Mini run — the build places every card it makes — any.
+function movesFor(record: RunRecord): { moves?: 'own' | 'any' } {
+  if (record.dispatchedBy) return { moves: 'own' };
+  return record.card === undefined && MINI_SKILLS.includes(record.skill) ? { moves: 'any' } : {};
+}
+
+// A run's limit: the wall clock, or for a Mini run only its silence.
+function limitsFor(
+  idleMs: number | undefined,
+  timeoutMs: () => number,
+  stop: () => void,
+): { timeoutMs: number; idle?: { idle: IdleWatch; idleMs: number } } {
+  if (idleMs === undefined) return { timeoutMs: timeoutMs() };
+  return { timeoutMs: NO_WALL_CLOCK_MS, idle: { idle: idleWatch(idleMs, stop), idleMs } };
+}
+
+type IdleWatch = { poke: () => void; stop: () => void; fired: boolean };
+
+// Fires once the run has been silent for `ms`; every event it produces starts the count again.
+function idleWatch(ms: number, fire: () => void): IdleWatch {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watch = {
+    fired: false,
+    poke: () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        watch.fired = true;
+        fire();
+      }, ms);
+    },
+    stop: () => clearTimeout(timer),
+  };
+  return watch;
 }
 
 export class AgentRunner {
@@ -262,6 +306,10 @@ export class AgentRunner {
     this.#queue = this.#queue.filter((q) => q.record.run !== run);
     void this.#endQueued(waiting);
     return true;
+  }
+
+  #stopIdle(run: string): void {
+    this.#active.get(run)?.turn.cancel();
   }
 
   async #endQueued(waiting: Queued): Promise<void> {
@@ -356,7 +404,7 @@ export class AgentRunner {
     const minted = this.#opts.credentials?.mintRun('work', run, root, record.card, {
       ...(record.board ? { board: record.board } : {}),
       skill: record.skill,
-      ...(record.dispatchedBy ? { byHand: true as const } : {}),
+      ...movesFor(record),
     });
     // Everything from here to the handover to #settle is inside the try: once a credential exists,
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
@@ -407,7 +455,7 @@ export class AgentRunner {
       credential,
     });
 
-    const timeoutMs = this.#opts.timeoutMs();
+    const { timeoutMs, idle } = limitsFor(input.idleMs, this.#opts.timeoutMs, () => this.#stopIdle(run));
     const box = await this.#boxFor(root, input.backend);
     const turn = runAgentTurn({
       cwd: root,
@@ -422,6 +470,7 @@ export class AgentRunner {
       ...(box ? { box } : {}),
       card: true,
       onEvent: (event) => {
+        idle?.idle.poke();
         // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line
         // each can interleave mid-line, and #settle reads the tail as soon as the process closes —
         // so an unawaited write lands AFTER the read and the line is missing from the report. That
@@ -438,7 +487,8 @@ export class AgentRunner {
       },
     });
     const gitAt = this.#opts.git?.point(root) ?? Promise.resolve(undefined);
-    this.#active.set(run, { turn, cancelled: false, timeoutMs, gitAt });
+    this.#active.set(run, { turn, cancelled: false, timeoutMs, gitAt, ...idle });
+    idle?.idle.poke();
 
     // ONE write, carrying the group and — for a run off the queue — the `running` transition with it.
     // The pgid exists only once the process does, which is why this cannot be part of the dispatch
@@ -593,7 +643,9 @@ export class AgentRunner {
       //
       // The report is still consumed, and still kept as EVIDENCE (decision 18): the verdict is ours,
       // the reasoning is worth reading, and a file left behind would sit in runs/ unread for ever.
-      const stopped = cancelled || result.timedOut;
+      active?.idle?.stop();
+      const ended = active?.idle?.fired ? { ...result, timedOut: true } : result;
+      const stopped = cancelled || ended.timedOut;
       const evidence = stopped ? await this.#takeEvidence(root, run, secret) : undefined;
       const folded = stopped ? null : await foldReport(root, spent, finishedAt, secret, this.#opts.log);
       final =
@@ -601,10 +653,10 @@ export class AgentRunner {
         (await this.#endWithoutReport(
           root,
           spent,
-          result,
+          ended,
           cancelled,
           finishedAt,
-          active?.timeoutMs,
+          active?.idle?.fired ? { idleMs: active.idleMs } : { timeoutMs: active?.timeoutMs },
           evidence,
         ));
     } catch (err) {
@@ -652,12 +704,11 @@ export class AgentRunner {
     finishedAt: string,
     // Absent only if the run never got as far as being spawned, in which case it did not time out
     // either and the sentence below is not reached.
-    carriedTimeoutMs = 0,
+    limit: { timeoutMs?: number; idleMs?: number } = {},
     // What a stopped run had already written. Falls back to the transcript when it wrote nothing
     // usable, which is the case the tail exists for.
     evidence?: string,
   ): Promise<RunRecord> {
-    const timeoutMs = carriedTimeoutMs;
     const tail = evidence?.trim() ? evidence : await transcriptTail(root, record.run);
     let status: RunRecord['status'] = 'attention';
     let note = 'The agent finished without writing a report.';
@@ -666,7 +717,10 @@ export class AgentRunner {
       note = 'You stopped this run.';
     } else if (result.timedOut) {
       status = 'failed';
-      note = `The agent was still running after ${Math.round(timeoutMs / 1000)}s and was stopped.`;
+      note =
+        limit.idleMs === undefined
+          ? `The agent was still running after ${Math.round((limit.timeoutMs ?? 0) / 1000)}s and was stopped.`
+          : `The agent had produced nothing for ${Math.round(limit.idleMs / 60_000)} minutes, so it was stopped.`;
     } else if (result.exitCode !== 0) {
       status = 'failed';
       note = `The agent exited with code ${result.exitCode ?? 'unknown'} and wrote no report.`;

@@ -27,9 +27,9 @@ export function credentialSection(
   token: string,
   scope: Scope,
   cardId?: string,
-  byHand = false,
+  moves?: 'own' | 'any',
 ): string {
-  const endpoints = endpointsFor(scope, cardId, byHand);
+  const endpoints = endpointsFor(scope, cardId, moves);
   return [
     `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
     'It stops working the moment this run ends, and it is yours alone — do not put it in a card, a',

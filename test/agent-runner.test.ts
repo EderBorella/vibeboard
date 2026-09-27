@@ -563,6 +563,18 @@ describe('AgentRunner.dispatch', () => {
     expect(final.note).toBe('The agent was still running after 0s and was stopped.');
   });
 
+  // DECISION 101: a Mini run has no wall-clock limit, and is ended by a silence instead.
+  it('holds a Mini run to its silence, not to the clock', async () => {
+    const shim = behaving('hang');
+    const root = await tempDir();
+    const { instance } = runner(root, { timeoutMs: () => 100 });
+    const { run } = await instance.dispatch({ ...input(root, shim), idleMs: 600 });
+    const final = await settled(root, run);
+
+    expect(final.status).toBe('failed');
+    expect(final.note).toBe('The agent had produced nothing for 0 minutes, so it was stopped.');
+  });
+
   // Decision 8: the enforceable per-run bound is wall-clock, and it has to be the number the user can
   // see. Two properties, and they pull in opposite directions: it is read PER DISPATCH so a change in
   // Settings needs no restart, and it is CARRIED for the life of that run so the sentence a timed-out
@@ -922,7 +934,7 @@ describe('the run credential', () => {
       card?: string,
       // `board` optional inside it, exactly as the store declares it: a project run has a skill and no board,
       // and a spy typed more narrowly than the thing it wraps is a spy that stops forwarding one day.
-      dispatched?: { board?: BoardName; skill: string; byHand?: true },
+      dispatched?: { board?: BoardName; skill: string; moves?: 'own' | 'any' },
     ): Credential {
       const cred = super.mintRun(scope, run, project, card, dispatched);
       this.minted.push(cred);
@@ -966,7 +978,7 @@ describe('the run credential', () => {
     await settled(root, loops);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
-    expect(store.minted.map((c) => c.byHand)).toEqual([true, undefined]);
+    expect(store.minted.map((c) => c.moves)).toEqual(['own', undefined]);
     const { readFile } = await import('node:fs/promises');
     const prompts = (await readFile(argsLog, 'utf8'))
       .trim()

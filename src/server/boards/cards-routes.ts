@@ -5,7 +5,7 @@ import { entryColumn } from '../../core/entry-column.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem, parentBoardOf, parentOf } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
-import { actingPhase, phaseForRun } from '../../core/phases.js';
+import { actingPhase, MINI_SKILLS, phaseForRun } from '../../core/phases.js';
 import {
   BOARDS,
   type BoardName,
@@ -62,12 +62,18 @@ async function place(
 // It fires for a hand dispatch too, and deliberately: a skill no phase names creates nothing, because there is
 // no `creates` to infer for it and inventing one would be guessing on the caller's behalf. The one exception is
 // the hand break-down, which borrows its board's break-down row (`actingPhase`, decision 96).
+// A Mini project run: the loop's build or review, about no card (decision 102). A person's run of the same skill
+// from a card is not one.
+function isMiniRun(cred: { card?: string; skill?: string }): boolean {
+  return cred.card === undefined && cred.skill !== undefined && MINI_SKILLS.includes(cred.skill);
+}
+
 function wrongBoardForRun(
   config: ProjectConfig,
   cred: { board?: BoardName; skill?: string },
   input: CreateCardInput,
 ): string | undefined {
-  if (!cred.skill) return undefined;
+  if (!cred.skill || isMiniRun(cred)) return undefined;
   const creates = actingPhase(cred.skill, cred.board)?.creates;
   // A phase with no `creates`, and any other skill no phase names, may create nothing. The work it found is real; it
   // is just not a card this run gets to make, so the refusal names the surface that exists for it.
@@ -332,15 +338,17 @@ function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: st
 // run's parent is derived from the card it is about — the loop is about none, so the task would land unlinked and
 // the story would still look empty. So the `service` scope may name one parent, only where none was derived, and
 // only a live card on the board directly above: the parent a derivation would have produced, never a sibling or a
-// card two boards up. The group comes from that parent, as it does for a break-down's tasks.
+// card two boards up. The group comes from that parent, as it does for a break-down's tasks. A Mini build is the
+// other caller with no card to derive from: it writes the whole board, stories under features and tasks under
+// stories (decision 102).
 async function withLoopParent(
   ctx: AppCtx,
   ruled: { effective: CreateCardInput; links: string[] } | { error: string },
-  scope: string | undefined,
+  cred: { scope?: string; card?: string; skill?: string },
   asked: unknown,
 ): Promise<{ effective: CreateCardInput; links: string[] } | { error: string }> {
-  if ('error' in ruled || scope !== 'service' || ruled.links.length > 0 || !Array.isArray(asked))
-    return ruled;
+  const namesParent = cred.scope === 'service' || isMiniRun(cred);
+  if ('error' in ruled || !namesParent || ruled.links.length > 0 || !Array.isArray(asked)) return ruled;
   const id = asked.find((one): one is string => typeof one === 'string');
   if (id === undefined) return ruled;
   const above = parentBoardOf(ruled.effective.board);
@@ -376,7 +384,7 @@ async function createForRequest(
   if (mistyped) return { code: 400, error: mistyped };
   // A run is held to the lifecycle; a person at the browser is not.
   const ruled = cred?.run
-    ? await withLoopParent(ctx, await lifecycleRulesForCreate(ctx, cred, input), cred.scope, asked)
+    ? await withLoopParent(ctx, await lifecycleRulesForCreate(ctx, cred, input), cred, asked)
     : { effective: input, links: Array.isArray(asked) ? asked : [] };
   // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
   if ('error' in ruled) return { code: 409, error: ruled.error };

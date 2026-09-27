@@ -59,6 +59,13 @@ const CAPS = [
     step: 1,
     hint: 'How many runs of one skill a card gets before it is blocked. A run you stopped does not count against it.',
   },
+  {
+    key: 'idleMinutes' as const,
+    label: 'Mini: idle limit (minutes)',
+    min: 1,
+    step: 1,
+    hint: 'A Mini run has no time limit and no spending cap while it runs. It stops on an error, on Stop, or after this many minutes with no output from the agent.',
+  },
 ];
 
 export function AutopilotPanel({

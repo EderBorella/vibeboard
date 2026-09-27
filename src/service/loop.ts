@@ -5,6 +5,7 @@ import type { AutopilotState } from '../core/autopilot-state.js';
 // nothing here should give it an edge into the layer that reads the filesystem.
 import { boardColumnSlugs } from '../core/board/columns.js';
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
+import type { MiniChecks } from '../core/lifecycle/mini.js';
 import { decideTick, type TickAction } from '../core/tick.js';
 import { BOARDS, type BoardName, type Card } from '../core/types.js';
 import type { DeclaredCommands } from '../store/project/foundation.js';
@@ -96,6 +97,8 @@ export interface ActResult {
   // The story whose one task the endpoint refused to create (decision 92) — see `unwrittenTasks` on `TickInput`.
   // Reported, not decided: whether that blocks the story is the tick's answer.
   unwrittenTask?: string;
+  // The gates and the smoke command, run after a Mini review (decision 100) — see `miniChecks` on `TickInput`.
+  miniChecks?: MiniChecks;
 }
 
 // Why the loop ended. Returned rather than thrown so the caller — a process whose exit code nobody reads —
@@ -134,6 +137,9 @@ interface Progress {
   // the tick has read it, so a story a person resets out of `blocked` is written for again rather than
   // blocked on a refusal it may no longer meet.
   unwritten: Set<string>;
+  // The last Mini review's checks. Kept rather than cleared once read: each review replaces it, and a tick lost
+  // to a failed read must not turn a measured pass into "could not check".
+  miniChecks?: MiniChecks;
 }
 
 export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
@@ -147,7 +153,7 @@ export async function runLoop(deps: LoopDeps): Promise<LoopEnded> {
       return { reason: state.reason ?? 'stopped', detail: state.detail, iterations: progress.iterations };
     }
 
-    const world = await gather(deps, progress.unrecorded, [...progress.unwritten]);
+    const world = await gather(deps, progress.unrecorded, [...progress.unwritten], progress.miniChecks);
     progress.unwritten.clear();
     if ('failed' in world) {
       const ended = await afterFailedRead(deps, world.failed, progress);
@@ -200,6 +206,7 @@ async function carryOut(
   // do with.
   if (result.unrecordedSendBack !== undefined) progress.unrecorded.add(result.unrecordedSendBack);
   if (result.unwrittenTask !== undefined) progress.unwritten.add(result.unwrittenTask);
+  if (result.miniChecks !== undefined) progress.miniChecks = result.miniChecks;
   if (result.dispatches > 0) {
     progress.iterations += result.dispatches;
     progress.idle = 0;
@@ -240,6 +247,7 @@ async function gather(
   // itself rather than from the world — see `Progress.unrecorded`.
   unrecorded: ReadonlySet<string>,
   unwritten: string[],
+  miniChecks: MiniChecks | undefined,
 ): Promise<{ input: Omit<Parameters<typeof decideTick>[0], 'state'> } | { failed: Failed }> {
   const board = await deps.client.board();
   if (!board.ok) return { failed: board };
@@ -277,6 +285,7 @@ async function gather(
       commands,
       unrecordedSendBacks: [...unrecorded],
       unwrittenTasks: unwritten,
+      miniChecks,
       // AFTER the board and the commands and from both, because that is what it is about: the story this
       // board says the machine is in the middle of, and the gates this project says it runs. A command is
       // spawned only where those two meet on a break-down candidate.

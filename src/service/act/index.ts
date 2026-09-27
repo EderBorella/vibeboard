@@ -1,6 +1,7 @@
 import type { TickAction } from '../../core/actions.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
-import { phase } from '../../core/phases.js';
+import { MINI_PHASES, type PhaseName, phase } from '../../core/phases.js';
+import type { RunRecord } from '../../core/runs.js';
 import type { Verification } from '../../core/verify.js';
 import { commitAll } from '../../exec/git-work.js';
 import type { verifyGates, verifySmoke } from '../../exec/verify.js';
@@ -10,6 +11,7 @@ import { stamp } from '../stamp.js';
 import { afterProjectRun } from './bootstrap.js';
 import { CHECKUP_PHASES, type CheckupEvidence, checkupEvidence } from './checkup.js';
 import { claimGroup } from './group.js';
+import { afterMiniRun } from './mini.js';
 import { afterCardRun, countsTheBoard, liveCount } from './outcomes.js';
 import { refused, stop } from './refusals.js';
 import { inSetup, reviewStory } from './review.js';
@@ -197,7 +199,13 @@ function smokeThatGates(gathered: {
 
 function requestFor(action: Dispatch, checkup?: CheckupEvidence): DispatchRequest {
   const card = action.card;
-  if (!card) return { project: true, skill: action.skill };
+  if (!card) {
+    return {
+      project: true,
+      skill: action.skill,
+      ...(action.previous === undefined ? {} : { previous: action.previous }),
+    };
+  }
   return {
     board: card.board,
     card: card.id,
@@ -234,12 +242,18 @@ async function stampsBefore(deps: ActDeps, action: Dispatch): Promise<ActResult 
   return (await stampEntry(deps, action)) ?? (await claimGroup(deps, action));
 }
 
+const PROJECT_RUN_DOING: Partial<Record<PhaseName, string>> = {
+  'mini-build': 'building the project',
+  'mini-review': 'reviewing the project',
+};
+
 // One dispatch, card or project. The two differ in exactly three places and share everything else, so they
 // are one function rather than two that drift: a project run has no card to stamp, no card to write a verdict
 // beside, and its own list rather than a card's to be found in.
 async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): Promise<ActResult> {
   const card = action.card;
-  const whose = card ? `${card.id}'s ${action.skill} run` : `the ${action.skill} run deriving the board`;
+  const doing = PROJECT_RUN_DOING[action.phase] ?? 'deriving the board';
+  const whose = card ? `${card.id}'s ${action.skill} run` : `the ${action.skill} run ${doing}`;
 
   // RULE 1. Before anything is spent. A clean tree is ordinary and carries on; a FAILURE stops the loop,
   // because from here on nothing it does could be reverted in one command.
@@ -247,7 +261,7 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     branch: deps.branch,
   });
   if (committed.reason !== undefined) {
-    const what = card ? `dispatching ${card.id}` : 'deriving the board';
+    const what = card ? `dispatching ${card.id}` : doing;
     return stop(deps, 'stalled', `Auto-pilot stopped before ${what}: ${committed.reason}`);
   }
 
@@ -283,11 +297,7 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   const started = await deps.client.dispatch(requestFor(action, gathered.evidence));
   if (!started.ok) return await refused(deps, `could not dispatch ${whose}`, started.reason, started.fatal);
 
-  // WHERE to look differs: a card's runs come from the card route, and a project run has no card in its path
-  // so it is found in the project's whole list.
-  const settled = await settle(deps, started.value.run.run, () =>
-    card ? deps.client.cardRuns(card.board, card.id) : deps.client.runs(),
-  );
+  const settled = await waitFor(deps, action, started.value.run.run);
   if (!settled) {
     return stop(
       deps,
@@ -295,7 +305,27 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
       `${whose[0]?.toUpperCase()}${whose.slice(1)} did not finish within the time auto-pilot waits for one, so nothing can be said about it.`,
     );
   }
-  return card
-    ? await afterCardRun(deps, action, card, settled, context, before, smokeThatGates(gathered))
-    : await afterProjectRun(deps, action, settled, context, before);
+  return await afterRun(deps, action, settled, context, before, gathered);
+}
+
+// WHERE to look differs: a card's runs come from the card route, and a project run has no card in its path so it
+// is found in the project's whole list.
+async function waitFor(deps: ActDeps, action: Dispatch, run: string): Promise<RunRecord | undefined> {
+  const card = action.card;
+  const look = () => (card ? deps.client.cardRuns(card.board, card.id) : deps.client.runs());
+  return await settle(deps, run, look, { untilEnded: MINI_PHASES.includes(action.phase) });
+}
+
+async function afterRun(
+  deps: ActDeps,
+  action: Dispatch,
+  settled: RunRecord,
+  context: TickContext,
+  before: number | undefined,
+  gathered: { evidence?: CheckupEvidence; lastFeature?: boolean },
+): Promise<ActResult> {
+  const card = action.card;
+  if (card) return await afterCardRun(deps, action, card, settled, context, before, smokeThatGates(gathered));
+  if (MINI_PHASES.includes(action.phase)) return await afterMiniRun(deps, action, settled, context);
+  return await afterProjectRun(deps, action, settled, context, before);
 }

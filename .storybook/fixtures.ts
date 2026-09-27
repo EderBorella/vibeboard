@@ -40,6 +40,7 @@ export const config: ProjectConfig = {
     terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
     blockedColumn: 'blocked',
     mode: 'standard',
+    idleMinutes: 10,
   },
   copilot: { backend: 'claude-code', backends: {} },
 };

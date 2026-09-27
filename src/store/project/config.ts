@@ -58,7 +58,9 @@ export function defaultConfig(name: string): ProjectConfig {
     // A clone, not the constant: config objects are mutated in place by the ensure* helpers and
     // written back, so a shared reference would let one project's edit reach the next project's
     // defaults inside the same process.
-    autopilot: structuredClone(DEFAULT_AUTOPILOT),
+    // Mini for a new project (decision 100). The default block stays `standard`, because that is what an older
+    // project's backfill and every fallback mean.
+    autopilot: { ...structuredClone(DEFAULT_AUTOPILOT), mode: 'mini' },
     // Explicitly web, so a project created before the wizard exists keeps the one behaviour every
     // project had until now — a checkup that can open a page. Old projects get NO backfill: absence
     // reads as the default image (containers.ts imageForKind), which is what they always ran on.

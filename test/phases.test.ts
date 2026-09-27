@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LIFECYCLE_SKILLS, PHASES, phase, phaseForRun } from '../src/core/phases.js';
+import { LIFECYCLE_SKILLS, MINI_PHASES, PHASES, phase, phaseForRun } from '../src/core/phases.js';
 
 describe('the phase table', () => {
   it('names every phase exactly once', () => {
@@ -103,7 +103,9 @@ describe('the phase table', () => {
 
   it('bounds every dispatching phase', () => {
     for (const p of PHASES) {
-      if (p.skill === undefined) expect(p.bounded, p.name).toBe('none');
+      // Mini's two are bounded by their own sequence instead — one build and at most two reviews a session
+      // (core/lifecycle/mini.ts, decision 100) — not by attempts.
+      if (p.skill === undefined || MINI_PHASES.includes(p.name)) expect(p.bounded, p.name).toBe('none');
       else expect(p.bounded, p.name).not.toBe('none');
     }
   });
@@ -111,10 +113,12 @@ describe('the phase table', () => {
   it('derives the lifecycle skill list from the table', () => {
     expect([...LIFECYCLE_SKILLS].sort()).toEqual([
       'break-down',
+      'build-project',
       'checkup-feature',
       'derive-features',
       'fix',
       'implement-story',
+      'review-project',
       'review-story',
     ]);
   });

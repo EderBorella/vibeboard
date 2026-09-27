@@ -191,9 +191,9 @@ describe('a block that is not the shape it claims', () => {
   // A MISTYPED MODE MUST NOT READ AS `standard`. `ensureAutopilotKeys` backfills an ABSENT key only, so a
   // hand-edited `mode: expres` reaches the tick — and defaulting there would run the whole project on the
   // lifecycle the person was trying to leave, silently and at roughly three times the cost.
-  it('refuses a lifecycle mode that is not one of the two', () => {
+  it('refuses a lifecycle mode that is not one of the three', () => {
     expect(malformed({ mode: 'expres' })).toEqual([
-      'autopilot.mode must be one of standard or express; it is "expres".',
+      'autopilot.mode must be one of standard or express or mini; it is "expres".',
     ]);
     // Absent counts too: a block hand-written without the key is not a project on `standard`, it is a
     // project whose lifecycle nobody has said. `ensureAutopilotKeys` fills it before this is ever asked on
@@ -201,7 +201,7 @@ describe('a block that is not the shape it claims', () => {
     const gone = fresh();
     delete (ap(gone) as { mode?: unknown }).mode;
     expect(coverageProblems(gone)).toEqual([
-      'autopilot.mode must be one of standard or express; it is undefined.',
+      'autopilot.mode must be one of standard or express or mini; it is undefined.',
     ]);
   });
 

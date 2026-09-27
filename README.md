@@ -278,6 +278,13 @@ a network you trust, and never expose it to the public internet.
   disk. Usage that no backend reported is shown as unreported rather than as zero:
   on a subscription plan the figure is API-equivalent, not what you were billed.
   A card also shows how many attempts each skill has used against its cap
+- **Three ways for auto-pilot to work**, picked on the bar. **Mini**, the default for a new project:
+  one run plans the whole project on the board and builds it, moving each card into Waiting approval
+  as it finishes, then a review tests and fixes it, for at most two rounds, with auto-pilot running
+  the tests and the smoke command itself after each one. A Mini run has **no time limit and no spending
+  cap while it runs**: it stops on an error, on Stop, or after the idle limit with no output.
+  **Standard** walks every feature, story and task with a run and a review each; **Express** does the
+  same with coarser cards
 - **Stopping, in three levels**: a soft stop that only stops dispatching, an
   emergency stop that kills every agent in the project and halts it, and a restart
   that brings it back. A halted project starts nothing — not even from the chat —

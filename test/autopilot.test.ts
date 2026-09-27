@@ -40,8 +40,9 @@ describe('the autopilot block', () => {
     expect(boards.engineering.columns.at(-1)).toBe('Done');
   });
 
+  // Mini for a new project, and nothing else different (decision 100).
   it('a new project ships the block, so its terminal columns and its columns agree from the start', () => {
-    expect(defaultConfig('T').autopilot).toEqual(DEFAULT_AUTOPILOT);
+    expect(defaultConfig('T').autopilot).toEqual({ ...DEFAULT_AUTOPILOT, mode: 'mini' });
   });
 
   // Every project's config is mutated in place by the ensure* helpers and written back, so a shared

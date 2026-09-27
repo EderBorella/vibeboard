@@ -121,6 +121,13 @@ async function start(
 ): Promise<Started> {
   const project = await openTestProject({ name: 'T', mode: 'brownfield', runBin: SHIM });
   await makeReady(project.app, project.root, { cards: false });
+  // THE STANDARD LIFECYCLE, which is what these traces are about. A new project runs Mini (decision 100).
+  const { config } = (await project.app.inject({ method: 'GET', url: '/api/state' })).json().snapshot;
+  await project.app.inject({
+    method: 'PATCH',
+    url: '/api/config',
+    payload: { autopilot: { ...config.autopilot, mode: 'standard' } },
+  });
   await putFoundation(project.app, 'CODE-QUALITY.md', gatesDoc(opts.gates ?? tally(GATE_LOG)));
   // A SMOKE COMMAND THAT IS NOT THE GATE, unless a test says otherwise: `complete` refuses while the two are the
   // same command (ruling 66), so this is the ordinary project rather than a detail of the fixture.

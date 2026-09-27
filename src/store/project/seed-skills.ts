@@ -513,6 +513,58 @@ Report what you found, list by id any stories you created, and name everything
 that is carrying a problem.
 `,
   },
+  // MINI'S TWO (decision 100): one run that builds everything, and the review after it. The loop's alone, and
+  // hidden from a card's skills by their slug.
+  {
+    slug: 'build-project',
+    content: `---
+name: Build the project
+description: Plan the whole project on the board and build it, in one run
+---
+Build the project the README describes, end to end, in this one run.
+
+Use the board to plan the work and keep your place. If you lose track, it is where
+you find out where you are.
+
+1. Read the board and the repository. What is already there is work to keep, not
+   to redo.
+2. Write the plan as cards, with \`POST /api/cards\`: the features the README needs
+   on the features board, each feature's user stories on product, each story's
+   tasks on engineering. Name a card's parent in \`links\` — a story's feature, a
+   task's story. Keep each card to a title and one acceptance criterion.
+3. Work through the tasks in order. Move a task to in-progress when you start it
+   and to blocked when it is done: that column is "Waiting approval", where the
+   person approves it. Move a story there when its tasks are, and a feature to
+   in-progress once its stories are.
+4. Run the gates in foundation/CODE-QUALITY.md as you go, and keep them passing.
+
+Carry on until everything the README asks for is built. If you cannot — a missing
+tool, a setup problem — stop, say why in one plain sentence as your report's
+summary, and report that it needs attention.
+`,
+  },
+  {
+    slug: 'review-project',
+    content: `---
+name: Review the project
+description: Review, test and fix the whole project until it works as documented
+---
+Review the whole project against its README and its foundation documents, and fix
+what is wrong.
+
+Read the code. Run the gates in foundation/CODE-QUALITY.md and the smoke command in
+foundation/TESTING.md, and use the product the way the README describes. Fix every
+problem you find — a failing test, missing behaviour, a broken setup — and run
+them again, until everything works as the documentation says.
+
+Change the code, not the cards: they are waiting for the person's approval.
+
+Report success when everything works. If something still does not, report that it
+needs attention and say what and where: auto-pilot gives the review one more
+round. If it cannot be done at all — a missing tool, a setup problem — say why in
+one plain sentence as the report's summary.
+`,
+  },
   {
     slug: 'summarise',
     content: `---

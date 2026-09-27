@@ -21,7 +21,12 @@ export type PhaseName =
   | 'story-implement'
   | 'story-fix'
   | 'story-review'
-  | 'feature-checkup';
+  | 'feature-checkup'
+  | 'mini-build'
+  | 'mini-review';
+
+export const MINI_BUILD = 'build-project';
+export const MINI_REVIEW = 'review-project';
 
 export interface Phase {
   name: PhaseName;
@@ -181,7 +186,14 @@ export const PHASES: readonly Phase[] = [
     creates: 'product',
     bounded: 'skill',
   },
+  // MINI (decision 100): two project runs the loop dispatches in its own sequence (core/lifecycle/mini.ts),
+  // outside the walk above. No board, no columns: the build creates and moves its own cards (decision 102).
+  { name: 'mini-build', skill: MINI_BUILD, bounded: 'none' },
+  { name: 'mini-review', skill: MINI_REVIEW, bounded: 'none' },
 ] as const;
+
+export const MINI_SKILLS: readonly string[] = [MINI_BUILD, MINI_REVIEW];
+export const MINI_PHASES: readonly PhaseName[] = ['mini-build', 'mini-review'];
 
 // Throws rather than failing closed: an unknown name is a programming error, not a state of the board.
 export function phase(name: PhaseName): Phase {

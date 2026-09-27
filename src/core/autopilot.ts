@@ -41,7 +41,9 @@ export type VerifyMode = (typeof VERIFY_MODES)[number];
 // says so above. `express` is read on the dispatch path — server/runs/routes.ts computes it from here and
 // server/runs/prompt/sections.ts renders a section from it — and a project set to it whose prompts did not
 // change would be the same defect a third time.
-export const LIFECYCLE_MODES = ['standard', 'express'] as const;
+// `mini` is a different machine rather than a different prompt (decision 100): two phases, one run that builds
+// everything and a review of at most two rounds, instead of the phase table's walk.
+export const LIFECYCLE_MODES = ['standard', 'express', 'mini'] as const;
 export type LifecycleMode = (typeof LIFECYCLE_MODES)[number];
 
 export function isLifecycleMode(value: unknown): value is LifecycleMode {
@@ -67,6 +69,9 @@ export interface AutopilotConfig {
   // Which of the two lifecycles above. Defaulted rather than optional: `ensureAutopilotKeys` backfills
   // every key this default carries, so an existing project reads `standard` and behaves exactly as it did.
   mode: LifecycleMode;
+  // How long a Mini run may produce nothing before it is stopped (decision 101). Mini runs have no wall-clock
+  // limit, so this is what ends one that has hung.
+  idleMinutes: number;
   // ONE FEATURE THE LOOP CONFINES ITSELF TO (`decision 73`), by id, or absent for the whole board.
   //
   // OPTIONAL AND ABSENT FROM `DEFAULT_AUTOPILOT` ON PURPOSE. `ensureAutopilotKeys` backfills every key the
@@ -95,6 +100,7 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
   mode: 'standard',
+  idleMinutes: 10,
 };
 
 // How many of the loop's own runs may be in flight at once. A CONSTANT rather than a setting, and that is a

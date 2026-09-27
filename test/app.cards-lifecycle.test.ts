@@ -112,11 +112,52 @@ describe('which board a run may create a card on', () => {
     expect(res.statusCode).toBe(code);
   });
 
+  // DECISION 102: a Mini build writes the whole board — every board, with each card hanging off the one above.
+  it('lets a Mini run create on every board and name each card’s parent', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-mini', root, undefined, { skill: 'build-project', moves: 'any' });
+    const make = async (board: string, title: string, links?: string[]) =>
+      (
+        await create(app, bearer(run.token), {
+          board,
+          columnSlug: 'backlog',
+          title,
+          ...(links ? { links } : {}),
+        })
+      ).json();
+    const feature = await make('features', 'Mini feature');
+    const story = await make('product', 'Mini story', [feature.id]);
+    const task = await make('engineering', 'Mini task', [story.id]);
+    expect([feature.id, story.id, task.id].every(Boolean)).toBe(true);
+    const state = (
+      await app.inject({ method: 'GET', url: '/api/state', headers: { authorization: `Bearer ${ADMIN}` } })
+    ).json().snapshot.boards;
+    const find = (board: string, id: string) => state[board].find((c: { id: string }) => c.id === id);
+    expect(find('features', feature.id).links).toContain(story.id);
+    expect(find('product', story.id)).toMatchObject({ group: feature.id });
+    expect(find('product', story.id).links).toContain(task.id);
+  });
+
+  it('gives the same skill run from a card none of that authority', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-mini-card', root, 'E-001', {
+      board: 'engineering',
+      skill: 'build-project',
+    });
+    const res = await create(app, bearer(run.token), {
+      board: 'features',
+      columnSlug: 'backlog',
+      title: 'No',
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
   // DECISION 97: a person's run may move its own card, which is how a check of theirs passes; no other run
   // may move one, and no run may move another card.
   it.each([
-    ['a hand run, its own card', { byHand: true as const }, 'E-001', 200],
-    ['a hand run, another card', { byHand: true as const }, 'E-002', 403],
+    ['a hand run, its own card', { moves: 'own' as const }, 'E-001', 200],
+    ['a hand run, another card', { moves: 'own' as const }, 'E-002', 403],
+    ['a Mini run, another card', { moves: 'any' as const }, 'E-002', 200],
     ["the loop's run, its own card", {}, 'E-001', 403],
   ])('moves a card for %s', async (_who, grant, target, code) => {
     const { app, store, root } = await open();

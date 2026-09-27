@@ -72,6 +72,7 @@ function checkNumbers(ap: AutopilotConfig, out: string[]): void {
   positive('maxIterations', ap.maxIterations, out);
   positive('runTimeoutMs', ap.runTimeoutMs, out);
   positive('attemptCap', ap.attemptCap, out);
+  positive('idleMinutes', ap.idleMinutes, out);
   // budgetUsd alone may be zero: for a subscription-backed or local model the figure is zero or not
   // what you are billed, and then maxIterations is the cap actually bounding the project.
   if (typeof ap.budgetUsd !== 'number' || !Number.isFinite(ap.budgetUsd) || ap.budgetUsd < 0) {

@@ -9,6 +9,12 @@ import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { defaultConfig } from '../src/store/project/config.js';
 import { injectFetch, openTestProject } from './helpers.js';
 
+// The standard lifecycle, which these sequencing tests walk; a new project runs Mini (decision 100).
+const standardConfig = () => ({
+  ...defaultConfig('T'),
+  autopilot: { ...defaultConfig('T').autopilot!, mode: 'standard' as const },
+});
+
 // The loop's HTTP surface, against a REAL app with a REAL minted service credential — the same store the
 // app verifies against, so a token this suite accepts is one the server would.
 //
@@ -234,7 +240,7 @@ describe('the loop’s sequencing', () => {
   // it is the bootstrap's own trigger. A board mid-lifecycle would make every test here depend on which phase
   // the tick picked, which is `test/tick.test.ts`'s subject and not this file's.
   const board = (): BoardView => ({
-    config: defaultConfig('T'),
+    config: standardConfig(),
     boards: { features: [], product: [], engineering: [] },
     problems: [],
   });
@@ -443,7 +449,7 @@ describe('the loop’s sequencing', () => {
   // running a project's gate commands. A test that faked the tick as well would prove the two fakes agreed.
   it('carries a send-back act could not record into the next tick, which routes the story to its fix', async () => {
     const story = (): BoardView => ({
-      config: defaultConfig('T'),
+      config: standardConfig(),
       boards: {
         features: [aCard('F-001', 'features', 'in-progress', ['P-001'])],
         product: [aCard('P-001', 'product', 'in-progress', ['F-001', 'E-001'])],
@@ -483,7 +489,7 @@ describe('the loop’s sequencing', () => {
   // on it, and the one after has forgotten, so a story a person has since reset is written for again.
   it('carries a refused task into the next tick only, which blocks the story on it', async () => {
     const story = (): BoardView => ({
-      config: defaultConfig('T'),
+      config: standardConfig(),
       boards: {
         features: [aCard('F-001', 'features', 'in-progress', ['P-001'])],
         product: [aCard('P-001', 'product', 'todo', ['F-001'])],

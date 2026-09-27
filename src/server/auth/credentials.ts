@@ -47,8 +47,9 @@ export interface Credential {
   // Absent for admin (a person is not a run) and for the service credential, which belongs to no card.
   board?: BoardName;
   skill?: string;
-  // A run a person started (decision 97). It may move its own card, which no other run may.
-  byHand?: true;
+  // Which cards this run may move, which no other run may: a person's run its own (decision 97), a Mini run any
+  // in the project (decision 102).
+  moves?: 'own' | 'any';
   // Which signed-in browser this is, when the caller is a device rather than the admin token. Carried
   // so a revoke can find and close that browser's open socket: a credential that stops working while
   // the socket it opened keeps streaming is a revocation that only looks like one.
@@ -137,7 +138,7 @@ export class CredentialStore {
     // An object rather than two more positionals: five was already the limit of what reads at a call site,
     // and only the dispatcher has these to give. `board` is optional inside it because a project run has a
     // skill and no board — see the comment at the call site in agent-runner.ts.
-    dispatched?: { board?: BoardName; skill: string; byHand?: true },
+    dispatched?: { board?: BoardName; skill: string; moves?: 'own' | 'any' },
   ): Credential {
     const cred: Credential = { token: randomUUID(), scope, run, project, card, ...dispatched };
     this.#byToken.set(cred.token, cred);

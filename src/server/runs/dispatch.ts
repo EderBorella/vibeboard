@@ -1,16 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { isBoxKind } from '../../core/box-kinds.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { foundationRel } from '../../core/layout.js';
+import { MINI_SKILLS } from '../../core/phases.js';
 import { BOARDS, type ProjectConfig } from '../../core/types.js';
 import { boardColumnSlugs } from '../../store/cards/board.js';
 import { readResources } from '../../store/project/control-files.js';
 import { foundationStatus, readGates } from '../../store/project/foundation.js';
 import { readSkills } from '../../store/project/skill-catalogue.js';
+import { readProjectRun } from '../../store/run-store.js';
 import type { Backend } from '../agent-turn.js';
 import type { Scope } from '../auth/credentials.js';
 import { BASE_IMAGE, imageForKind } from '../boxes/containers.js';
@@ -245,11 +248,20 @@ export async function resolveProjectDispatch(
   const { skills } = await readSkills(root, config);
   const skill = skills.find((s) => s.slug === body.skill);
   if (!skill) return { code: 404, error: 'No such skill' };
+  const previous = body.previous ? await readProjectRun(root, body.previous) : null;
+  if (body.previous && !previous)
+    return { code: 409, error: `There is no run ${body.previous} on this project.` };
+  // A Mini run has no wall-clock limit (decision 101): it is ended by an error, the Stop button, or a silence.
+  const idleMs = MINI_SKILLS.includes(skill.slug)
+    ? (config.autopilot?.idleMinutes ?? DEFAULT_AUTOPILOT.idleMinutes) * 60_000
+    : undefined;
   return {
     input: {
       skill,
       linked: [],
       userPrompt: body.prompt,
+      ...(previous ? { previous } : {}),
+      ...(idleMs === undefined ? {} : { idleMs }),
       ...(await dispatchFrame(root, config, body)),
     },
   };

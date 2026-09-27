@@ -39,6 +39,7 @@ const config = (over: Partial<AutopilotConfig> = {}): AutopilotConfig => ({
   runTimeoutMs: 1000,
   attemptCap: 3,
   mode: 'standard',
+  idleMinutes: 10,
   blockedColumn: 'blocked',
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   ...over,

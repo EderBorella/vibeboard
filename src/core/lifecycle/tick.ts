@@ -43,6 +43,7 @@ import { derivePosition, type Position } from '../position.js';
 import { isHandRun, isProjectRun, type RunRecord } from '../runs.js';
 import { criterionCommand } from '../satisfied.js';
 import type { BoardName, Card } from '../types.js';
+import { type MiniChecks, miniAction } from './mini.js';
 import {
   focusFinishedSentence,
   invalidAttemptCap,
@@ -129,6 +130,9 @@ export interface TickInput {
   // whole project stalls over one story. So the story is blocked instead, and the loop carries on (decision 45).
   // REQUIRED, as `unrecordedSendBacks` is, and a memory of one tick: the loop forgets it once it has been read.
   unwrittenTasks: string[];
+  // WHAT THE LOOP MEASURED AFTER A MINI REVIEW (decision 100), reported by `act` the tick before and then
+  // forgotten, like `unwrittenTasks`. Undefined in every other mode, and before a review has run.
+  miniChecks: MiniChecks | undefined;
   // THE BREAK-DOWN CANDIDATES WHOSE ACCEPTANCE CRITERION ALREADY PASSES, by card id (decision 85). The
   // service ran the command — `satisfied.ts` beside the loop — and this is its exit code, reduced to the
   // only thing the machine needs from it. Nothing here spawns anything, exactly as with `commands`.
@@ -1005,6 +1009,7 @@ export function decideTick(given: TickInput): TickAction {
   // `stalled` over the work it was waiting for. Nothing in the derivation reads a run, so there is no
   // eligibility to fall out of — and a tick that may start nothing need not work out what it would have.
   if (inFlight.length >= AUTOPILOT_CONCURRENCY) return { kind: 'wait' };
+  if (ap.mode === 'mini') return miniAction(input);
 
   // THE FOCUS, from the config rather than from a field of its own on the input: it is a person's standing
   // instruction about this project, which is what that block holds, and a second home for it would be a

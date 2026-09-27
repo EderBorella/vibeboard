@@ -247,7 +247,7 @@ describe('the scope table', () => {
     );
     const move = 'POST /api/cards/:board/:id/move';
     expect(rows.has(move)).toBe(true);
-    const hand: Credential = { ...cred('work', 'E-001'), byHand: true };
+    const hand: Credential = { ...cred('work', 'E-001'), moves: 'own' };
     for (const row of rows) {
       const [method, route] = row.split(' ') as [string, string];
       const loops = allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001');

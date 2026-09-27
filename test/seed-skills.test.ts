@@ -600,6 +600,15 @@ describe('the skills the lifecycle does not use', () => {
     expect(offered('engineering')).toEqual(['check-task', 'execute', 'research', 'summarise']);
   });
 
+  // DECISION 100: the Mini review closes what it verified and leaves the rest open, so an open card is what blocks.
+  it('tells the Mini review to close the cards it checked and leave the others where they are', () => {
+    const text = SEED_SKILLS.find((s) => s.slug === 'review-project')?.content ?? '';
+    expect(text).toContain('Move each task\nwhose acceptance criterion you have checked to done');
+    expect(text).toContain('Leave every card you could not confirm where it\nis');
+    expect(text).toContain('name the cards you left open and why');
+    expect(text).not.toContain('not the cards');
+  });
+
   it('tells each check to move only its own card to done, and only when it passes', () => {
     for (const slug of ['check-feature', 'check-story', 'check-task']) {
       const text = SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';

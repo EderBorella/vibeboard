@@ -534,7 +534,7 @@ you find out where you are.
    task's story. Keep each card to a title and one acceptance criterion.
 3. Work through the tasks in order. Move a task to in-progress when you start it
    and to blocked when it is done: that column is "Waiting approval", where the
-   person approves it. Move a story there when its tasks are, and a feature to
+   review checks it. Move a story there when its tasks are, and a feature to
    in-progress once its stories are.
 4. Run the gates in foundation/CODE-QUALITY.md as you go, and keep them passing.
 
@@ -547,22 +547,26 @@ summary, and report that it needs attention.
     slug: 'review-project',
     content: `---
 name: Review the project
-description: Review, test and fix the whole project until it works as documented
+description: Review, test and fix the whole project, and close the cards that are right
 ---
-Review the whole project against its README and its foundation documents, and fix
-what is wrong.
+Review the whole project against its README and its foundation documents, fix what
+is wrong, and close what is right.
 
 Read the code. Run the gates in foundation/CODE-QUALITY.md and the smoke command in
 foundation/TESTING.md, and use the product the way the README describes. Fix every
 problem you find — a failing test, missing behaviour, a broken setup — and run
 them again, until everything works as the documentation says.
 
-Change the code, not the cards: they are waiting for the person's approval.
+Then go through the cards waiting in blocked ("Waiting approval"). Move each task
+whose acceptance criterion you have checked to done, then each story whose tasks are
+all done, then each feature whose stories are: \`POST /api/cards/<board>/<id>/move\`
+with \`{ "toColumnSlug": "done" }\`. Leave every card you could not confirm where it
+is — an open card is how a person sees what is still blocking.
 
 Report success when everything works. If something still does not, report that it
-needs attention and say what and where: auto-pilot gives the review one more
-round. If it cannot be done at all — a missing tool, a setup problem — say why in
-one plain sentence as the report's summary.
+needs attention and name the cards you left open and why: auto-pilot gives the review
+one more round. If it cannot be done at all — a missing tool, a setup problem — say
+why in one plain sentence as the report's summary.
 `,
   },
   {

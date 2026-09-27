@@ -69,7 +69,7 @@ export function miniAction({ runs, state, commands }: MiniInput): TickAction {
         kind: 'stop',
         reason: 'complete',
         detail:
-          'Auto-pilot finished: the project is built and reviewed, and the gates and the smoke command pass when auto-pilot runs them. The cards are waiting for your approval.',
+          'Auto-pilot finished: the project is built and reviewed, and the gates and the smoke command pass when auto-pilot runs them. The review closed the cards it verified; any still open are waiting for you.',
       }
     );
   }

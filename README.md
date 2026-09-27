@@ -280,7 +280,8 @@ a network you trust, and never expose it to the public internet.
   A card also shows how many attempts each skill has used against its cap
 - **Three ways for auto-pilot to work**, picked on the bar. **Mini**, the default for a new project:
   one run plans the whole project on the board and builds it, moving each card into Waiting approval
-  as it finishes, then a review tests and fixes it, for at most two rounds, with auto-pilot running
+  as it finishes, then a review tests and fixes it and closes the cards it verified, for at most two
+  rounds — anything still open afterwards is what blocks — with auto-pilot running
   the tests and the smoke command itself after each one. A Mini run has **no time limit and no spending
   cap while it runs**: it stops on an error, on Stop, or after the idle limit with no output.
   **Standard** walks every feature, story and task with a run and a review each; **Express** does the

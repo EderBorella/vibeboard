@@ -26,7 +26,7 @@ function toFields(body: unknown, slug: string): SkillFields | string {
   const boards = asList(b.boards);
   const unknown = boards.find((x) => !isBoard(x));
   if (unknown !== undefined) return `Unknown board "${unknown}"`;
-  // Absent keeps the slug's default, so a caller that knows nothing of the flags changes neither.
+  // Absent means the slug's default, which a file does not carry.
   const autopilotOnly = b.autopilotOnly ?? autopilotOnlyByDefault(slug);
   const moveOnSuccess = b.moveOnSuccess ?? moveOnSuccessByDefault(slug);
   if (typeof autopilotOnly !== 'boolean' || typeof moveOnSuccess !== 'boolean') {

@@ -74,6 +74,14 @@ describe('SkillEditor', () => {
     });
   });
 
+  it('shows the flags the skill has, not the defaults', () => {
+    render(<SkillEditor {...props} skill={skill({ autopilotOnly: true, moveOnSuccess: false })} />);
+    expect((screen.getByLabelText(/^For auto-pilot only/) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/^Move the card to the next column/) as HTMLInputElement).checked).toBe(
+      false,
+    );
+  });
+
   it('saves both running flags, and stops offering the move while the skill is auto-pilot only', () => {
     const onSave = saver();
     render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);

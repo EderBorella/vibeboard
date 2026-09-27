@@ -214,6 +214,25 @@ describe('a checkup’s evidence', () => {
     ]);
   });
 
+  // DECISION 93: a run a person started is not evidence about the loop's work.
+  it('does not tell the judgement about a run a person started', async () => {
+    const task = { ...CARD('E-001', 'engineering'), columnSlug: 'review' };
+    const story = { ...CARD('P-001', 'product'), columnSlug: 'in-progress', links: ['E-001'] };
+    const r = recorder({ boardCards: [story, task] });
+    r.client.runs = async () => ({
+      ok: true as const,
+      value: {
+        runs: [record({ card: 'E-001', skill: 'execute', status: 'failed', dispatchedBy: 'person' })],
+      },
+    });
+    await performAction(
+      deps(r.client, { verify: verify(smokePass) }),
+      { kind: 'dispatch', phase: 'story-review', skill: 'review-story', card: story, previous: 'W-1' },
+      context,
+    );
+    expect(r.requests[0]?.checkup?.children).toEqual([{ id: 'E-001', column: 'review', blocked: false }]);
+  });
+
   it('marks a blocked child as blocked, so the prompt need not know which slug means it', async () => {
     const r = recorder({ boardCards: board() });
     await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_REVIEW, context);

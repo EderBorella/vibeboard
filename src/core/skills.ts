@@ -30,7 +30,8 @@ export const WIZARD_SKILLS: readonly string[] = ['scan-project', 'suggest-stack'
 
 // Retired seeds an older project still holds: nothing dispatches them and nothing rewrites a skills folder.
 const RETIRED_SKILLS = ['implement', 'review', 'checkup-story'];
-const READING_SKILLS = ['research', 'summarise'];
+// Skills that do not do their card's work: a reading task, and a split, after which the card still needs it.
+const STAYING_SKILLS = ['research', 'summarise', 'split'];
 
 // Defaults by slug rather than keys in every file (decision 94), so a project seeded before the flags existed
 // hides the machine's skills with no file rewritten, and a file only carries a flag a person changed.
@@ -38,9 +39,8 @@ export function autopilotOnlyByDefault(slug: string): boolean {
   return LIFECYCLE_SKILLS.includes(slug) || WIZARD_SKILLS.includes(slug) || RETIRED_SKILLS.includes(slug);
 }
 
-// A reading task changes nothing about where its card stands.
 export function moveOnSuccessByDefault(slug: string): boolean {
-  return !READING_SKILLS.includes(slug);
+  return !STAYING_SKILLS.includes(slug);
 }
 
 // An invalid file is not a failure to report loudly — it is a skill that does not appear in the

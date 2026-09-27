@@ -84,7 +84,7 @@ export function linkedSection(linked: Card[], projectRoot: string, from?: Card):
 // against and the review judges, and an agent sent to go and read them will sometimes not bother. These
 // four neither write code nor judge it — they need the bar, which is the commands, and not the argument
 // for it (decision 89). A phase is matched on skill and board, so a break-down dispatched by hand is one
-// too; a run no phase claims keeps the document.
+// too, and so is `split` (decision 96); any other run no phase claims keeps the document.
 const GATE_LIST_ONLY: ReadonlySet<PhaseName> = new Set([
   'bootstrap',
   'feature-breakdown',

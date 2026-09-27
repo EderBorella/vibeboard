@@ -93,6 +93,24 @@ describe('which board a run may create a card on', () => {
     expect(res.json().error).toContain('engineering/backlog');
   });
 
+  // DECISION 96: a person's `split` creates one level down, as its board's break-down would, and no further.
+  it.each([
+    ['features', 'F-001', 'product', 200],
+    ['features', 'F-001', 'features', 409],
+    ['product', 'P-001', 'engineering', 200],
+    ['product', 'P-001', 'product', 409],
+    ['engineering', 'E-001', 'engineering', 409],
+  ] as const)('lets a split on %s %s create on %s: %i', async (board, card, onto, code) => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', `run-split-${board}-${onto}`, root, card, { board, skill: 'split' });
+    const res = await create(app, bearer(run.token), {
+      board: onto,
+      columnSlug: 'backlog',
+      title: 'A split card',
+    });
+    expect(res.statusCode).toBe(code);
+  });
+
   it('refuses an implement run creating any card', async () => {
     const { app, store, root } = await open();
     const run = store.mintRun('work', 'run-4', root, 'E-001', { board: 'engineering', skill: 'implement' });

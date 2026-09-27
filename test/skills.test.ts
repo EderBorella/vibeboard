@@ -134,7 +134,7 @@ describe('the two running flags', () => {
     ['scan-project', { autopilotOnly: true, moveOnSuccess: true }],
     ['checkup-story', { autopilotOnly: true, moveOnSuccess: true }],
     ['execute', { autopilotOnly: false, moveOnSuccess: true }],
-    ['split', { autopilotOnly: false, moveOnSuccess: true }],
+    ['split', { autopilotOnly: false, moveOnSuccess: false }],
     ['research', { autopilotOnly: false, moveOnSuccess: false }],
   ])('gives %s its slug default when the file says nothing', (slug, expected) => {
     expect(flags(slug)).toEqual(expected);

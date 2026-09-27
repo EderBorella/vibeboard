@@ -5,7 +5,7 @@ import { blockedUnder } from '../../core/derived-status.js';
 import { childrenOf } from '../../core/hierarchy.js';
 import { isLastOpenFeature } from '../../core/last-feature.js';
 import type { PhaseName } from '../../core/phases.js';
-import type { RunRecord } from '../../core/runs.js';
+import { isHandRun, type RunRecord } from '../../core/runs.js';
 import { BOARDS, type Card } from '../../core/types.js';
 import type { Verification } from '../../core/verify.js';
 import { verifySmoke } from '../../exec/verify.js';
@@ -153,7 +153,11 @@ export async function refuseWhileGateDocumentUnread(deps: ActDeps): Promise<ActR
 // How this card's own work last ended, or nothing when nothing has run on it. `latestOwnRun` is in bounds.ts
 // with every other "which run answers this" question, and it excludes the REVIEW runs — the whole of what was
 // wrong here — and orders by when a run started rather than by an id whose tie-break is random.
+// A person's run is theirs (decision 93), so a hand run that failed is not evidence against the loop's work.
 function lastOutcome(runs: RunRecord[], card: string): { outcome?: string } {
-  const last = latestOwnRun(runs, card);
+  const last = latestOwnRun(
+    runs.filter((r) => !isHandRun(r)),
+    card,
+  );
   return last === undefined ? {} : { outcome: last.status };
 }

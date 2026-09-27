@@ -60,7 +60,8 @@ async function place(
 // now chosen from the position rather than from a column and cannot be re-entered by a card appearing in one.
 //
 // It fires for a hand dispatch too, and deliberately: a skill no phase names creates nothing, because there is
-// no `creates` to infer for it and inventing one would be guessing on the caller's behalf.
+// no `creates` to infer for it and inventing one would be guessing on the caller's behalf. The one exception is
+// the hand break-down, which borrows its board's break-down row (`actingPhase`, decision 96).
 function wrongBoardForRun(
   config: ProjectConfig,
   cred: { board?: BoardName; skill?: string },
@@ -68,7 +69,7 @@ function wrongBoardForRun(
 ): string | undefined {
   if (!cred.skill) return undefined;
   const creates = actingPhase(cred.skill, cred.board)?.creates;
-  // A phase with no `creates`, and a skill no phase names, may create nothing. The work it found is real; it
+  // A phase with no `creates`, and any other skill no phase names, may create nothing. The work it found is real; it
   // is just not a card this run gets to make, so the refusal names the surface that exists for it.
   if (creates === undefined) {
     return `A ${cred.skill} run may not create cards: that phase's product is its own work, and a card it made would be work no phase picks up. Anything real you found that does not belong to this card goes to POST /api/suggestions instead.`;

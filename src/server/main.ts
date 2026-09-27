@@ -4,7 +4,7 @@ import { adminToken, CredentialStore } from './auth/credentials.js';
 import { DeviceStore } from './auth/devices.js';
 import { installBreakGlass, signinBanner } from './auth/signin-terminal.js';
 import { ProjectSession } from './boards/session.js';
-import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
+import { listenOnApiSocket, removeApiSocketFile, serverPort } from './boxes/api-socket.js';
 import { backendCheck } from './boxes/backend-liveness.js';
 import { BoxManager } from './boxes/box-manager.js';
 import { BoxService } from './boxes/box-service.js';
@@ -27,7 +27,7 @@ try {
   /* no .env — defaults and exported vars apply */
 }
 
-const port = Number(process.env.VIBEBOARD_PORT ?? 4610);
+const port = serverPort();
 // Loopback by default. The copilot auto-approves tool calls — it can read and write files anywhere
 // in the open project — so exposing that to a network must be a deliberate act: set
 // VIBEBOARD_HOST=0.0.0.0 to reach it from other devices. The API is authenticated either way.

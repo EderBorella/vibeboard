@@ -4,6 +4,7 @@ import { classifyCopilotError } from '../../core/copilot-errors.js';
 import { readWizardState } from '../../store/project/wizard.js';
 import { redactCredential } from '../../store/redaction.js';
 import type { Credential } from '../auth/credentials.js';
+import { apiBase } from '../boxes/api-socket.js';
 import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
 import { agentRefusal } from '../boxes/sandbox.js';
 import { errorText } from '../errors.js';
@@ -109,8 +110,7 @@ export function createCopilotTurns(ctx: AppCtx): {
   }
 
   function withCredential(token: string, text: string): string {
-    const apiBase = `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`;
-    return `${assistCredentialSection(apiBase, token)}\n\n---\n\n${text}`;
+    return `${assistCredentialSection(apiBase(), token)}\n\n---\n\n${text}`;
   }
 
   // WHAT THE MODEL GETS, WHICH IS NOT WHAT THE TRANSCRIPT GETS — see the two paragraphs at the call
@@ -250,8 +250,7 @@ export function createCopilotTurns(ctx: AppCtx): {
       credential = ctx.copilotAuthority.authorise(chat, root, 'repair');
       const granted = credential;
       const frame = fixBoardFrame(forClient(await ctx.autopilot.current()));
-      const apiBase = `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`;
-      const modelText = `${repairCredentialSection(apiBase, granted.token)}\n\n---\n\n${frame}\n\n---\n\n${FIX_BOARD_ASK}`;
+      const modelText = `${repairCredentialSection(apiBase(), granted.token)}\n\n---\n\n${frame}\n\n---\n\n${FIX_BOARD_ASK}`;
       await chats.recordUser(FIX_BOARD_ASK);
       // Every tab, so each lands in the new conversation with the ask already in it — the same broadcast a
       // new chat sends, and the one the panel hydrates from.

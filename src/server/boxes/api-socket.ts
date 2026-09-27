@@ -22,6 +22,17 @@ import type { FastifyInstance } from 'fastify';
 // measured, a server restart that recreates the socket leaves every live box holding a mount of the
 // deleted one, failing `ECONNREFUSED` forever — which looks exactly like the server being down and
 // would be diagnosed as anything but a mount. Mounting the directory makes recreation visible inside.
+// The port this server listens on, and so the one the relay in every box must listen on too: agents are
+// told `apiBase()`, and inside a box only the relay makes that address answer. One reader, because the
+// relay's port was once left to its own default of 4610 while agents were told the configured one.
+export function serverPort(): number {
+  return Number(process.env.VIBEBOARD_PORT ?? 4610);
+}
+
+export function apiBase(): string {
+  return `http://127.0.0.1:${serverPort()}`;
+}
+
 export function apiSocketDir(): string {
   return process.env.VIBEBOARD_API_SOCKET_DIR ?? join(homedir(), '.vibeboard', 'run');
 }

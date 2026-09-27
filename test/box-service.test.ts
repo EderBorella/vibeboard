@@ -264,6 +264,27 @@ describe('a box is the same box whoever asks for it', () => {
     expect(created[0].slice(-2)).toEqual(['sleep', 'infinity']);
     expect(created[0]).not.toContain('-p');
   });
+
+  // The relay inside the box listens on VIBEBOARD_PORT and fell back to 4610 when the box was not told,
+  // so a server on any other port had agents that could not reach it. Two ports, so a hard-coded 4610
+  // cannot pass.
+  it.each(['4610', '4620'])('tells the box the port the server is on (%s), for its relay', async (port) => {
+    const saved = process.env.VIBEBOARD_PORT;
+    process.env.VIBEBOARD_PORT = port;
+    try {
+      const root = await tempDir();
+      mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+      const { boxes, created } = daemon();
+
+      await boxes.ensure(root, 'claude-code');
+
+      const env = created[0].flatMap((arg, i) => (created[0][i - 1] === '-e' ? [arg] : []));
+      expect(env).toContain(`VIBEBOARD_PORT=${port}`);
+    } finally {
+      if (saved === undefined) delete process.env.VIBEBOARD_PORT;
+      else process.env.VIBEBOARD_PORT = saved;
+    }
+  });
 });
 
 // WHICH IMAGE, AND WHOSE PACKAGES — read from the project's config HERE, by one reader, and never

@@ -19,6 +19,7 @@ import { registerConfigRoutes } from './boards/config-routes.js';
 import { registerProjectRoutes } from './boards/project-routes.js';
 import type { ProjectSession } from './boards/session.js';
 import { registerWizardRoutes } from './boards/wizard-routes.js';
+import { apiBase } from './boxes/api-socket.js';
 import { boxNetworkBytes } from './boxes/box-activity.js';
 import { registerBoxRoutes } from './boxes/box-routes.js';
 import type { BoxService } from './boxes/box-service.js';
@@ -164,7 +165,7 @@ export function buildApp(
     credentials,
     // Read at dispatch rather than captured, so a port set after buildApp still lands. Taken from
     // the same variable main.ts listens on — the app is not told the port it was bound to.
-    apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
+    apiBase,
     bin: opts.runBin,
     sandbox: opts.sandbox,
     boxes: opts.boxes,
@@ -239,9 +240,9 @@ export function buildApp(
     root: () => session.root,
     now: () => new Date(),
     credentials,
-    // The same expression the runner uses, for the same reason: read at start rather than captured, so a
+    // The same function the runner uses, for the same reason: read at start rather than captured, so a
     // port set after buildApp still lands.
-    apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
+    apiBase,
     ...(opts.serviceCommand ? { command: opts.serviceCommand } : {}),
     // Read at every start, so flipping the switch in Settings takes effect on the next Start rather than at
     // the next restart of the whole app.

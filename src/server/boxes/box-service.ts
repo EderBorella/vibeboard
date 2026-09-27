@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { BOX_KINDS, type BoxKind, isBoxKind } from '../../core/box-kinds.js';
 import { readConfig } from '../../store/project/config.js';
-import { apiSocketDir } from './api-socket.js';
+import { apiSocketDir, serverPort } from './api-socket.js';
 import { BoxManager, boxPathsFor, type ProbeResult } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
 import {
@@ -237,7 +237,9 @@ export class BoxService {
       projectRoot,
       backend,
       paths: boxPathsForBackend(projectRoot, backend),
-      env: boxEnvFor(backend),
+      // The port rides in the box's environment for its relay, which starts with the container and
+      // listens where agents are told the API is. It is in the spec, so a port change replaces the box.
+      env: { ...boxEnvFor(backend), VIBEBOARD_PORT: String(serverPort()) },
       image: imageForKind(box.kind, this.#image),
       packages: box.packages,
       ...(shape.publishPort ? { publishPort: shape.publishPort } : {}),

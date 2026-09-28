@@ -6,7 +6,7 @@ spend time on it. Security bugs go through [`SECURITY.md`](SECURITY.md) instead.
 
 ## Licensing your contribution
 
-VibeBoard is licensed under [PolyForm Noncommercial 1.0.0](LICENSE). By submitting a contribution,
+VibeBoard is licensed under [PolyForm Shield 1.0.0](LICENSE). By submitting a contribution,
 you grant Eder Borella a perpetual, worldwide, royalty-free, irrevocable licence to use, copy,
 modify, distribute, sublicense and relicense it, commercially or not, and you confirm that it is
 yours to grant. You keep the copyright in your contribution.

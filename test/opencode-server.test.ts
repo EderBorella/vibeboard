@@ -55,7 +55,11 @@ async function boxedStart(): Promise<{ calls: string[][]; port: string }> {
     return { code: 0, stdout: '', stderr: '' };
   };
   attachBoxes(new BoxService({ manager: new BoxManager({ docker, user: '1000:1000' }) }));
-  attachProjectRoot(() => '/data/projects/demo');
+  // A real directory under the run's own temp root: ensuring the box creates folders inside the project,
+  // so a fixed host path failed with EACCES on any machine where it was not writable, and wrote into it
+  // on any machine where it was.
+  const root = await mkdtemp(join(testTmp(), 'vibeboard-ocbox-'));
+  attachProjectRoot(() => root);
   const url = await opencodeBaseUrl();
   return { calls, port: url };
 }
